@@ -1,0 +1,86 @@
+# Render Blueprint — deploys the Gravvia BACKEND only.
+# The dashboard (@gravvia/dashboard) is deployed separately later.
+#
+# This is a native Node build (not Docker). The build runs from the repo root,
+# so we use npm workspaces to build/start only @gravvia/backend.
+#
+# IMPORTANT:
+#  - `--include=dev` is required: Render sets NODE_ENV=production, which makes
+#    `npm install` skip devDependencies — including the @types/* needed by tsc.
+#  - Node 22+ is required: @supabase/supabase-js needs native WebSocket, absent
+#    in Node 20. NODE_VERSION pins it (the repo-root package.json has no engines).
+#  - All credentials use `sync: false` so Render prompts for them in the
+#    dashboard and they are NEVER stored in this file.
+
+services:
+  - type: web
+    name: gravvia-backend
+    runtime: node
+    plan: starter
+    # Build from the repo root using the workspace.
+    buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/backend
+    # `start` script = `node dist/server.js`, run in the backend workspace dir.
+    startCommand: npm run start --workspace=@gravvia/backend
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      # JWT_EXPIRES_IN is non-secret config.
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # ---- Secrets (set in the Render dashboard; never committed) ----
+      - key: JWT_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      # Upstash Redis connection string (redis:// or rediss://).
+      - key: REDIS_URL
+        sync: false
+      - key: RETELL_API_KEY
+        sync: false
+      - key: RETELL_WEBHOOK_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      # ---- Optional: email notifications (nodemailer). Set if used. ----
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OPTIONAL: background workers (BullMQ). The API above does NOT process queued
+# jobs (CRM sync, notifications, call processing) — that's this worker's job.
+# Enable it when you want async processing in production. It shares the same
+# build; only the start command differs. Uncomment and set the same env vars
+# (a Render env group is the cleanest way to share them across both services).
+#
+#   - type: worker
+#     name: gravvia-workers
+#     runtime: node
+#     plan: starter
+#     buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/backend
+#     startCommand: npm run start:workers --workspace=@gravvia/backend
+#     autoDeploy: true
+#     envVars:
+#       - key: NODE_ENV
+#         value: production
+#       - key: NODE_VERSION
+#         value: "22"
+#       # ...same secrets as the web service (JWT_SECRET, SUPABASE_*, DATABASE_URL,
+#       #    REDIS_URL, RETELL_*, ENCRYPTION_KEY)...
