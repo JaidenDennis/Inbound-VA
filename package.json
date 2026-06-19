@@ -1,0 +1,19 @@
+{
+  "name": "gravvia-engage",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "dashboard"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:dashboard": "npm run dev --workspace=dashboard",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspace=backend",
+    "lint": "npm run lint --workspaces"
+  },
+  "overrides": {
+    "ioredis": "5.10.1"
+  }
+}
