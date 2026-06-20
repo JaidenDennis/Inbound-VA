@@ -1,4 +1,4 @@
-# Render Blueprint — deploys the Gravvia BACKEND only.
+# Render Blueprint — deploys the Gravvia BACKEND: API (web) + workers (worker).
 # The dashboard (@gravvia/dashboard) is deployed separately later.
 #
 # This is a native Node build (not Docker). The build runs from the repo root,
@@ -9,30 +9,60 @@
 #    `npm install` skip devDependencies — including the @types/* needed by tsc.
 #  - Node 22+ is required: @supabase/supabase-js needs native WebSocket, absent
 #    in Node 20. NODE_VERSION pins it (the repo-root package.json has no engines).
-#  - All credentials use `sync: false` so Render prompts for them in the
-#    dashboard and they are NEVER stored in this file.
+#  - Secrets live in a shared env group (`gravvia-secrets`) so the web service
+#    and the worker share ONE copy. Set the values once in the Render dashboard.
 
 services:
+  # ─── API (handles webhooks, custom functions, dashboard API) ────────────────
   - type: web
     name: gravvia-backend
     runtime: node
     plan: starter
-    # Build from the repo root using the workspace.
     buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/backend
-    # `start` script = `node dist/server.js`, run in the backend workspace dir.
     startCommand: npm run start --workspace=@gravvia/backend
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      - fromGroup: gravvia-secrets
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
         value: "22"
-      # JWT_EXPIRES_IN is non-secret config.
       - key: JWT_EXPIRES_IN
         value: 7d
-      # ---- Secrets (set in the Render dashboard; never committed) ----
+
+  # ─── Workers (BullMQ: crm-sync, notifications, call/transcript, analytics,
+  #     booking). Without this, queued jobs (post-call automations, CRM sync,
+  #     confirmations) never run. Same build; only the start command differs. ──
+  - type: worker
+    name: gravvia-workers
+    runtime: node
+    plan: starter
+    buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/backend
+    startCommand: npm run start:workers --workspace=@gravvia/backend
+    autoDeploy: true
+    envVars:
+      - fromGroup: gravvia-secrets
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: JWT_EXPIRES_IN
+        value: 7d
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared secrets — set these ONCE in the Render dashboard (Env Groups →
+# gravvia-secrets). Both services above reference this group via `fromGroup`.
+# `sync: false` means Render prompts for the value and never stores it in git.
+envVarGroups:
+  - name: gravvia-secrets
+    envVars:
       - key: JWT_SECRET
+        sync: false
+      # Public base URL Retell calls back into (events + custom functions).
+      # MUST be the deployed API URL, e.g. https://inbound-va.onrender.com —
+      # if unset/wrong, provisioning bakes placeholder URLs and calls 404.
+      - key: WEBHOOK_BASE_URL
         sync: false
       - key: SUPABASE_URL
         sync: false
@@ -62,25 +92,3 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
-
-# ─────────────────────────────────────────────────────────────────────────────
-# OPTIONAL: background workers (BullMQ). The API above does NOT process queued
-# jobs (CRM sync, notifications, call processing) — that's this worker's job.
-# Enable it when you want async processing in production. It shares the same
-# build; only the start command differs. Uncomment and set the same env vars
-# (a Render env group is the cleanest way to share them across both services).
-#
-#   - type: worker
-#     name: gravvia-workers
-#     runtime: node
-#     plan: starter
-#     buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/backend
-#     startCommand: npm run start:workers --workspace=@gravvia/backend
-#     autoDeploy: true
-#     envVars:
-#       - key: NODE_ENV
-#         value: production
-#       - key: NODE_VERSION
-#         value: "22"
-#       # ...same secrets as the web service (JWT_SECRET, SUPABASE_*, DATABASE_URL,
-#       #    REDIS_URL, RETELL_*, ENCRYPTION_KEY)...
