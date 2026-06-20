@@ -17,7 +17,15 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
   RETELL_API_KEY: z.string().min(1),
-  RETELL_WEBHOOK_SECRET: z.string().min(1),
+  // Retell signs webhooks AND custom-function calls with the API KEY via the
+  // X-Retell-Signature header (v={ts},d={digest}). There is no separate webhook
+  // secret in Retell, so this is optional and kept only for backward-compat.
+  RETELL_WEBHOOK_SECRET: z.string().optional(),
+  // Default Retell voice id, overridable per client via client_settings.
+  RETELL_DEFAULT_VOICE_ID: z.string().default('11labs-Adrian'),
+  // Base URL Retell calls back into (events + custom functions). Falls back to
+  // API_BASE_URL when unset. e.g. https://api.gravvia.com
+  WEBHOOK_BASE_URL: z.string().url().optional(),
 
   ENCRYPTION_KEY: z.string().min(32),
 

@@ -25,13 +25,34 @@ export interface Client {
   phone_numbers: string[];
   status: ClientStatus;
   retell_agent_id: string | null;
+  retell_llm_id: string | null;
+  retell_voice_id: string | null;
+  retell_agent_version: number | null;
+  retell_last_provisioned_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AgentConfig {
+  /** A recurring membership/loyalty program, if the client runs one. */
+  membership_program?: { name: string; description?: string };
+  /** Whether the client sells multi-treatment packages. */
+  offers_packages?: boolean;
+  /** Whether the client offers a PRP enhancement add-on. */
+  offers_prp?: boolean;
+  /** Whether consultations are free (affects how they're offered). */
+  free_consultation?: boolean;
+  [key: string]: unknown;
 }
 
 export interface ClientSettings {
   id: string;
   client_id: string;
+  /** Public-facing business + agent names rendered into the prompt (no {{vars}}). */
+  business_name: string | null;
+  agent_name: string | null;
+  /** Vertical offerings config that drives upsell decisions (reusable per client). */
+  agent_config: AgentConfig;
   agent_prompt: string;
   agent_personality: string;
   agent_tone: string;

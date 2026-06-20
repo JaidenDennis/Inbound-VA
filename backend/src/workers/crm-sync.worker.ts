@@ -109,6 +109,16 @@ async function processCrmSync(job: Job<CrmSyncJobData>): Promise<void> {
       );
       break;
     }
+    case 'note': {
+      const crmContactId = await resolveCrmContactId(adapter, clientId, payload.contactId as string);
+      result = await adapter.createNote({
+        contactId: crmContactId,
+        body: payload.body as string,
+        // createdAt is serialized to a string across the queue boundary.
+        createdAt: new Date((payload.createdAt as string) ?? Date.now()),
+      });
+      break;
+    }
     case 'summary': {
       const crmContactId = await resolveCrmContactId(adapter, clientId, payload.contactId as string);
       result = await adapter.pushCallSummary(

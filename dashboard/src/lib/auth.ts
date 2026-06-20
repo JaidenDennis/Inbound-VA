@@ -6,7 +6,8 @@ import { jwtVerify } from 'jose';
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? 'secret');
 
 export async function getServerSession() {
-  const cookieStore = cookies();
+  // Next 15+: cookies() is async and must be awaited.
+  const cookieStore = await cookies();
   const token = cookieStore.get('gravvia_token')?.value;
   if (!token) return null;
   try {

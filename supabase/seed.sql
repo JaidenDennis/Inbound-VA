@@ -2,10 +2,10 @@
 -- GRAVVIA ENGAGE – Seed Data for Development
 -- ============================================================
 
--- Default super admin user (password: Admin1234!)
+-- Default super admin user (password: Beastmode21!)
 -- Hash generated with bcrypt rounds=10
 INSERT INTO users (email, name, password_hash, role, is_active) VALUES
-  ('admin@gravvia.com', 'Gravvia Admin', '$2a$10$examplehashherereplacewithreal', 'super_admin', true)
+  ('admin@gravvia.com', 'Gravvia Admin', '$2a$12$AHLhLNvyWB7xaNuoSrdJM.MB1TRwJ0IMODz7nqreQt0TaTpRhTWPa', 'super_admin', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- Sample Clients

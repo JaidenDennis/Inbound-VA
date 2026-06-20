@@ -4,7 +4,11 @@ import { startCallProcessingWorker } from './call-processing.worker.js';
 import { startTranscriptProcessingWorker } from './transcript-processing.worker.js';
 import { startAnalyticsWorker } from './analytics.worker.js';
 import { startBookingWorker } from './booking.worker.js';
+import { registerAutomationSubscribers } from '../automation/index.js';
 import { logger } from '../utils/index.js';
+
+// Booking can be created inside the worker process; ensure follow-ups fire there too.
+registerAutomationSubscribers();
 
 const workers = [
   startCrmSyncWorker(),
