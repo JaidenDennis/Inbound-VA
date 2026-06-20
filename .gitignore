@@ -8,4 +8,8 @@ dist/
 coverage/
 .DS_Store
 Thumbs.db
-supabase/
+# Supabase CLI local/temp artifacts only — keep the SQL source (migrations,
+# data, seed, setup) tracked so deploys are reproducible.
+supabase/.branches/
+supabase/.temp/
+supabase/.env
