@@ -29,17 +29,23 @@ export async function createOrUpdateResponseEngine(
   spec: ResponseEngineSpec,
   existingLlmId?: string | null
 ): Promise<string> {
-  const body = {
-    model: (spec.model ?? 'gpt-4.1') as 'gpt-4.1',
+  // Prompt + greeting + tools are what provisioning refreshes on every run.
+  const common = {
     general_prompt: spec.general_prompt,
     begin_message: spec.begin_message,
     general_tools: toCustomTools(spec.general_tools),
   };
   if (existingLlmId) {
-    const res = await retell.llm.update(existingLlmId, body);
+    // On UPDATE, deliberately omit `model`. The LLM may have been switched to a
+    // speech-to-speech model (`s2s_model`) in the Retell dashboard; Retell then
+    // rejects any body that also sets `model` ("Cannot set both model and
+    // s2s_model"). Omitting it preserves whichever model is configured and just
+    // refreshes the prompt/tools/greeting.
+    const res = await retell.llm.update(existingLlmId, common);
     return res.llm_id;
   }
-  const res = await retell.llm.create(body);
+  // On CREATE there's no model yet, so set the template's text model.
+  const res = await retell.llm.create({ model: (spec.model ?? 'gpt-4.1') as 'gpt-4.1', ...common });
   return res.llm_id;
 }
 
