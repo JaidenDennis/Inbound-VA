@@ -1,83 +1,62 @@
 # Gravvia Engage — Remaining Deployment Steps (Render)
 
-This lists **what's left to do** to finish going live. Foundational pieces are
-already done (see "Already in place" below) — don't redo them.
+What's left to finish going live. Foundational work is done — don't redo it.
 
-> **Already in place (no action):** Supabase project + migrations `001–007` +
-> `data/006`; admin user (`admin@gravvia.com`); backend API + workers running at
-> `inbound-va.onrender.com` (native build); Bare Beauty agent provisioned;
-> security hardening (scrubbed secrets, AES-256-GCM, rate limits, log redaction,
-> configurable CORS); audit retention, Sentry wiring, and failed-job alerting
-> (code — needs the env vars below + a deploy to activate).
+> **Already live / done (no action):** Supabase + migrations `001–007` + `data/006`;
+> admin user; **backend API live** (`inbound-va.onrender.com`, native build) with
+> **rotated** Supabase creds and the **latest code deployed**; **dashboard live**;
+> CORS allow-list confirmed; security hardening (AES-256-GCM, rate limits, log
+> redaction); audit-retention / Sentry / failed-job-alerting code shipped.
 
 ---
 
-## 1. Rotate the exposed Supabase credentials (do this first)
-The `service_role` key, `anon` key, and DB password were committed earlier, so
-they must be rotated even though `.env.example` is now scrubbed.
-1. Supabase → Settings → API → roll **service_role** and **anon** keys.
-2. Supabase → Settings → Database → reset the **password**.
-3. Update `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `DATABASE_URL` in the
-   Render env group.
+## 1. Change the admin password (do now)
+The seeded login `admin@gravvia.com` / `Beastmode21!` is in the committed seed
+file — treat it as public. Log in, then change it via **Dashboard → Users** (or
+`PATCH /users/:id` with a new `password`).
 
-## 2. Push the latest backend code
-The new backend (configurable CORS, daily retention purge, Sentry, failed-job
-alerting) only takes effect once deployed. Push `main`; Render auto-deploys the
-backend + workers.
+## 2. Deploy the Workers — needs a Render paid plan (currently NOT deployed)
+Render Background Workers require a paid instance, so this is blocked until you
+upgrade. **Until workers run, these don't happen** (jobs just queue in Redis):
+- email notifications (handoff / callback / staff messages),
+- post-call automations (appointment confirmations + 24h reminders, lead recovery,
+  missed-call follow-up),
+- CRM sync, transcript / call / analytics processing,
+- the daily retention purge and failed-job alerts.
 
-## 3. Add the new env vars to the env group (`gravvia-production`)
-On top of the existing keys, set:
+**The core still works without workers:** inbound calls, the agent talking,
+booking, lead capture, lookups, and the dashboard — those run synchronously in
+the API. You're only missing the async follow-ups above, which resume once
+workers are deployed.
 
-| Var | Value | Notes |
-|---|---|---|
-| `CORS_ORIGINS` | `https://gravvia-dashboard.onrender.com` | **Required** or the dashboard's API calls are blocked. Comma-separate multiple origins. |
-| `SENTRY_DSN` | your Sentry DSN | Recommended. Without it, error reporting is a no-op. |
-| `ALERT_EMAIL` | ops inbox | Recommended. Receives "manual review" job-failure alerts (needs SMTP configured). |
-| `AUDIT_RETENTION_DAYS` | `90` | Optional; default 90. Older `audit_logs`/`events` are purged daily at 03:00. |
+**Option A — separate worker service (when on a paid plan):**
+- New → **Background Worker** → same repo · Root Directory *(blank)* · Docker ·
+  Dockerfile `backend/Dockerfile.workers` · Build Context `.` · attach the
+  backend env group. Verify the log shows `Started 7 workers`.
 
-## 4. Verify the Workers service
-Workers are defined in `render.yaml` and likely already running. Confirm in
-Render that **`gravvia-workers`** is live (it runs CRM sync, notifications,
-call/transcript processing, booking, and the new retention job). If you
-deliberately want a separate Docker worker instead, use:
-- New → **Background Worker** → same repo
-- **Root Directory:** *(blank / repo root)* · **Dockerfile Path:** `backend/Dockerfile.workers` · **Build Context:** `.`
-- Attach the `gravvia-production` env group.
+**Option B — co-locate workers in the API (no extra cost if the API is already a
+paid Web Service):** run the workers inside the existing API process via a flag,
+so you don't pay for a second service. Trade-off: less isolation than the
+architecture's default, fine at launch scale. *Ask me and I'll wire it.*
 
-> ⚠️ Do **not** set Root Directory to `backend` with Docker — the Dockerfiles
-> build from the **repo root** (they need the root `package-lock.json`). Setting
-> it to `backend` makes the build context `backend/` and the build fails.
+## 3. Enable Supabase Point-in-Time Recovery (after you upgrade the Supabase plan)
+Not available on the current plan — enable it once upgraded.
 
-## 5. Deploy the Dashboard (the main missing service)
-- New → **Web Service** → same repo
-- **Name:** `gravvia-dashboard`
-- **Root Directory:** *(blank / repo root)* · **Dockerfile Path:** `dashboard/Dockerfile` · **Build Context:** `.`
-- **Environment vars on this service:**
-  - `NEXT_PUBLIC_API_URL=https://inbound-va.onrender.com` — **build-time**; baked
-    into the bundle (the Dockerfile declares `ARG NEXT_PUBLIC_API_URL`). Changing
-    it later requires a rebuild.
-  - `JWT_SECRET=<same value as the backend>` — runtime; the dashboard middleware
-    verifies sessions with it. Missing → every `/dashboard` route bounces to login.
+## 4. Monitoring (when ready)
+- Uptime monitor on `https://inbound-va.onrender.com/health`.
+- Redis memory alerts.
+- After workers are up: confirm a failure-alert email arrives and that the daily
+  retention purge logged `Retention purge complete`.
 
-## 6. Post-deploy verification
-- `GET https://inbound-va.onrender.com/health` → `200`.
-- Open the dashboard URL, log in as `admin@gravvia.com`, confirm pages load
-  (proves CORS + JWT_SECRET are correct).
-- Workers log line `Scheduled daily retention purge (03:00)` on boot.
-- (Optional) force a job failure and confirm a `failed_jobs` row + alert email.
+## 5. Pre-launch smoke tests
+- Log in to the dashboard; every page loads.
+- `GET /admin/plugins` returns the CRM + calendar adapters.
+- Create a test appointment via `POST /booking/create`.
+- (After workers) retry a failed job from the dashboard.
 
-## 7. Optional — move the backend onto Docker (`gravvia-api`)
-Only if you want to retire the native `inbound-va` service:
-1. New → Web Service, **Dockerfile Path:** `backend/Dockerfile`, Build Context `.`,
-   Health Check `/health`, env group attached, `PORT=3001`.
-2. Set `API_BASE_URL` and `WEBHOOK_BASE_URL` to the new `gravvia-api` URL.
-3. **Re-provision the agent** so Retell calls the new URL (otherwise calls keep
-   hitting `inbound-va`).
-4. Point `NEXT_PUBLIC_API_URL` (dashboard) at the new URL and rebuild.
-5. Retire `inbound-va`.
+---
 
-## 8. Still deferred (not blocking launch)
-- Provision the other clients + populate `clients.phone_numbers`.
-- Enable Supabase Point-in-Time Recovery (verify your plan supports it).
-- Uptime monitor on `/health`; Redis memory alerts.
-- **CRM integrations** — intentionally deferred.
+## Decisions / deferred
+- **Backend on Docker?** No — staying on the working native build (a migration
+  would force an agent re-provision for no functional gain).
+- **CRM integrations** — intentionally deferred (per-client creds + field maps).
