@@ -1,123 +1,83 @@
-# Gravvia Engage – Deployment Guide (Render)
+# Gravvia Engage — Remaining Deployment Steps (Render)
 
-## Prerequisites
-- GitHub repo with this codebase
-- Supabase project (free tier works for launch)
-- Upstash Redis or Render Redis
-- Retell AI account with at least one agent
+This lists **what's left to do** to finish going live. Foundational pieces are
+already done (see "Already in place" below) — don't redo them.
 
----
-
-## Step 1: Supabase Setup
-
-1. Create a new Supabase project at https://supabase.com
-2. Open SQL Editor → run migrations in order:
-   ```
-   supabase/migrations/001_initial_schema.sql
-   supabase/migrations/002_rls_policies.sql
-   supabase/migrations/003_seed_roles.sql
-   supabase/seed.sql  ← update the admin password hash first!
-   ```
-3. Copy the Project URL and Service Role Key
-
-**Generate a real bcrypt hash for the seed admin password:**
-```js
-import bcrypt from 'bcryptjs';
-const hash = await bcrypt.hash('YourSecurePassword!', 10);
-console.log(hash);
-```
+> **Already in place (no action):** Supabase project + migrations `001–007` +
+> `data/006`; admin user (`admin@gravvia.com`); backend API + workers running at
+> `inbound-va.onrender.com` (native build); Bare Beauty agent provisioned;
+> security hardening (scrubbed secrets, AES-256-GCM, rate limits, log redaction,
+> configurable CORS); audit retention, Sentry wiring, and failed-job alerting
+> (code — needs the env vars below + a deploy to activate).
 
 ---
 
-## Step 2: Redis Setup
+## 1. Rotate the exposed Supabase credentials (do this first)
+The `service_role` key, `anon` key, and DB password were committed earlier, so
+they must be rotated even though `.env.example` is now scrubbed.
+1. Supabase → Settings → API → roll **service_role** and **anon** keys.
+2. Supabase → Settings → Database → reset the **password**.
+3. Update `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `DATABASE_URL` in the
+   Render env group.
 
-Option A – Upstash (recommended, free tier):
-1. Create Redis at https://upstash.com
-2. Copy the Redis URL (starts with rediss://)
+## 2. Push the latest backend code
+The new backend (configurable CORS, daily retention purge, Sentry, failed-job
+alerting) only takes effect once deployed. Push `main`; Render auto-deploys the
+backend + workers.
 
-Option B – Render Redis:
-1. Create a Redis instance on Render
-2. Copy the Internal Redis URL
+## 3. Add the new env vars to the env group (`gravvia-production`)
+On top of the existing keys, set:
 
----
+| Var | Value | Notes |
+|---|---|---|
+| `CORS_ORIGINS` | `https://gravvia-dashboard.onrender.com` | **Required** or the dashboard's API calls are blocked. Comma-separate multiple origins. |
+| `SENTRY_DSN` | your Sentry DSN | Recommended. Without it, error reporting is a no-op. |
+| `ALERT_EMAIL` | ops inbox | Recommended. Receives "manual review" job-failure alerts (needs SMTP configured). |
+| `AUDIT_RETENTION_DAYS` | `90` | Optional; default 90. Older `audit_logs`/`events` are purged daily at 03:00. |
 
-## Step 3: Render Deployment
+## 4. Verify the Workers service
+Workers are defined in `render.yaml` and likely already running. Confirm in
+Render that **`gravvia-workers`** is live (it runs CRM sync, notifications,
+call/transcript processing, booking, and the new retention job). If you
+deliberately want a separate Docker worker instead, use:
+- New → **Background Worker** → same repo
+- **Root Directory:** *(blank / repo root)* · **Dockerfile Path:** `backend/Dockerfile.workers` · **Build Context:** `.`
+- Attach the `gravvia-production` env group.
 
-### 3a. Create Environment Group
-1. Render Dashboard → Env Groups → "gravvia-production"
-2. Add all variables from .env.example with real values
+> ⚠️ Do **not** set Root Directory to `backend` with Docker — the Dockerfiles
+> build from the **repo root** (they need the root `package-lock.json`). Setting
+> it to `backend` makes the build context `backend/` and the build fails.
 
-### 3b. Deploy Backend API
-1. New → Web Service → Connect GitHub repo
-2. Name: `gravvia-api`
-3. Root Directory: `backend`
-4. Environment: `Docker`
-5. Dockerfile Path: `Dockerfile`
-6. Health Check Path: `/health`
-7. Attach env group: `gravvia-production`
-8. Add NEXT_PUBLIC_API_URL env var pointing to this service URL
+## 5. Deploy the Dashboard (the main missing service)
+- New → **Web Service** → same repo
+- **Name:** `gravvia-dashboard`
+- **Root Directory:** *(blank / repo root)* · **Dockerfile Path:** `dashboard/Dockerfile` · **Build Context:** `.`
+- **Environment vars on this service:**
+  - `NEXT_PUBLIC_API_URL=https://inbound-va.onrender.com` — **build-time**; baked
+    into the bundle (the Dockerfile declares `ARG NEXT_PUBLIC_API_URL`). Changing
+    it later requires a rebuild.
+  - `JWT_SECRET=<same value as the backend>` — runtime; the dashboard middleware
+    verifies sessions with it. Missing → every `/dashboard` route bounces to login.
 
-### 3c. Deploy Workers
-1. New → Worker → Connect same GitHub repo
-2. Name: `gravvia-workers`
-3. Root Directory: `backend`
-4. Dockerfile Path: `Dockerfile.workers`
-5. Attach same env group
+## 6. Post-deploy verification
+- `GET https://inbound-va.onrender.com/health` → `200`.
+- Open the dashboard URL, log in as `admin@gravvia.com`, confirm pages load
+  (proves CORS + JWT_SECRET are correct).
+- Workers log line `Scheduled daily retention purge (03:00)` on boot.
+- (Optional) force a job failure and confirm a `failed_jobs` row + alert email.
 
-### 3d. Deploy Dashboard
-1. New → Web Service → Connect GitHub repo
-2. Name: `gravvia-dashboard`
-3. Root Directory: `dashboard`
-4. Environment: `Docker`
-5. Add: `NEXT_PUBLIC_API_URL=https://gravvia-api.onrender.com`
+## 7. Optional — move the backend onto Docker (`gravvia-api`)
+Only if you want to retire the native `inbound-va` service:
+1. New → Web Service, **Dockerfile Path:** `backend/Dockerfile`, Build Context `.`,
+   Health Check `/health`, env group attached, `PORT=3001`.
+2. Set `API_BASE_URL` and `WEBHOOK_BASE_URL` to the new `gravvia-api` URL.
+3. **Re-provision the agent** so Retell calls the new URL (otherwise calls keep
+   hitting `inbound-va`).
+4. Point `NEXT_PUBLIC_API_URL` (dashboard) at the new URL and rebuild.
+5. Retire `inbound-va`.
 
----
-
-## Step 4: Configure Retell Webhooks
-
-In your Retell agent settings, add:
-```
-call_started:   POST https://gravvia-api.onrender.com/webhooks/retell/call-started
-call_ended:     POST https://gravvia-api.onrender.com/webhooks/retell/call-ended
-transcript:     POST https://gravvia-api.onrender.com/webhooks/retell/transcript
-call_analyzed:  POST https://gravvia-api.onrender.com/webhooks/retell/summary
-```
-
-Copy the webhook secret and set `RETELL_WEBHOOK_SECRET` in your env group.
-
----
-
-## Step 5: First Client Setup
-
-Using the API (or SQL directly):
-```sql
-UPDATE clients SET retell_agent_id = 'your-retell-agent-id'
-WHERE slug = 'your-client-slug';
-```
-
-Or via dashboard: Clients → Edit → set Retell Agent ID.
-
----
-
-## Local Development
-
-```bash
-# 1. Copy .env
-cp .env.example .env
-# Fill in real SUPABASE_URL, RETELL keys, etc.
-
-# 2. Start Redis
-docker run -p 6379:6379 redis:7-alpine
-
-# 3. Start backend
-cd backend && npm install && npm run dev
-
-# 4. Start workers (separate terminal)
-cd backend && npm run start:workers
-
-# 5. Start dashboard
-cd dashboard && npm install && npm run dev
-```
-
-Dashboard: http://localhost:3000
-API: http://localhost:3001/health
+## 8. Still deferred (not blocking launch)
+- Provision the other clients + populate `clients.phone_numbers`.
+- Enable Supabase Point-in-Time Recovery (verify your plan supports it).
+- Uptime monitor on `/health`; Redis memory alerts.
+- **CRM integrations** — intentionally deferred.

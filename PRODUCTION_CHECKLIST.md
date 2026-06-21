@@ -1,60 +1,44 @@
-# Gravvia Engage – Production Checklist
+# Gravvia Engage — Production Checklist (Outstanding Items)
 
-## Infrastructure
-- [ ] Supabase project created, URL + service role key added to .env
-- [ ] Redis instance provisioned (Redis Cloud / Upstash / Render Redis)
-- [ ] Environment variables set on Render (never committed to git)
-- [ ] ENCRYPTION_KEY is a cryptographically random 32+ char string
-- [ ] JWT_SECRET is a cryptographically random 32+ char string
+Only **remaining** work is listed. Done already (no action): Supabase + all
+migrations, admin user, backend/workers live, security hardening, Bare Beauty
+agent, and the audit-retention / Sentry / failed-job-alerting code.
 
-## Database
-- [ ] Run migration 001_initial_schema.sql on production Supabase
-- [ ] Run migration 002_rls_policies.sql
-- [ ] Run migration 003_seed_roles.sql
-- [ ] Run seed.sql with real admin password hash
-- [ ] Verify all indexes exist
-- [ ] Enable Point-in-Time Recovery on Supabase
+## Secrets (do first)
+- [ ] Rotate Supabase `service_role` + `anon` keys and the DB password
+- [ ] Update `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY` / `DATABASE_URL` in the Render env group
 
-## Retell AI
-- [ ] Retell agent(s) created and agent IDs stored in clients table
-- [ ] Retell webhook URLs configured:
-      POST https://api.gravvia.com/webhooks/retell/call-started
-      POST https://api.gravvia.com/webhooks/retell/call-ended
-      POST https://api.gravvia.com/webhooks/retell/transcript
-      POST https://api.gravvia.com/webhooks/retell/summary
-- [ ] RETELL_WEBHOOK_SECRET matches what's configured in Retell dashboard
-- [ ] Phone numbers added to clients.phone_numbers array
+## Environment / config (Render `gravvia-production`)
+- [ ] `CORS_ORIGINS` = the dashboard's public URL (required — else dashboard API calls are blocked)
+- [ ] `JWT_SECRET` set on the **dashboard** service (same value as backend)
+- [ ] `NEXT_PUBLIC_API_URL` set on the dashboard (build-time)
+- [ ] `SENTRY_DSN` configured (recommended — error reporting is a no-op without it)
+- [ ] `ALERT_EMAIL` configured (recommended — job-failure alerts; needs SMTP)
+- [ ] `AUDIT_RETENTION_DAYS` reviewed (optional; default 90)
 
-## CRM Integrations
-- [ ] Per-client CRM credentials encrypted and stored in crm_connections table
-- [ ] testConnection() verified for each active CRM connection
-- [ ] Custom field mappings reviewed for each client
+## Deploy
+- [ ] Push latest backend code (CORS / retention / Sentry / alerting)
+- [ ] Confirm `gravvia-workers` is running on Render
+- [ ] Deploy the dashboard (Docker, build context = repo root, **not** Root Directory `backend`)
 
-## Security
-- [ ] CORS origin locked to dashboard domain in production
-- [ ] Rate limiting tuned for expected traffic
-- [ ] Helmet headers active
-- [ ] Audit log retention policy set
-- [ ] No raw CRM credentials in logs (encrypted at rest)
+## Retell
+- [ ] If the backend URL changes (migrating to `gravvia-api`), set `WEBHOOK_BASE_URL` and re-provision the agent
+- [ ] Provision the remaining clients; populate `clients.phone_numbers`
 
-## Render Deployment
-- [ ] Backend service created (Web Service, Docker)
-- [ ] Workers service created (Worker, Docker, Dockerfile.workers)
-- [ ] Dashboard service created (Web Service, Docker)
-- [ ] Health check path set to /health
-- [ ] Auto-deploy from GitHub enabled
-- [ ] Environment variables group shared across services
+## Data protection
+- [ ] Enable Supabase Point-in-Time Recovery (verify your plan supports it)
 
 ## Monitoring
-- [ ] SENTRY_DSN configured (optional but recommended)
-- [ ] Uptime monitor on /health endpoint
-- [ ] Redis memory alerts configured
-- [ ] BullMQ failed-job alerting tested
+- [ ] Uptime monitor on `/health`
+- [ ] Redis memory alerts
+- [ ] Verify a job-failure alert email actually arrives (trigger a test failure)
+- [ ] Confirm the daily retention purge ran (worker log: "Retention purge complete")
 
-## Testing Before Launch
-- [ ] POST a test call-started webhook and verify DB record created
-- [ ] POST a test call-ended webhook and verify CRM sync queued
-- [ ] Create a test appointment via POST /booking/create
-- [ ] Login to dashboard, verify all pages load
-- [ ] Retry a failed job from /dashboard/settings
-- [ ] Verify /admin/plugins returns all registered adapters
+## Pre-launch tests
+- [ ] Log in to the dashboard; verify every page loads
+- [ ] Retry a failed job from the dashboard / `POST /admin/retry-job`
+- [ ] `GET /admin/plugins` returns all registered CRM + calendar adapters
+- [ ] Create a test appointment via `POST /booking/create`
+
+## Deferred (post-launch)
+- [ ] CRM integrations — per-client credentials, `testConnection()`, field mappings (intentionally deferred)
