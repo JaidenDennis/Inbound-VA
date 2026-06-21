@@ -371,8 +371,10 @@ export const medSpaTemplate: AgentTemplate = {
       // Hang-up behavior: the agent ends the call itself with the end_call tool
       // right after its goodbye (a natural ~2-3s as the farewell finishes), so
       // the line no longer sits in long dead air. This silence timeout is only a
-      // safety net for callers who go quiet WITHOUT saying goodbye.
-      end_call_after_silence_ms: 8000,
+      // safety net for callers who go quiet WITHOUT saying goodbye; Retell
+      // enforces a 10s minimum, so the end_call tool is what delivers the quick
+      // post-goodbye hangup.
+      end_call_after_silence_ms: 10000,
       reminder_trigger_ms: 5000,
       reminder_max_count: 1,
     };
