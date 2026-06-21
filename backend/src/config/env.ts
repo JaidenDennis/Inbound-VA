@@ -82,7 +82,17 @@ const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 function validateEnv(): Env {
-  const result = envSchema.safeParse(process.env);
+  // Render (and most hosts) pass a listed-but-unset env var as an EMPTY STRING,
+  // not as absent. Treat "" as undefined so optional/defaulted fields with
+  // url()/email() formats don't crash boot (e.g. `ALERT_EMAIL=`, `WEBHOOK_BASE_URL=`).
+  // Empty is never a meaningful value for any field here; required fields still
+  // fail (undefined → "Required"), which is correct.
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    cleaned[key] = value === '' ? undefined : value;
+  }
+
+  const result = envSchema.safeParse(cleaned);
   if (!result.success) {
     console.error('Invalid environment variables:');
     console.error(result.error.flatten().fieldErrors);
