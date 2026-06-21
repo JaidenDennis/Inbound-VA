@@ -1,3 +1,5 @@
 export { logger, LOG_REDACT_PATHS } from './logger.js';
 export { encrypt, decrypt, hashApiKey, generateApiKey } from './crypto.js';
 export { buildIdempotencyKey } from './idempotency.js';
+export { initSentry, captureException } from './sentry.js';
+export { mailer } from './mailer.js';

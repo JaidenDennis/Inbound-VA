@@ -152,26 +152,10 @@ async function processCrmSync(job: Job<CrmSyncJobData>): Promise<void> {
 }
 
 export function startCrmSyncWorker(): Worker<CrmSyncJobData> {
-  const worker = new Worker<CrmSyncJobData>('crm-sync', processCrmSync, {
+  // Terminal-failure handling (failed_jobs + alerts) is wired centrally for all
+  // queues in workers/index.ts via onFinalFailure.
+  return new Worker<CrmSyncJobData>('crm-sync', processCrmSync, {
     connection: redis,
     concurrency: 5,
   });
-
-  worker.on('failed', async (job, err) => {
-    if (!job) return;
-    const maxAttempts = job.opts.attempts ?? 3;
-    if (job.attemptsMade >= maxAttempts) {
-      logger.error({ jobId: job.id, err }, 'CRM sync job exceeded max retries → MANUAL_REVIEW');
-      await supabase.from('failed_jobs').insert({
-        queue_name: 'crm-sync',
-        job_id: job.id,
-        job_data: job.data as unknown as Record<string, unknown>,
-        error_message: err.message,
-        attempts: job.attemptsMade,
-        status: 'manual_review',
-      });
-    }
-  });
-
-  return worker;
 }

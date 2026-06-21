@@ -42,6 +42,12 @@ export const analyticsQueue = new Queue<AnalyticsJobData>('analytics', {
   defaultJobOptions: { ...defaultJobOptions, attempts: 1 },
 });
 
+// Internal housekeeping (daily retention purge). No payload; not tenant-scoped.
+export const maintenanceQueue = new Queue<Record<string, never>>('maintenance', {
+  connection: redis,
+  defaultJobOptions: { attempts: 1, removeOnComplete: { count: 30 }, removeOnFail: { count: 30 } },
+});
+
 export const allQueues = [
   crmSyncQueue,
   bookingQueue,
@@ -49,6 +55,7 @@ export const allQueues = [
   callProcessingQueue,
   transcriptProcessingQueue,
   analyticsQueue,
+  maintenanceQueue,
 ];
 
 export const crmSyncEvents = new QueueEvents('crm-sync', { connection: redis });

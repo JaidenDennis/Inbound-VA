@@ -63,6 +63,19 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().default(10),
   PROVISION_RATE_LIMIT_MAX: z.coerce.number().default(30),
 
+  // Allowed browser origins in production (comma-separated). The dashboard's
+  // public URL MUST be listed here or its API calls are CORS-blocked. In
+  // development all origins are reflected, so this is only read in production.
+  CORS_ORIGINS: z.string().optional(),
+
+  // Audit/event retention: rows older than this are purged by the daily
+  // maintenance job (keeps audit_logs/events from growing unbounded).
+  AUDIT_RETENTION_DAYS: z.coerce.number().default(90),
+
+  // Where exhausted-retry ("manual review") job alerts are emailed. If unset,
+  // failures are still recorded in failed_jobs + Sentry, just not emailed.
+  ALERT_EMAIL: z.string().email().optional(),
+
   SENTRY_DSN: z.string().optional(),
 });
 

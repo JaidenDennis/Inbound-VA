@@ -4,7 +4,7 @@ import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import { env } from './config/index.js';
-import { logger, LOG_REDACT_PATHS } from './utils/index.js';
+import { logger, LOG_REDACT_PATHS, initSentry, captureException } from './utils/index.js';
 import { redis } from './queues/index.js';
 import { registerAutomationSubscribers } from './automation/index.js';
 
@@ -26,6 +26,9 @@ import { adminRoutes } from './dashboard-api/admin.route.js';
 import { userRoutes } from './dashboard-api/users.route.js';
 
 export async function buildApp() {
+  // Report unhandled request errors to Sentry (no-op without SENTRY_DSN).
+  initSentry('api');
+
   // Wire post-call automation (lead recovery, missed-call, confirmations) to events.
   registerAutomationSubscribers();
 
@@ -43,10 +46,14 @@ export async function buildApp() {
     contentSecurityPolicy: false,
   });
 
+  // Allowed browser origins. In production, read from CORS_ORIGINS (comma-
+  // separated) so the dashboard's deployed URL can be whitelisted without a code
+  // change; falls back to the canonical domain. In dev, reflect any origin.
+  const corsOrigins = env.CORS_ORIGINS
+    ? env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+    : ['https://dashboard.gravvia.com'];
   await app.register(cors, {
-    origin: env.NODE_ENV === 'production'
-      ? ['https://dashboard.gravvia.com']
-      : true,
+    origin: env.NODE_ENV === 'production' ? corsOrigins : true,
     credentials: true,
   });
 
@@ -80,6 +87,11 @@ export async function buildApp() {
   // FastifyError so statusCode/message are available.
   app.setErrorHandler((error: FastifyError, request, reply) => {
     logger.error({ err: error, url: request.url }, 'Request error');
+    // Only server-side (5xx) faults are worth alerting on; 4xx are client errors.
+    const status = error.statusCode ?? 500;
+    if (status >= 500) {
+      captureException(error, { url: request.url, method: request.method });
+    }
     if (error.statusCode) {
       reply.code(error.statusCode).send({ error: error.message });
     } else {
