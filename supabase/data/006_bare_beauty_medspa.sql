@@ -53,5 +53,19 @@ UPDATE client_settings AS cs SET
     {"name":"Laser Hair Removal","price":150,"unit":"area","notes":"packages available"},
     {"name":"Body Contouring","price":600,"notes":"varies by area; consultation required"}
   ]'::jsonb,
-  booking_rules = cs.booking_rules || '{"lead_qualification_fields":["skin_concern"]}'::jsonb
+  -- Hours: same every day, 10:00 AM–5:00 PM. Stored 24h ("HH:mm") because the
+  -- booking service parses open/close that way; the agent prompt renders them as
+  -- friendly 12-hour times. Merged so other booking_rules keys are preserved.
+  booking_rules = COALESCE(cs.booking_rules, '{}'::jsonb) || jsonb_build_object(
+    'lead_qualification_fields', jsonb_build_array('skin_concern'),
+    'working_hours', jsonb_build_object(
+      'monday',    jsonb_build_object('open', '10:00', 'close', '17:00'),
+      'tuesday',   jsonb_build_object('open', '10:00', 'close', '17:00'),
+      'wednesday', jsonb_build_object('open', '10:00', 'close', '17:00'),
+      'thursday',  jsonb_build_object('open', '10:00', 'close', '17:00'),
+      'friday',    jsonb_build_object('open', '10:00', 'close', '17:00'),
+      'saturday',  jsonb_build_object('open', '10:00', 'close', '17:00'),
+      'sunday',    jsonb_build_object('open', '10:00', 'close', '17:00')
+    )
+  )
 WHERE cs.client_id = (SELECT id FROM clients WHERE slug = 'bare-beauty-medspa');

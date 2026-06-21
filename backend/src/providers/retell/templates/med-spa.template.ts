@@ -51,10 +51,20 @@ function renderFaqs(faqs: FAQ[]): string {
   return faqs.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n');
 }
 
+/** "10:00" → "10:00 AM", "17:00" → "5:00 PM"; leaves already-friendly strings as-is. */
+function to12h(t: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+  if (!m) return t;
+  let h = Number(m[1]);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m[2]} ${ampm}`;
+}
+
 function renderHours(hours: WorkingHours): string {
   const days: (keyof WorkingHours)[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const lines = days
-    .map((d) => (hours[d] ? `- ${d[0].toUpperCase() + d.slice(1)}: ${hours[d]!.open}–${hours[d]!.close}` : null))
+    .map((d) => (hours[d] ? `- ${d[0].toUpperCase() + d.slice(1)}: ${to12h(hours[d]!.open)}–${to12h(hours[d]!.close)}` : null))
     .filter(Boolean);
   return lines.length ? lines.join('\n') : 'Hours are not configured; offer to take a message or schedule a callback.';
 }
@@ -124,6 +134,12 @@ Make the caller feel genuinely cared for, never "processed." Be warm, natural, a
 - YIELD INSTANTLY: The moment the caller starts speaking, stop talking and listen. Never talk over them; let them finish before you respond.
 - CATCH EVERYTHING AT ONCE: If the caller gives several details in one turn (e.g., name + treatment + a preferred day), capture and acknowledge ALL of them, and confirm the full set back. Never ignore part of what they said, and never re-ask for something they already provided.
 
+★ CONFIRMING A PHONE NUMBER — read it back DIGIT BY DIGIT, every time ★
+Whenever you repeat a caller's phone number back to them, say each digit ON ITS OWN with a brief pause between digits. NEVER group digits into larger numbers and NEVER say them as words like "nine hundred".
+- For 9045551234, say: "9 — 0 — 4 — 5 — 5 — 5 — 1 — 2 — 3 — 4", one digit at a time.
+- Correct: "9 0 4 5 5 5 1 2 3 4".  Wrong: "904, 555, 1234" or "nine hundred four...".
+After reading it back, ask the caller to confirm it's correct (e.g. "Did I get that right?") and wait for their "yes" before moving on.
+
 NEVER say any text inside curly braces or any placeholder out loud. If a detail is missing, use a natural phrase instead of reading a variable.
 
 ★ WHAT YOU CAN OFFER — STRICT; read before recommending anything ★
@@ -133,7 +149,7 @@ TIMEZONE: ${client.timezone}. Assume this timezone for any times unless the call
 
 === OPENING FLOW — follow in order. Do NOT reference any caller history before step 3. ===
 1. INTRODUCE ONLY: "Thank you for calling ${business}, this is ${agentName}." Do not mention any prior visit or caller details — you do not know who they are yet.
-2. IDENTIFY THE CALLER, warmly: get their name (ask them to spell it, read it back) and best phone number (read it back). If they ALSO volunteer why they're calling (a service, a date), capture that now — don't make them repeat it later. Continue once name + phone are confirmed.
+2. IDENTIFY THE CALLER, warmly: get their name (ask them to spell it, read it back) and best phone number (read it back DIGIT BY DIGIT per the phone readback rule above, then have them confirm). If they ALSO volunteer why they're calling (a service, a date), capture that now — don't make them repeat it later. Continue once name + phone are confirmed.
 3. NOW call lookup_existing_client with the confirmed name and phone.
 4. PERSONALIZE briefly: returning client → welcome them back by name and reference their history naturally; new caller → a warm welcome to ${business}. This is the ONLY place you use caller context.
 5. If they haven't already told you why they called, ask "How can I help you today?" — otherwise go straight to helping with what they raised (don't re-ask it).
@@ -173,8 +189,8 @@ ${renderUpsell(cfg, settings.services)}
 === CALLBACK ===
 If the caller prefers a person to call them (or a function isn't working), use schedule_callback with their name, phone, preferred time, and topic, and reassure them someone will follow up.
 
-=== CLOSING — do NOT hang up abruptly ===
-Recap anything booked (date, time, service) plus any prep/cancellation note. Ask "Is there anything else I can help you with?" — then PAUSE and let them answer. Only when they're truly done, give a warm, short goodbye and let the caller respond before the call ends. Never cut off your own goodbye.
+=== CLOSING — end gracefully, never abruptly ===
+Recap anything booked (date, time, service) plus any prep/cancellation note. Ask "Is there anything else I can help you with?" — then PAUSE and let them answer. Only when they confirm they're all set, give a warm, unhurried goodbye and let it finish completely. Then END THE CALL with the end_call tool so the line hangs up cleanly instead of sitting silent. Do NOT trigger end_call before your goodbye, and never hang up mid-sentence or while the caller is still talking.
 
 === SERVICES (the ONLY treatments you offer) ===
 ${renderServices(settings.services)}
@@ -352,9 +368,13 @@ export const medSpaTemplate: AgentTemplate = {
       interruption_sensitivity: 0.95,
       enable_backchannel: true,
       begin_message_delay_ms: 600,
-      end_call_after_silence_ms: 15000,
-      reminder_trigger_ms: 12000,
-      reminder_max_count: 2,
+      // Hang-up behavior: the agent ends the call itself with the end_call tool
+      // right after its goodbye (a natural ~2-3s as the farewell finishes), so
+      // the line no longer sits in long dead air. This silence timeout is only a
+      // safety net for callers who go quiet WITHOUT saying goodbye.
+      end_call_after_silence_ms: 8000,
+      reminder_trigger_ms: 5000,
+      reminder_max_count: 1,
     };
     return { responseEngine, agent };
   },

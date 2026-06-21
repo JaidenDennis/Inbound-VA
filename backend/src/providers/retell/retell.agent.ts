@@ -10,8 +10,13 @@ type RetellCustomTool = {
   parameters?: ResponseEngineSpec['general_tools'][number]['parameters'];
 };
 
-function toCustomTools(tools: ResponseEngineSpec['general_tools']): RetellCustomTool[] {
-  return tools.map((t) => ({
+// Retell's built-in end-call tool: lets the LLM hang up the line itself once the
+// goodbye is done, so calls don't sit in dead air waiting on the silence timer.
+type RetellEndCallTool = { type: 'end_call'; name: string; description?: string };
+type RetellGeneralTool = RetellCustomTool | RetellEndCallTool;
+
+function buildGeneralTools(tools: ResponseEngineSpec['general_tools']): RetellGeneralTool[] {
+  const custom: RetellGeneralTool[] = tools.map((t) => ({
     type: 'custom',
     name: t.name,
     url: t.url,
@@ -19,6 +24,13 @@ function toCustomTools(tools: ResponseEngineSpec['general_tools']): RetellCustom
     speak_during_execution: t.speak_during_execution ?? true,
     parameters: t.parameters,
   }));
+  custom.push({
+    type: 'end_call',
+    name: 'end_call',
+    description:
+      'End the phone call. Call this ONLY after you have given the caller a warm goodbye and confirmed they need nothing else, so the line hangs up instead of sitting silent.',
+  });
+  return custom;
 }
 
 /**
@@ -33,7 +45,7 @@ export async function createOrUpdateResponseEngine(
   const common = {
     general_prompt: spec.general_prompt,
     begin_message: spec.begin_message,
-    general_tools: toCustomTools(spec.general_tools),
+    general_tools: buildGeneralTools(spec.general_tools),
   };
   if (existingLlmId) {
     // On UPDATE, deliberately omit `model`. The LLM may have been switched to a
