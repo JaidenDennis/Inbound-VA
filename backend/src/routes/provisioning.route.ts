@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { provisioningService } from '../services/index.js';
 import { requirePermission, assertClientAccess } from '../middleware/index.js';
+import { env } from '../config/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 const provisionSchema = z.object({
@@ -14,6 +15,13 @@ export async function provisioningRoutes(app: FastifyInstance): Promise<void> {
   // Idempotently create/update the client's Retell agent from its settings.
   app.post<{ Params: { id: string } }>('/clients/:id/provision', {
     preHandler: requirePermission('settings:write'),
+    // Provisioning triggers paid Retell API calls; cap it per IP on top of auth.
+    config: {
+      rateLimit: {
+        max: env.PROVISION_RATE_LIMIT_MAX,
+        timeWindow: env.RATE_LIMIT_WINDOW_MS,
+      },
+    },
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
       if (!assertClientAccess(user, request.params.id)) {

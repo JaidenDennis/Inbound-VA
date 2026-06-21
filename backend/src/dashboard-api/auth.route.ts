@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { supabase } from '../db/index.js';
+import { env } from '../config/index.js';
 import { writeAuditLog } from '../services/index.js';
 import type { User } from '../types/index.js';
 
@@ -12,7 +13,16 @@ const loginSchema = z.object({
 });
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-  app.post('/auth/login', async (request, reply) => {
+  // Tight per-route rate limit so credential stuffing / brute force on the only
+  // unauthenticated endpoint is throttled per IP (the global limiter is looser).
+  app.post('/auth/login', {
+    config: {
+      rateLimit: {
+        max: env.AUTH_RATE_LIMIT_MAX,
+        timeWindow: env.RATE_LIMIT_WINDOW_MS,
+      },
+    },
+  }, async (request, reply) => {
     const { email, password } = loginSchema.parse(request.body);
 
     const { data: user, error } = await supabase

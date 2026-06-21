@@ -4,7 +4,7 @@ import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import { env } from './config/index.js';
-import { logger } from './utils/index.js';
+import { logger, LOG_REDACT_PATHS } from './utils/index.js';
 import { redis } from './queues/index.js';
 import { registerAutomationSubscribers } from './automation/index.js';
 
@@ -32,6 +32,9 @@ export async function buildApp() {
   const app = Fastify({
     logger: {
       level: env.NODE_ENV === 'production' ? 'info' : 'debug',
+      // Redact secrets (auth/cookie/signature headers, credentials) from the
+      // built-in request/response logs. Same paths as the standalone logger.
+      redact: { paths: LOG_REDACT_PATHS, censor: '[Redacted]' },
     },
   });
 

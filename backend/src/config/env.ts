@@ -57,6 +57,11 @@ const envSchema = z.object({
 
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
+  // Stricter caps for sensitive endpoints (over RATE_LIMIT_WINDOW_MS). Login is
+  // the unauthenticated brute-force surface; provisioning triggers paid Retell
+  // API calls. Both are intentionally low and configurable.
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().default(10),
+  PROVISION_RATE_LIMIT_MAX: z.coerce.number().default(30),
 
   SENTRY_DSN: z.string().optional(),
 });
