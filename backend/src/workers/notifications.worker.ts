@@ -2,14 +2,14 @@ import { Worker, type Job } from 'bullmq';
 import { redis } from '../queues/index.js';
 import { supabase } from '../db/index.js';
 import { env } from '../config/index.js';
-import { logger, mailer } from '../utils/index.js';
+import { logger, sendMail } from '../utils/index.js';
 import type { NotificationJobData } from '../types/index.js';
 
 async function processNotification(job: Job<NotificationJobData>): Promise<void> {
   const { clientId, type, recipients, subject, body, callId, metadata } = job.data;
 
   for (const recipient of recipients) {
-    await mailer.sendMail({
+    await sendMail({
       from: env.EMAIL_FROM,
       to: recipient,
       subject,

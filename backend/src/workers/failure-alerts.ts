@@ -1,7 +1,7 @@
 import type { Job } from 'bullmq';
 import { supabase } from '../db/index.js';
 import { env } from '../config/index.js';
-import { logger, captureException, mailer } from '../utils/index.js';
+import { logger, captureException, sendMail } from '../utils/index.js';
 
 /**
  * Shared terminal-failure handler for EVERY queue. BullMQ fires 'failed' on each
@@ -41,7 +41,7 @@ export async function onFinalFailure(queueName: string, job: Job | undefined, er
 async function sendAlertEmail(queueName: string, job: Job, err: Error): Promise<void> {
   if (!env.ALERT_EMAIL) return;
   try {
-    await mailer.sendMail({
+    await sendMail({
       from: env.EMAIL_FROM,
       to: env.ALERT_EMAIL,
       subject: `[Gravvia] Job needs manual review: ${queueName}`,
