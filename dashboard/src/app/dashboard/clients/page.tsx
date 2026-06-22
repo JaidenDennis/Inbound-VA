@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Plus, Search, Edit2, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Plus } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
+import { Badge } from '@/components/Badge';
 
 interface Client {
   id: string;
@@ -18,54 +20,118 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    api.get('/clients').then((r) => {
-      setClients(r.data.data);
-      setTotal(r.data.count);
-    }).finally(() => setLoading(false));
+    api
+      .get('/clients')
+      .then((r) => {
+        setClients(r.data.data);
+        setTotal(r.data.count);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-gray-400 animate-pulse">Loading clients...</div>;
+  const filteredClients = clients.filter(
+    (client) =>
+      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.industry.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.phone_numbers.some((p) => p.includes(searchQuery))
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="h-12 bg-gray-200 rounded-lg w-1/3 animate-pulse" />
+        <div className="h-64 bg-gray-200 rounded-lg animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Clients <span className="text-gray-400 text-lg font-normal">({total})</span></h1>
-        <Link href="/dashboard/clients/new" className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-          <Plus className="w-4 h-4" /> New Client
-        </Link>
+      <PageHeader
+        title="Clients"
+        description="Manage all client accounts and configurations"
+        breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Clients' }]}
+        action={
+          <Link
+            href="/dashboard/clients/new"
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 flex items-center gap-2 cursor-pointer inline-flex"
+          >
+            <Plus className="w-4 h-4" />
+            Add Client
+          </Link>
+        }
+      />
+
+      {/* Search */}
+      <div className="mb-6 relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search by name, industry, or phone..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+        />
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Industry</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Phone Numbers</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Created</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {clients.map((c) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <Link href={`/dashboard/clients/${c.id}`} className="font-medium text-brand-600 hover:underline">{c.name}</Link>
-                </td>
-                <td className="px-4 py-3 capitalize text-gray-600">{c.industry}</td>
-                <td className="px-4 py-3 text-gray-500">{c.phone_numbers.join(', ') || '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {c.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
+
+      {/* Data Table */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Name</th>
+                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Industry</th>
+                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Phone Numbers</th>
+                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Status</th>
+                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Created</th>
+                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredClients.map((c) => (
+                <tr key={c.id} className="hover:bg-gray-50 transition-colors duration-150">
+                  <td className="px-6 py-4">
+                    <Link href={`/dashboard/clients/${c.id}`} className="font-medium text-primary-600 hover:text-primary-700 cursor-pointer transition-colors">
+                      {c.name}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-4 text-gray-700 capitalize">{c.industry}</td>
+                  <td className="px-6 py-4 text-gray-600 font-mono text-xs">{c.phone_numbers.join(', ') || '—'}</td>
+                  <td className="px-6 py-4">
+                    <Badge
+                      label={c.status}
+                      variant={c.status === 'active' ? 'success' : 'gray'}
+                      size="md"
+                    />
+                  </td>
+                  <td className="px-6 py-4 text-gray-600">{new Date(c.created_at).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex gap-2">
+                      <button className="p-1 text-gray-600 hover:text-primary-600 transition-colors cursor-pointer" title="Edit client">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button className="p-1 text-gray-600 hover:text-red-600 transition-colors cursor-pointer" title="Delete client">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {filteredClients.length === 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <p className="text-gray-500 text-lg">No clients found</p>
+          <p className="text-gray-400 text-sm mt-1">Try adjusting your search or create a new client</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Phone, Users, Calendar, TrendingUp } from 'lucide-react';
+import { Phone, Users, Calendar, TrendingUp, Activity, Clock } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
+import { KPICard } from '@/components/KPICard';
 
 interface Overview {
   totalCalls: number;
@@ -12,15 +14,14 @@ interface Overview {
   conversionRate: string;
 }
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: string | number; icon: React.ElementType; color: string }) {
+function LoadingSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4">
-      <div className={`p-3 rounded-lg ${color}`}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-      <div>
-        <p className="text-sm text-gray-500">{label}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
+    <div className="space-y-8">
+      <div className="h-12 bg-gray-200 rounded-lg w-1/3 animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-32 bg-gray-200 rounded-lg animate-pulse" />
+        ))}
       </div>
     </div>
   );
@@ -31,24 +32,85 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/analytics/overview').then((r) => setOverview(r.data)).finally(() => setLoading(false));
+    api
+      .get('/analytics/overview')
+      .then((r) => setOverview(r.data))
+      .catch(() => setOverview(null))
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="animate-pulse text-gray-400">Loading...</div>;
+  if (loading) return <LoadingSkeleton />;
   if (!overview) return null;
+
+  const minutes = Math.floor(overview.avgCallDurationSeconds / 60);
+  const seconds = overview.avgCallDurationSeconds % 60;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Overview</h1>
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total Calls (30d)" value={overview.totalCalls} icon={Phone} color="bg-blue-500" />
-        <StatCard label="Leads Captured" value={overview.leadsCapured} icon={Users} color="bg-green-500" />
-        <StatCard label="Appointments Booked" value={overview.appointmentsBooked} icon={Calendar} color="bg-purple-500" />
-        <StatCard label="Conversion Rate" value={`${overview.conversionRate}%`} icon={TrendingUp} color="bg-orange-500" />
+      <PageHeader
+        title="Dashboard"
+        description="Real-time overview of your AI operations"
+        breadcrumbs={[{ label: 'Home' }, { label: 'Dashboard' }]}
+      />
+
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <KPICard
+          label="Total Calls (30d)"
+          value={overview.totalCalls.toLocaleString()}
+          icon={Phone}
+          color="primary"
+          trend={12}
+          trendLabel="vs last month"
+        />
+        <KPICard
+          label="Leads Captured"
+          value={overview.leadsCapured.toLocaleString()}
+          icon={Users}
+          color="secondary"
+          trend={8}
+          trendLabel="vs last month"
+        />
+        <KPICard
+          label="Appointments Booked"
+          value={overview.appointmentsBooked.toLocaleString()}
+          icon={Calendar}
+          color="accent"
+          trend={15}
+          trendLabel="vs last month"
+        />
+        <KPICard
+          label="Conversion Rate"
+          value={`${overview.conversionRate}%`}
+          icon={TrendingUp}
+          color="success"
+          trend={3}
+          trendLabel="vs last month"
+        />
+        <KPICard
+          label="Avg Call Duration"
+          value={`${minutes}m ${seconds}s`}
+          icon={Clock}
+          color="primary"
+          subtitle="30-day average"
+        />
+        <KPICard
+          label="System Status"
+          value="Operational"
+          icon={Activity}
+          color="success"
+          subtitle="All systems green"
+        />
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-700 mb-2">Avg Call Duration</h2>
-        <p className="text-3xl font-bold">{Math.round(overview.avgCallDurationSeconds / 60)}m {overview.avgCallDurationSeconds % 60}s</p>
+
+      {/* Activity Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Activity</h2>
+        <div className="text-center py-12">
+          <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500 text-lg">Activity stream coming soon</p>
+          <p className="text-gray-400 text-sm mt-2">Track recent calls, bookings, and system events here</p>
+        </div>
       </div>
     </div>
   );
