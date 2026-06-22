@@ -35,9 +35,12 @@ workers are deployed.
   backend env group. Verify the log shows `Started 7 workers`.
 
 **Option B — co-locate workers in the API (no extra cost if the API is already a
-paid Web Service):** run the workers inside the existing API process via a flag,
-so you don't pay for a second service. Trade-off: less isolation than the
-architecture's default, fine at launch scale. *Ask me and I'll wire it.*
+paid, always-on Web Service):** set **`RUN_WORKERS_IN_API=true`** on the API
+service's env, then redeploy. The API process then also runs all 7 workers +
+the retention schedule (look for `Workers co-located in the API process` and
+`Started 7 workers` in the API logs). Trade-off: less isolation than the
+architecture's default — fine at launch scale. Only works if the API never
+spins down (free-tier web services sleep, which would stall the queues).
 
 ## 3. Enable Supabase Point-in-Time Recovery (after you upgrade the Supabase plan)
 Not available on the current plan — enable it once upgraded.

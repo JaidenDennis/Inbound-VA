@@ -76,6 +76,11 @@ const envSchema = z.object({
   // failures are still recorded in failed_jobs + Sentry, just not emailed.
   ALERT_EMAIL: z.string().email().optional(),
 
+  // Budget mode: run the BullMQ workers inside the API process instead of a
+  // separate (paid) worker service. Only effective if the API service is
+  // always-on. Default false → workers run as their own service.
+  RUN_WORKERS_IN_API: z.preprocess((v) => v === 'true' || v === '1', z.boolean()),
+
   SENTRY_DSN: z.string().optional(),
 });
 
