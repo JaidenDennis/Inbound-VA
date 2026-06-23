@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { validateRetellWebhook } from '../../middleware/index.js';
-import { clientService, callService, contactService } from '../../services/index.js';
+import { clientService, callService, contactService, callRecordService } from '../../services/index.js';
+import type { RetellAnalyzedCall } from '../../services/callRecord.service.js';
 import { notificationsQueue, transcriptProcessingQueue, crmSyncQueue } from '../../queues/index.js';
 import { eventBus } from '../../events/index.js';
 import {
@@ -84,6 +85,12 @@ async function onCallEnded(body: RetellCallEndedPayload, req: FastifyRequest, re
 
 async function onCallAnalyzed(body: RetellSummaryPayload, envelope: RetellEnvelope, req: FastifyRequest, reply: FastifyReply) {
   const { call } = body;
+
+  // Client-dashboard call_record (idempotent on retell_call_id). Resolves the
+  // tenant from agent_id itself, so it runs independently of the calls row and
+  // is safe even if call_started was missed.
+  await callRecordService.recordFromAnalyzed(envelope.call as unknown as RetellAnalyzedCall);
+
   const existing = await callService.findByRetellId(call.call_id);
   if (!existing) return reply.code(404).send({ error: 'Call not found' });
 

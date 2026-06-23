@@ -1,5 +1,6 @@
 import { supabase } from '../db/index.js';
 import { logger } from '../utils/index.js';
+import { onboardingService } from './onboarding.service.js';
 import type { Client, ClientSettings } from '../types/index.js';
 
 export class ClientService {
@@ -50,8 +51,9 @@ export class ClientService {
   async create(payload: Partial<Client>): Promise<Client> {
     const { data, error } = await supabase.from('clients').insert(payload).select().single();
     if (error) throw new Error(error.message);
-    // Create default settings
+    // Create default settings + seed the 8 onboarding milestones.
     await supabase.from('client_settings').insert({ client_id: data.id });
+    await onboardingService.seedForClient(data.id);
     logger.info({ clientId: data.id }, 'Client created');
     return data as Client;
   }

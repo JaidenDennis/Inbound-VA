@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
+import { stageLabel, ONBOARDING_STATUSES, type Milestone } from '@/lib/onboarding';
+import { type ActionItem } from '@/lib/actionItems';
 
 interface ClientSettings {
   agent_prompt: string;
@@ -36,6 +38,10 @@ export default function ClientEditPage() {
   const [savingClient, setSavingClient] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [msg, setMsg] = useState('');
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [items, setItems] = useState<ActionItem[]>([]);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
 
   // client fields
   const [name, setName] = useState('');
@@ -68,7 +74,42 @@ export default function ClientEditPage() {
     }).finally(() => setLoading(false));
   }, [id]);
 
+  useEffect(() => {
+    api.get(`/onboarding?clientId=${id}`).then((r) => setMilestones(r.data.data ?? [])).catch(() => {});
+    api.get(`/action-items?clientId=${id}`).then((r) => setItems(r.data.data ?? [])).catch(() => {});
+  }, [id]);
+
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
+
+  const updateStage = async (stageKey: string, status: string) => {
+    const { data } = await api.patch(`/onboarding/${stageKey}`, { clientId: id, status });
+    setMilestones((ms) => ms.map((m) => (m.stage_key === stageKey ? data : m)));
+    flash('Onboarding updated');
+  };
+
+  const addItem = async () => {
+    if (!newTitle.trim()) return;
+    const { data } = await api.post('/action-items', { clientId: id, title: newTitle, description: newDesc || undefined });
+    setItems((xs) => [...xs, data]);
+    setNewTitle('');
+    setNewDesc('');
+    flash('Action item added');
+  };
+
+  const saveItem = async (item: ActionItem) => {
+    const { data } = await api.patch(`/action-items/${item.id}`, { title: item.title, description: item.description });
+    setItems((xs) => xs.map((x) => (x.id === item.id ? data : x)));
+    flash('Action item saved');
+  };
+
+  const toggleItem = async (item: ActionItem) => {
+    const status = item.status === 'done' ? 'pending' : 'done';
+    const { data } = await api.patch(`/action-items/${item.id}`, { status });
+    setItems((xs) => xs.map((x) => (x.id === item.id ? data : x)));
+  };
+
+  const editItem = (id: string, patch: Partial<ActionItem>) =>
+    setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch } : x)));
 
   const saveClient = async () => {
     setSavingClient(true);
@@ -177,6 +218,90 @@ export default function ClientEditPage() {
           className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">
           {savingSettings ? 'Saving...' : 'Save Settings'}
         </button>
+      </section>
+
+      {/* Onboarding pipeline — advance the client's stages */}
+      <section className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+        <h2 className="font-semibold text-gray-700 mb-4">Onboarding</h2>
+        {milestones.length === 0 ? (
+          <p className="text-sm text-gray-400">No milestones.</p>
+        ) : (
+          <ul className="space-y-2">
+            {milestones.map((m) => (
+              <li key={m.id} className="flex items-center justify-between gap-3">
+                <span className="text-sm text-gray-700">
+                  {m.sort_order}. {stageLabel(m.stage_key)}
+                </span>
+                <select
+                  value={m.status}
+                  onChange={(e) => updateStage(m.stage_key, e.target.value)}
+                  className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  {ONBOARDING_STATUSES.map((s) => (
+                    <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Waiting on You — client action items */}
+      <section className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+        <h2 className="font-semibold text-gray-700 mb-4">
+          Waiting on You <span className="text-gray-400 font-normal text-sm">(client action items)</span>
+        </h2>
+        <div className="space-y-2 mb-4">
+          {items.length === 0 && <p className="text-sm text-gray-400">No action items.</p>}
+          {items.map((item) => (
+            <div key={item.id} className="flex items-center gap-2">
+              <button
+                onClick={() => toggleItem(item)}
+                className={`text-xs px-2 py-1 rounded-lg font-medium shrink-0 ${
+                  item.status === 'done' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                }`}
+              >
+                {item.status === 'done' ? 'Done' : 'Pending'}
+              </button>
+              <input
+                className={`${inputCls} flex-1`}
+                value={item.title}
+                onChange={(e) => editItem(item.id, { title: e.target.value })}
+              />
+              <input
+                className={`${inputCls} flex-1`}
+                placeholder="Description"
+                value={item.description ?? ''}
+                onChange={(e) => editItem(item.id, { description: e.target.value })}
+              />
+              <button onClick={() => saveItem(item)} className="text-brand-600 hover:underline text-xs shrink-0">
+                Save
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 border-t border-gray-100 pt-4">
+          <input
+            className={`${inputCls} flex-1`}
+            placeholder="New item title"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+          />
+          <input
+            className={`${inputCls} flex-1`}
+            placeholder="Description (optional)"
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+          />
+          <button
+            onClick={addItem}
+            disabled={!newTitle.trim()}
+            className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition disabled:opacity-50 shrink-0"
+          >
+            Add
+          </button>
+        </div>
       </section>
     </div>
   );

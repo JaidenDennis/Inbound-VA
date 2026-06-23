@@ -5,3 +5,6 @@ export * from './booking.types.js';
 export * from './event.types.js';
 export * from './queue.types.js';
 export * from './auth.types.js';
+export * from './ticket.types.js';
+export * from './onboarding.types.js';
+export * from './actionItem.types.js';

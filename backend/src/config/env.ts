@@ -49,6 +49,16 @@ const envSchema = z.object({
   CALENDLY_CLIENT_ID: z.string().optional(),
   CALENDLY_CLIENT_SECRET: z.string().optional(),
 
+  // Ticket notifications. v1 sends to Telegram; set NOTIFY_CHANNEL=discord (+
+  // DISCORD_WEBHOOK_URL) to switch with no code change. If the selected channel
+  // is unconfigured, notifications are skipped (logged), never failing a request.
+  NOTIFY_CHANNEL: z.enum(['telegram', 'discord']).default('telegram'),
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_CHAT_ID: z.string().optional(),
+  DISCORD_WEBHOOK_URL: z.string().url().optional(),
+  // Public dashboard base URL, used to build deep links in notifications.
+  DASHBOARD_URL: z.string().url().default('http://localhost:3000'),
+
   SMTP_HOST: z.string().default('smtp.sendgrid.net'),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().default('apikey'),

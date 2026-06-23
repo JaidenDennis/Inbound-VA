@@ -24,6 +24,10 @@ import { authRoutes } from './dashboard-api/auth.route.js';
 import { analyticsRoutes } from './dashboard-api/analytics.route.js';
 import { adminRoutes } from './dashboard-api/admin.route.js';
 import { userRoutes } from './dashboard-api/users.route.js';
+import { ticketRoutes } from './dashboard-api/tickets.route.js';
+import { onboardingRoutes } from './dashboard-api/onboarding.route.js';
+import { actionItemRoutes } from './dashboard-api/action-items.route.js';
+import { statsRoutes } from './dashboard-api/stats.route.js';
 
 export async function buildApp() {
   // Report unhandled request errors to Sentry (no-op without SENTRY_DSN).
@@ -115,6 +119,10 @@ export async function buildApp() {
   await app.register(analyticsRoutes);
   await app.register(adminRoutes);
   await app.register(userRoutes);
+  await app.register(ticketRoutes);
+  await app.register(onboardingRoutes);
+  await app.register(actionItemRoutes);
+  await app.register(statsRoutes);
 
   return app;
 }

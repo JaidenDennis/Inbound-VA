@@ -13,3 +13,7 @@ Thumbs.db
 supabase/.branches/
 supabase/.temp/
 supabase/.env
+
+# Local agent/tooling dirs — never commit.
+.claude/
+.agent/
