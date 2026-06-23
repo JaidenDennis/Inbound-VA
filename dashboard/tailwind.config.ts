@@ -5,15 +5,31 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Enterprise blue/navy — coherent ramp used for brand + CTAs
         primary: {
-          50: '#F0F4F8',
-          100: '#D9E2F0',
-          200: '#B3C5E1',
-          400: '#4A7BA7',
-          500: '#2E5266',
-          600: '#1E40AF',
-          700: '#1B3A8F',
-          900: '#0F1F3F',
+          50: '#EFF5FF',
+          100: '#DBE8FE',
+          200: '#BFD7FE',
+          300: '#93BBFD',
+          400: '#6098FA',
+          500: '#3B76F6',
+          600: '#2563EB',
+          700: '#1D4ED8',
+          800: '#1E40AF',
+          900: '#1E3A8A',
+        },
+        // Deep corporate navy — surfaces, headings, dark brand panels
+        navy: {
+          50: '#F4F6FB',
+          100: '#E6EAF3',
+          200: '#C9D2E6',
+          300: '#9FAFCF',
+          400: '#5E73A0',
+          500: '#34456E',
+          600: '#243456',
+          700: '#1B2742',
+          800: '#131C32',
+          900: '#0B1220',
         },
         secondary: {
           50: '#F0F9FF',
@@ -21,6 +37,7 @@ const config: Config = {
           200: '#BAE6FD',
           500: '#0EA5E9',
           600: '#0284C7',
+          700: '#0369A1',
         },
         accent: {
           50: '#FFFBEB',
@@ -29,17 +46,18 @@ const config: Config = {
           500: '#F59E0B',
           600: '#D97706',
         },
+        // Legacy alias kept so existing bg-brand-* classes stay on-brand
         brand: {
-          50: '#f0f5ff',
-          500: '#3b5bdb',
-          600: '#364fc7',
-          700: '#2f44b8',
+          50: '#EFF5FF',
+          500: '#2563EB',
+          600: '#1D4ED8',
+          700: '#1E40AF',
         },
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-        heading: ['"Fira Code"', 'monospace'],
-        mono: ['"Fira Code"', 'monospace'],
+        sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        heading: ['var(--font-sans)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['var(--font-mono)', '"Fira Code"', 'ui-monospace', 'monospace'],
       },
       fontSize: {
         xs: ['12px', { lineHeight: '16px' }],

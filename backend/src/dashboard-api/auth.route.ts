@@ -24,11 +24,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request, reply) => {
     const { email, password } = loginSchema.parse(request.body);
+    // Users are always stored with a lowercased email (see UserService.create),
+    // so normalize the input to keep login case-insensitive.
+    const normalizedEmail = email.trim().toLowerCase();
 
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .eq('email', normalizedEmail)
       .eq('is_active', true)
       .single();
 
