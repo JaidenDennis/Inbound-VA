@@ -5,7 +5,7 @@ import { clientService, contactService, callService } from '../../services/index
 import { bookingService } from '../../booking/index.js';
 import { notificationsQueue } from '../../queues/index.js';
 import { supabase } from '../../db/index.js';
-import { buildIdempotencyKey } from '../../utils/index.js';
+import { buildIdempotencyKey, formatPhone, spellName } from '../../utils/index.js';
 import type { Client, ClientSettings } from '../../types/index.js';
 
 // ─── Retell custom-function request shape: { name, call, args } ──────────────
@@ -111,7 +111,11 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
       tags: ['lead', 'voice'],
       custom_fields: { service_interest, ...extra },
     });
-    return reply.send({ qualified: true, contact_id: contact.id, message: `Lead captured for ${name}. Offer to book a consultation or appointment.` });
+    return reply.send({
+      qualified: true,
+      contact_id: contact.id,
+      message: `Lead captured for ${name} (spelling: ${spellName(name)}). Phone on file: ${formatPhone(phone)}. Read the phone number back digit by digit to confirm, then confirm the name spelling before offering to book.`,
+    });
   });
 
   // ── book_appointment & book_consultation share booking logic ──────────────
@@ -166,7 +170,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
         booked: true,
         appointment_id: appt.id,
         start_time: startTime.toISOString(),
-        message: `Booked ${svcName} for ${args.data.contact_name} at ${startTime.toISOString()}. Confirm the details out loud and set arrival expectations.`,
+        message: `Booked ${svcName} for ${args.data.contact_name} at ${startTime.toISOString()}. Phone: ${formatPhone(args.data.phone)}. Confirm the name, date, time, and read the phone number back digit by digit before closing.`,
       });
     } catch (err) {
       return reply.send({ booked: false, reason: 'unavailable', message: `That time isn't available (${(err as Error).message}). Offer another slot.` });
@@ -225,7 +229,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
     }
     return reply.send({
       scheduled: true,
-      message: `Got it — I've scheduled a callback for ${args.data.caller_name}${args.data.preferred_time ? ` around ${args.data.preferred_time}` : ''}. Reassure them a team member will follow up.`,
+      message: `Callback scheduled for ${args.data.caller_name}. Phone: ${formatPhone(args.data.phone)}${args.data.preferred_time ? ` around ${args.data.preferred_time}` : ''}. Read the phone back digit by digit to confirm, then reassure them a team member will follow up.`,
     });
   });
 
@@ -258,7 +262,10 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
         callId: existingCall?.id,
       });
     }
-    return reply.send({ saved: true, message: 'Message saved and staff notified. Reassure the caller someone will follow up.' });
+    return reply.send({
+      saved: true,
+      message: `Message saved for ${args.data.caller_name}. Phone: ${formatPhone(args.data.phone)}. Confirm their number back digit by digit, then reassure them someone will follow up.`,
+    });
   });
 
   // ── request_human_handoff ─────────────────────────────────────────────────
@@ -298,6 +305,10 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
         callId: existingCall?.id,
       }, { jobId: existingCall ? buildIdempotencyKey('handoff', existingCall.id) : undefined });
     }
-    return reply.send({ transferring: true, message: 'A team member has been alerted. Offer to take a callback number if no one is available.' });
+    const callbackPhone = args.data.phone ?? req.body.call?.from_number;
+    return reply.send({
+      transferring: true,
+      message: `A team member has been alerted. ${callbackPhone ? `Callback number on file: ${formatPhone(callbackPhone)}. Read it back digit by digit to confirm.` : 'Offer to take a callback number if no one is available.'}`,
+    });
   });
 }
