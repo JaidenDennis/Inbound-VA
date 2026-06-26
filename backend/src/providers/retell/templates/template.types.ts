@@ -51,6 +51,12 @@ export interface AgentSpec {
   end_call_after_silence_ms?: number;
   reminder_trigger_ms?: number;
   reminder_max_count?: number;
+  // Per-client TTS pronunciation overrides, passed straight through to Retell.
+  pronunciation_dictionary?: Array<{
+    word: string;
+    alphabet: 'ipa' | 'cmu';
+    phoneme: string;
+  }>;
 }
 
 export interface TemplateContext {

@@ -33,6 +33,13 @@ export interface Client {
   updated_at: string;
 }
 
+/** One TTS pronunciation override passed through to the Retell agent. */
+export interface PronunciationEntry {
+  word: string;
+  alphabet: 'ipa' | 'cmu';
+  phoneme: string;
+}
+
 export interface AgentConfig {
   /** A recurring membership/loyalty program, if the client runs one. */
   membership_program?: { name: string; description?: string };
@@ -42,6 +49,12 @@ export interface AgentConfig {
   offers_prp?: boolean;
   /** Whether consultations are free (affects how they're offered). */
   free_consultation?: boolean;
+  /**
+   * Per-client TTS pronunciation overrides (business name, unusual service or
+   * surname pronunciations) passed straight through to the Retell agent. A
+   * TTS-layer safety net that catches digit/name strings regardless of LLM text.
+   */
+  pronunciation_dictionary?: PronunciationEntry[];
   [key: string]: unknown;
 }
 
