@@ -38,6 +38,17 @@ function serviceDuration(settings: ClientSettings, name: string | undefined, fal
   return svc?.duration_minutes ?? fallback;
 }
 
+/**
+ * Wrap a break-tagged readback value (from formatPhone/spellName) with an
+ * instruction that forces the LLM to speak it VERBATIM. The <break> pause tags
+ * only survive to the TTS if the model echoes the string exactly rather than
+ * paraphrasing it — hence the explicit "say this back exactly" framing and the
+ * reminder that the markers are silent and must never be spoken aloud.
+ */
+function verbatim(value: string): string {
+  return `say this back to the caller EXACTLY as written, reproducing the "<break ... />" pause markers but NEVER speaking them aloud (they are silent pauses): "${value}"`;
+}
+
 export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> {
   // Every function endpoint validates the Retell signature (API key based).
   const guard = { preHandler: validateRetellWebhook };
@@ -114,7 +125,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
     return reply.send({
       qualified: true,
       contact_id: contact.id,
-      message: `Lead captured for ${name} (spelling: ${spellName(name)}). Phone on file: ${formatPhone(phone)}. Read the phone number back digit by digit to confirm, then confirm the name spelling before offering to book.`,
+      message: `Lead captured for ${name}. To confirm the phone, ${verbatim(formatPhone(phone))}. To confirm the name, ${verbatim(spellName(name))}. Then ask "Did I get that right?" and wait before offering to book.`,
     });
   });
 
@@ -170,7 +181,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
         booked: true,
         appointment_id: appt.id,
         start_time: startTime.toISOString(),
-        message: `Booked ${svcName} for ${args.data.contact_name} at ${startTime.toISOString()}. Phone: ${formatPhone(args.data.phone)}. Confirm the name, date, time, and read the phone number back digit by digit before closing.`,
+        message: `Booked ${svcName} for ${args.data.contact_name} at ${startTime.toISOString()}. Confirm the name, date, and time, and to confirm the phone, ${verbatim(formatPhone(args.data.phone))}. Then close warmly.`,
       });
     } catch (err) {
       return reply.send({ booked: false, reason: 'unavailable', message: `That time isn't available (${(err as Error).message}). Offer another slot.` });
@@ -229,7 +240,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
     }
     return reply.send({
       scheduled: true,
-      message: `Callback scheduled for ${args.data.caller_name}. Phone: ${formatPhone(args.data.phone)}${args.data.preferred_time ? ` around ${args.data.preferred_time}` : ''}. Read the phone back digit by digit to confirm, then reassure them a team member will follow up.`,
+      message: `Callback scheduled for ${args.data.caller_name}${args.data.preferred_time ? ` around ${args.data.preferred_time}` : ''}. To confirm the number, ${verbatim(formatPhone(args.data.phone))}. Then reassure them a team member will follow up.`,
     });
   });
 
@@ -264,7 +275,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
     }
     return reply.send({
       saved: true,
-      message: `Message saved for ${args.data.caller_name}. Phone: ${formatPhone(args.data.phone)}. Confirm their number back digit by digit, then reassure them someone will follow up.`,
+      message: `Message saved for ${args.data.caller_name}. To confirm their number, ${verbatim(formatPhone(args.data.phone))}. Then reassure them someone will follow up.`,
     });
   });
 
@@ -308,7 +319,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
     const callbackPhone = args.data.phone ?? req.body.call?.from_number;
     return reply.send({
       transferring: true,
-      message: `A team member has been alerted. ${callbackPhone ? `Callback number on file: ${formatPhone(callbackPhone)}. Read it back digit by digit to confirm.` : 'Offer to take a callback number if no one is available.'}`,
+      message: `A team member has been alerted. ${callbackPhone ? `To confirm the callback number, ${verbatim(formatPhone(callbackPhone))}.` : 'Offer to take a callback number if no one is available.'}`,
     });
   });
 }

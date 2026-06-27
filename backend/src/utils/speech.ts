@@ -12,13 +12,22 @@ const DIGIT_WORDS: Record<string, string> = {
 };
 
 /**
- * Format a phone number as comma-separated English word-form digits for TTS readback.
- * Strips all non-digit characters, maps each digit to its English word, then joins
- * with ", ". Commas are a universal TTS pause signal and word-form digits are what
- * TTS engines are trained on, so the agent reads each digit clearly and separately.
+ * ElevenLabs SSML pause tag inserted between digits/letters. Commas and periods
+ * get compressed by the 11labs prosody model when the tokens are short, so a
+ * hard <break> is the only reliable way to stop digits/letters slurring together.
+ * The tag is silent — the LLM must reproduce it verbatim but never speak it.
+ * 0.3s is long enough to separate cleanly without sounding robotic. NOTE: too
+ * many breaks in one utterance can cause 11labs audio artifacts; tune here.
+ */
+export const PAUSE_TAG = '<break time="0.3s" />';
+
+/**
+ * Format a phone number for TTS readback with a hard pause between every digit.
+ * Strips non-digits, maps each to its English word (so "904" is never read as
+ * "nine hundred four"), then joins with a <break> tag so ElevenLabs can't slur
+ * them. The result is meant to be spoken VERBATIM by the agent.
  *
- * "9045551234"     → "nine, zero, four, five, five, five, one, two, three, four"
- * "(904) 555-1234" → "nine, zero, four, five, five, five, one, two, three, four"
+ * "9045551234" → "nine <break time="0.3s" /> zero <break time="0.3s" /> four ..."
  */
 export function formatPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -26,20 +35,18 @@ export function formatPhone(raw: string): string {
   return digits
     .split('')
     .map((d) => DIGIT_WORDS[d])
-    .join(', ');
+    .join(` ${PAUSE_TAG} `);
 }
 
 /**
- * Spell a name letter by letter for TTS confirmation readback.
- * Trims, uppercases, then joins each character with ", " (comma + space) so the
- * TTS engine pauses between letters. Used in confirmation contexts only — not for
- * casual greetings.
+ * Spell a name letter by letter for TTS confirmation readback, with a hard pause
+ * between every letter so the TTS reads each one distinctly. Trims, uppercases,
+ * then joins each character with a <break> tag. Confirmation contexts only.
  *
- * "Sarah"  → "S, A, R, A, H"
- * "nguyen" → "N, G, U, Y, E, N"
+ * "Sarah" → "S <break time="0.3s" /> A <break time="0.3s" /> R ..."
  */
 export function spellName(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return '';
-  return trimmed.toUpperCase().split('').join(', ');
+  return trimmed.toUpperCase().split('').join(` ${PAUSE_TAG} `);
 }
