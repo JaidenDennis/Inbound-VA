@@ -1,4 +1,5 @@
 import Fastify, { type FastifyError } from 'fastify';
+import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
@@ -90,6 +91,12 @@ export async function buildApp() {
   // Error handler. Fastify 5 types the error param as `unknown`; annotate it as
   // FastifyError so statusCode/message are available.
   app.setErrorHandler((error: FastifyError, request, reply) => {
+    // Zod .parse() failures in route handlers are client errors, not server
+    // faults — answer 400 with the field problems instead of a generic 500.
+    if (error instanceof ZodError) {
+      reply.code(400).send({ error: 'Validation failed', details: error.flatten().fieldErrors });
+      return;
+    }
     logger.error({ err: error, url: request.url }, 'Request error');
     // Only server-side (5xx) faults are worth alerting on; 4xx are client errors.
     const status = error.statusCode ?? 500;

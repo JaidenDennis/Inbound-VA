@@ -29,7 +29,8 @@ export default function LoginPage() {
     try {
       const { data } = await api.post('/auth/login', { email, password });
       localStorage.setItem('gravvia_token', data.token);
-      document.cookie = `gravvia_token=${data.token}; path=/; max-age=604800`;
+      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `gravvia_token=${data.token}; path=/; max-age=604800; SameSite=Lax${secure}`;
       router.push('/dashboard');
     } catch {
       setError('Invalid email or password');

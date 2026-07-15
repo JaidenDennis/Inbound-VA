@@ -18,7 +18,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
+    // A 401 from the login attempt itself must surface as a form error, not a
+    // redirect — reloading /login here wipes the "Invalid credentials" message.
+    const isLoginRequest = err.config?.url?.includes('/auth/login');
+    if (
+      err.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      !isLoginRequest &&
+      window.location.pathname !== '/login'
+    ) {
       localStorage.removeItem('gravvia_token');
       window.location.href = '/login';
     }
