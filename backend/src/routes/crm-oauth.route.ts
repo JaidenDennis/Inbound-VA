@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { getCrmAdapter } from '../crm/index.js';
 import { resolveAdapterConfig } from '../crm/credentials.js';
+import { activeGhlConnection } from '../crm/ghl-connection.js';
 import {
   buildInstallUrl,
   exchangeCode,
@@ -22,25 +23,15 @@ import type { CrmConnection, JwtPayload } from '../types/index.js';
 //   2. GHL redirects the browser to /callback (unauthenticated — the signed
 //      state is what binds the code to a tenant); tokens are exchanged and
 //      stored encrypted on crm_connections.
-//   3. Dashboard lists pipelines/calendars (created in the GHL UI — the API
-//      cannot create pipelines) and saves the selection via /config.
+//   3. Dashboard lists pipelines/calendars and saves the selection via
+//      /config. Pipelines/fields/tags can also be created in bulk from a
+//      blueprint via POST /crm/ghl/provision (crm-provisioning.route.ts).
 
 const configSchema = z.object({
   pipelineId: z.string().min(1).optional(),
   stageId: z.string().min(1).optional(),
   calendarId: z.string().min(1).optional(),
 });
-
-async function activeGhlConnection(clientId: string): Promise<CrmConnection | null> {
-  const { data } = await supabase
-    .from('crm_connections')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('crm_type', 'gohighlevel')
-    .eq('is_active', true)
-    .maybeSingle();
-  return (data as CrmConnection | null) ?? null;
-}
 
 interface GhlDiscovery {
   listPipelines(): Promise<GhlPipeline[]>;
@@ -94,6 +85,8 @@ export async function crmOAuthRoutes(app: FastifyInstance): Promise<void> {
           crm_type: 'gohighlevel',
           credentials_encrypted: encrypt(JSON.stringify(credentials)),
           is_active: true,
+          // A fresh install always yields working tokens — clear any 401 flag.
+          needs_reauth: false,
         }, { onConflict: 'client_id,crm_type' });
       if (error) {
         logger.error({ clientId, error: error.message }, 'Failed to store GHL connection');
@@ -118,6 +111,7 @@ export async function crmOAuthRoutes(app: FastifyInstance): Promise<void> {
       if (!conn) return reply.send({ connected: false });
       reply.send({
         connected: true,
+        needsReauth: conn.needs_reauth,
         pipelineId: conn.pipeline_id,
         stageId: (conn.crm_config as Record<string, unknown> | null)?.stageId ?? null,
         calendarId: (conn.crm_config as Record<string, unknown> | null)?.calendarId ?? null,
