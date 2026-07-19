@@ -111,7 +111,7 @@ async function processProvisionJob(job: Job<CrmSyncJob>): Promise<void> {
   }
 }
 
-async function processCrmSync(job: Job<CrmSyncJob>): Promise<void> {
+export async function processCrmSync(job: Job<CrmSyncJob>): Promise<void> {
   if (job.name === 'provision' && 'kind' in job.data && job.data.kind === 'provision') {
     return processProvisionJob(job);
   }
