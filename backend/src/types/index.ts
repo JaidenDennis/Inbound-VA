@@ -1,6 +1,7 @@
 export * from './client.types.js';
 export * from './call.types.js';
 export * from './crm.types.js';
+export * from './ghl-blueprint.types.js';
 export * from './booking.types.js';
 export * from './event.types.js';
 export * from './queue.types.js';

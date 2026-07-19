@@ -4,6 +4,7 @@ import { clientService } from '../services/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
 import { writeAuditLog } from '../services/index.js';
 import type { JwtPayload, Client } from '../types/index.js';
+import { ghlBlueprintSchema } from '../types/index.js';
 
 const createClientSchema = z.object({
   name: z.string().min(1),
@@ -36,6 +37,7 @@ const updateSettingsSchema = z.object({
   crm_type: z.string().optional(),
   crm_config: z.record(z.unknown()).optional(),
   custom_field_mapping: z.record(z.string()).optional(),
+  ghl_blueprint: ghlBlueprintSchema.nullable().optional(),
 });
 
 export async function clientRoutes(app: FastifyInstance): Promise<void> {
