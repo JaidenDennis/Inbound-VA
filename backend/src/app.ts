@@ -14,6 +14,7 @@ import { healthRoutes } from './routes/health.route.js';
 import { clientRoutes } from './routes/clients.route.js';
 import { bookingRoutes } from './routes/booking.route.js';
 import { crmRoutes } from './routes/crm.route.js';
+import { crmOAuthRoutes } from './routes/crm-oauth.route.js';
 import { retellFunctionRoutes } from './routes/functions/retell-functions.route.js';
 import { provisioningRoutes } from './routes/provisioning.route.js';
 import { retellWebhookDispatcher } from './routes/webhooks/retell-dispatcher.route.js';
@@ -116,6 +117,7 @@ export async function buildApp() {
   await app.register(clientRoutes);
   await app.register(bookingRoutes);
   await app.register(crmRoutes);
+  await app.register(crmOAuthRoutes);
   await app.register(retellFunctionRoutes);
   await app.register(provisioningRoutes);
   await app.register(retellWebhookDispatcher);

@@ -31,6 +31,10 @@ const envSchema = z.object({
 
   GHL_CLIENT_ID: z.string().optional(),
   GHL_CLIENT_SECRET: z.string().optional(),
+  // OAuth redirect registered on the GHL marketplace app. Defaults to
+  // `${API_BASE_URL}/crm/level/oauth/callback` when unset (the path must stay
+  // free of "ghl"/"highlevel" — the marketplace rejects those in redirect URLs).
+  GHL_REDIRECT_URI: z.string().url().optional(),
   HUBSPOT_APP_ID: z.string().optional(),
   HUBSPOT_CLIENT_SECRET: z.string().optional(),
   SF_CONSUMER_KEY: z.string().optional(),

@@ -1,8 +1,7 @@
 import { Worker, type Job } from 'bullmq';
 import { redis } from '../queues/index.js';
 import { supabase } from '../db/index.js';
-import { getCrmAdapter, type ICrmAdapter } from '../crm/index.js';
-import { decrypt } from '../utils/index.js';
+import { getCrmAdapter, resolveAdapterConfig, type ICrmAdapter } from '../crm/index.js';
 import { logger } from '../utils/index.js';
 import type { CrmSyncJobData } from '../types/index.js';
 
@@ -65,8 +64,9 @@ async function processCrmSync(job: Job<CrmSyncJobData>): Promise<void> {
 
   if (error || !conn) throw new Error(`CRM connection not found: ${crmConnectionId}`);
 
-  const credentials = JSON.parse(decrypt(conn.credentials_encrypted));
-  const adapter = getCrmAdapter(conn.crm_type, { ...credentials, ...conn.crm_config });
+  // Decrypt + merge connection settings; refreshes OAuth tokens (GHL) if the
+  // access token is at/near expiry.
+  const adapter = getCrmAdapter(conn.crm_type, await resolveAdapterConfig(conn));
 
   let result;
   switch (entityType) {
