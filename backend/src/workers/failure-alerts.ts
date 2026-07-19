@@ -14,7 +14,10 @@ import { logger, captureException, sendMail } from '../utils/index.js';
 export async function onFinalFailure(queueName: string, job: Job | undefined, err: Error): Promise<void> {
   if (!job) return;
   const maxAttempts = job.opts.attempts ?? 1;
-  if (job.attemptsMade < maxAttempts) return; // more retries pending — not terminal yet
+  // UnrecoverableError fails the job immediately regardless of attempts left
+  // (e.g. a CRM 401 that a retry can't fix), so it is always terminal.
+  const unrecoverable = err.name === 'UnrecoverableError';
+  if (!unrecoverable && job.attemptsMade < maxAttempts) return; // more retries pending — not terminal yet
 
   logger.error(
     { queue: queueName, jobId: job.id, attempts: job.attemptsMade, err },
