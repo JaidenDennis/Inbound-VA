@@ -62,11 +62,15 @@ Retell Talks → Backend Decides → Database Remembers → CRM Displays.
   - locations.readonly
   - locations/customFields.readonly, locations/customFields.write
   - locations/tags.readonly, locations/tags.write
-  - opportunities/pipelines.readonly, opportunities/pipelines.write
-- OPEN ITEM: exact scope string for pipeline create is new; if the marketplace
-  scope picker shows a different variant (or bundles it under
-  opportunities.write), use what the picker offers and mirror it in
-  `GHL_SCOPES`. Verified at first 401 during implementation testing.
+  - pipelines.readonly, pipelines.write, pipelines.create
+- Scope strings verified 2026-07-18 against the marketplace app "GI
+  Integration 3" (app id 6a5be942bcb170b51b3b9285) via the developer portal;
+  all scopes above are ticked and saved on that app. `GHL_SCOPES` in code
+  must be updated to match this exact list (pipelines.* are separate from
+  opportunities.*).
+- The active marketplace app is "GI Integration 3" — its client id/secret
+  must replace the old app's GHL_CLIENT_ID / GHL_CLIENT_SECRET in
+  backend/.env and the Render environment.
 - Scope changes require re-running the install on already-connected locations.
 
 ## Components
