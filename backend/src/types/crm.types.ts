@@ -57,6 +57,8 @@ export interface CrmConnection {
   custom_field_mapping: Record<string, string>;
   /** CRM-specific settings merged into the adapter config (e.g. GHL stageId/calendarId). */
   crm_config: Record<string, unknown> | null;
+  /** Set on a 401 from the CRM: the OAuth install must be re-run. Cleared by the callback. */
+  needs_reauth: boolean;
   is_active: boolean;
   last_sync_at: string | null;
   created_at: string;
@@ -69,11 +71,13 @@ export interface CrmSyncLog {
   crm_connection_id: string;
   entity_type: string;
   entity_id: string;
-  operation: 'create' | 'update' | 'delete';
-  status: 'success' | 'failed' | 'pending';
+  operation: 'create' | 'update' | 'delete' | 'provision';
+  status: 'success' | 'failed' | 'pending' | 'manual_review';
   external_id: string | null;
   error_message: string | null;
   attempts: number;
+  /** Provision runs store { blueprintName, steps: ProvisionStepResult[] } here. */
+  payload: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

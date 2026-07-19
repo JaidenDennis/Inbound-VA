@@ -81,6 +81,8 @@ export interface ClientSettings {
   crm_type: CrmType;
   crm_config: Record<string, unknown>;
   custom_field_mapping: Record<string, string>;
+  /** Per-client GHL provisioning blueprint; NULL falls back to a shipped default. */
+  ghl_blueprint: import('./ghl-blueprint.types.js').GhlBlueprint | null;
   created_at: string;
   updated_at: string;
 }

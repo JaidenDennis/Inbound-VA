@@ -16,6 +16,23 @@ export interface CrmSyncJobData {
   idempotencyKey: string;
 }
 
+/**
+ * GHL blueprint provisioning job (job name 'provision' on the crm-sync
+ * queue). The blueprint is snapshotted at enqueue time so retries apply what
+ * was requested even if client_settings changes mid-run.
+ */
+export interface CrmProvisionJobData {
+  kind: 'provision';
+  clientId: string;
+  crmConnectionId: string;
+  runId: string;
+  blueprintName: string;
+  blueprint: import('./ghl-blueprint.types.js').GhlBlueprint;
+  idempotencyKey: string;
+}
+
+export type CrmSyncJob = CrmSyncJobData | CrmProvisionJobData;
+
 export interface BookingJobData {
   clientId: string;
   action: 'create' | 'cancel' | 'reschedule';

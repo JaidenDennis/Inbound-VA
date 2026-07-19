@@ -1,7 +1,7 @@
 import { Queue, QueueEvents } from 'bullmq';
 import { redis } from './redis.js';
 import type {
-  CrmSyncJobData, BookingJobData, NotificationJobData,
+  CrmSyncJob, BookingJobData, NotificationJobData,
   CallProcessingJobData, TranscriptProcessingJobData, AnalyticsJobData,
 } from '../types/index.js';
 
@@ -12,7 +12,8 @@ const defaultJobOptions = {
   removeOnFail: false,
 };
 
-export const crmSyncQueue = new Queue<CrmSyncJobData>('crm-sync', {
+// Carries entity sync jobs plus 'provision' blueprint jobs (CrmSyncJob union).
+export const crmSyncQueue = new Queue<CrmSyncJob>('crm-sync', {
   connection: redis,
   defaultJobOptions,
 });

@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS client_settings (
   crm_type              TEXT NOT NULL DEFAULT 'none',
   crm_config            JSONB NOT NULL DEFAULT '{}',
   custom_field_mapping  JSONB NOT NULL DEFAULT '{}',
+  ghl_blueprint         JSONB,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(client_id)
@@ -243,6 +244,7 @@ CREATE TABLE IF NOT EXISTS crm_connections (
   stage_mapping         JSONB NOT NULL DEFAULT '{}',
   custom_field_mapping  JSONB NOT NULL DEFAULT '{}',
   crm_config            JSONB NOT NULL DEFAULT '{}',
+  needs_reauth          BOOLEAN NOT NULL DEFAULT false,
   is_active             BOOLEAN NOT NULL DEFAULT true,
   last_sync_at          TIMESTAMPTZ,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -258,17 +260,19 @@ CREATE TABLE IF NOT EXISTS crm_sync_logs (
   crm_connection_id   UUID NOT NULL REFERENCES crm_connections(id) ON DELETE CASCADE,
   entity_type         TEXT NOT NULL,
   entity_id           UUID NOT NULL,
-  operation           TEXT NOT NULL CHECK (operation IN ('create','update','delete')),
-  status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('success','failed','pending')),
+  operation           TEXT NOT NULL CHECK (operation IN ('create','update','delete','provision')),
+  status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('success','failed','pending','manual_review')),
   external_id         TEXT,
   error_message       TEXT,
   attempts            INTEGER NOT NULL DEFAULT 0,
+  payload             JSONB,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_crm_sync_logs_client ON crm_sync_logs(client_id);
 CREATE INDEX IF NOT EXISTS idx_crm_sync_logs_status ON crm_sync_logs(status);
 CREATE INDEX IF NOT EXISTS idx_crm_sync_logs_entity ON crm_sync_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_crm_sync_logs_connection ON crm_sync_logs(crm_connection_id);
 
 -- EVENTS
 CREATE TABLE IF NOT EXISTS events (
@@ -455,6 +459,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_clients_retell_agent
 -- OPTIONAL per-client Retell webhook secret (only if clients use separate
 -- Retell accounts; leave NULL when sharing one workspace).
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS retell_webhook_secret TEXT;
+
+-- ─────────────────────────────────────────────
+-- 4c. GHL PROVISIONING (mirrors migration 010)
+-- Convergence for databases created before these columns/constraints
+-- existed; no-ops on a fresh install.
+-- ─────────────────────────────────────────────
+ALTER TABLE crm_sync_logs DROP CONSTRAINT IF EXISTS crm_sync_logs_operation_check;
+ALTER TABLE crm_sync_logs ADD CONSTRAINT crm_sync_logs_operation_check
+  CHECK (operation IN ('create','update','delete','provision'));
+ALTER TABLE crm_sync_logs DROP CONSTRAINT IF EXISTS crm_sync_logs_status_check;
+ALTER TABLE crm_sync_logs ADD CONSTRAINT crm_sync_logs_status_check
+  CHECK (status IN ('success','failed','pending','manual_review'));
+ALTER TABLE crm_sync_logs ADD COLUMN IF NOT EXISTS payload JSONB;
+ALTER TABLE crm_connections ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE client_settings ADD COLUMN IF NOT EXISTS ghl_blueprint JSONB;
 
 -- ─────────────────────────────────────────────
 -- 5. SEED: ROLES + PERMISSIONS
