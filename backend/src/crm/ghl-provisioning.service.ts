@@ -75,6 +75,17 @@ interface RunRowState {
   errorMessage: string | null;
 }
 
+/** Loads a run with its persisted step state (fresh pending steps if the row is missing). */
+export async function loadProvisionRun(
+  clientId: string,
+  crmConnectionId: string,
+  runId: string,
+  blueprintName: string
+): Promise<ProvisionRun> {
+  const { run } = await loadRun(clientId, crmConnectionId, runId, blueprintName);
+  return run;
+}
+
 async function loadRun(
   clientId: string,
   crmConnectionId: string,
