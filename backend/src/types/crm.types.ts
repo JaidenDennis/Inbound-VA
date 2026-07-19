@@ -55,6 +55,8 @@ export interface CrmConnection {
   pipeline_id: string | null;
   stage_mapping: Record<string, string>;
   custom_field_mapping: Record<string, string>;
+  /** CRM-specific settings merged into the adapter config (e.g. GHL stageId/calendarId). */
+  crm_config: Record<string, unknown> | null;
   is_active: boolean;
   last_sync_at: string | null;
   created_at: string;

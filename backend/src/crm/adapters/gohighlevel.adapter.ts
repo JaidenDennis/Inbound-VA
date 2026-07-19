@@ -6,35 +6,65 @@ import type {
 import type { Plugin } from '../../plugins/index.js';
 import type { ICrmAdapter } from '../crm.interface.js';
 
+// GoHighLevel v2 API (services.leadconnectorhq.com), authenticated with the
+// OAuth access token resolved by resolveAdapterConfig(). The legacy v1 API
+// (rest.gohighlevel.com + location API keys) is deprecated and new
+// sub-accounts can no longer issue v1 keys, so v1 is not supported here.
+//
+// Every v2 request needs a Version header; contacts/opportunities/locations
+// use 2021-07-28, calendars use 2021-04-15.
+const DEFAULT_BASE_URL = 'https://services.leadconnectorhq.com';
+const API_VERSION = '2021-07-28';
+const CALENDARS_API_VERSION = '2021-04-15';
+
 interface GhlConfig {
-  apiKey: string;
+  accessToken: string;
   locationId: string;
+  /** Default pipeline for new opportunities (crm_connections.pipeline_id). */
+  pipelineId?: string;
+  /** Default stage inside pipelineId (crm_config.stageId). */
+  stageId?: string;
+  /** Calendar that receives AI-booked appointments (crm_config.calendarId). */
+  calendarId?: string;
+  /** Maps internal custom-field names → GHL custom-field keys/ids. */
+  customFieldMapping?: Record<string, string>;
   baseUrl?: string;
+}
+
+export interface GhlPipeline {
+  id: string;
+  name: string;
+  stages: Array<{ id: string; name: string }>;
+}
+
+export interface GhlCalendar {
+  id: string;
+  name: string;
 }
 
 class GoHighLevelAdapter extends BaseCrmAdapter {
   readonly name = 'gohighlevel';
-  private readonly locationId: string;
+  private readonly cfg: GhlConfig;
 
   constructor(config: Record<string, unknown>) {
     super(config);
-    const cfg = config as unknown as GhlConfig;
-    this.locationId = cfg.locationId;
-    this.http.defaults.baseURL = cfg.baseUrl ?? 'https://rest.gohighlevel.com/v1';
-    this.http.defaults.headers.common['Authorization'] = `Bearer ${cfg.apiKey}`;
+    this.cfg = config as unknown as GhlConfig;
+    this.http.defaults.baseURL = this.cfg.baseUrl ?? DEFAULT_BASE_URL;
+    this.http.defaults.headers.common['Authorization'] = `Bearer ${this.cfg.accessToken}`;
+    this.http.defaults.headers.common['Version'] = API_VERSION;
     this.http.defaults.headers.common['Content-Type'] = 'application/json';
   }
 
   async createOrUpdateContact(contact: CrmContact): Promise<CrmSyncResult> {
     try {
-      const { data } = await this.http.post('/contacts/', {
-        locationId: this.locationId,
+      const { data } = await this.http.post('/contacts/upsert', {
+        locationId: this.cfg.locationId,
         firstName: contact.firstName,
         lastName: contact.lastName,
         email: contact.email,
         phone: contact.phone,
         tags: contact.tags ?? [],
-        customField: contact.customFields,
+        ...this.mapCustomFields(contact.customFields),
       });
       return this.success(data.contact?.id);
     } catch (err) {
@@ -43,13 +73,21 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
   }
 
   async createLead(lead: CrmLead): Promise<CrmSyncResult> {
+    const pipelineId = lead.pipelineId ?? this.cfg.pipelineId;
+    if (!pipelineId) {
+      return this.failure(
+        new Error('No GoHighLevel pipeline configured — pick one in CRM settings (pipelines must be created in the GHL sub-account UI first)')
+      );
+    }
+    const stageId = lead.stageId ?? this.cfg.stageId;
     try {
       const { data } = await this.http.post('/opportunities/', {
-        pipelineId: lead.pipelineId,
-        locationId: this.locationId,
-        name: lead.title,
-        pipelineStageId: lead.stageId,
+        locationId: this.cfg.locationId,
+        pipelineId,
+        ...(stageId ? { pipelineStageId: stageId } : {}),
         contactId: lead.contactId,
+        name: lead.title,
+        status: 'open',
         monetaryValue: lead.value ?? 0,
         source: lead.source,
       });
@@ -61,10 +99,10 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
 
   async createNote(note: CrmNote): Promise<CrmSyncResult> {
     try {
-      const { data } = await this.http.post(`/contacts/${note.contactId}/notes/`, {
+      const { data } = await this.http.post(`/contacts/${note.contactId}/notes`, {
         body: note.body,
       });
-      return this.success(data.note?.id);
+      return this.success(data.note?.id ?? data.id);
     } catch (err) {
       return this.failure(err);
     }
@@ -72,29 +110,52 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
 
   async createTask(task: CrmTask): Promise<CrmSyncResult> {
     try {
-      const { data } = await this.http.post(`/contacts/${task.contactId}/tasks/`, {
+      const { data } = await this.http.post(`/contacts/${task.contactId}/tasks`, {
         title: task.title,
         dueDate: task.dueDate.toISOString(),
-        assignedTo: task.assigneeId,
+        completed: false,
+        ...(task.assigneeId ? { assignedTo: task.assigneeId } : {}),
       });
-      return this.success(data.task?.id);
+      return this.success(data.task?.id ?? data.id);
     } catch (err) {
       return this.failure(err);
     }
   }
 
   async createAppointment(appointment: CrmAppointment): Promise<CrmSyncResult> {
+    if (!this.cfg.calendarId) {
+      return this.failure(
+        new Error('No GoHighLevel calendar configured — pick one in CRM settings so booked appointments sync')
+      );
+    }
     try {
-      const { data } = await this.http.post('/appointments/', {
-        calendarId: (this.config as unknown as GhlConfig & { calendarId?: string }).calendarId,
-        locationId: this.locationId,
-        contactId: appointment.contactId,
-        title: appointment.title,
-        startTime: appointment.startTime.toISOString(),
-        endTime: appointment.endTime.toISOString(),
-        notes: appointment.notes,
-      });
-      return this.success(data.appointment?.id);
+      const { data } = await this.http.post(
+        '/calendars/events/appointments',
+        {
+          calendarId: this.cfg.calendarId,
+          locationId: this.cfg.locationId,
+          contactId: appointment.contactId,
+          title: appointment.title,
+          startTime: appointment.startTime.toISOString(),
+          endTime: appointment.endTime.toISOString(),
+          appointmentStatus: 'confirmed',
+          // Availability was already checked against the booking source of
+          // truth; don't let GHL slot rules reject the write-back.
+          ignoreFreeSlotValidation: true,
+        },
+        { headers: { Version: CALENDARS_API_VERSION } }
+      );
+      const appointmentId = data.id ?? data.event?.id ?? data.appointment?.id;
+      // The v2 appointment payload has no notes field; preserve notes on the
+      // contact instead. Best-effort — the appointment itself already synced.
+      if (appointment.notes) {
+        await this.createNote({
+          contactId: appointment.contactId,
+          body: `Appointment note (${appointment.title}): ${appointment.notes}`,
+          createdAt: new Date(),
+        });
+      }
+      return this.success(appointmentId);
     } catch (err) {
       return this.failure(err);
     }
@@ -127,19 +188,62 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
 
   async testConnection(): Promise<boolean> {
     try {
-      await this.http.get(`/locations/${this.locationId}`);
+      await this.http.get(`/locations/${this.cfg.locationId}`);
       return true;
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Pipelines can't be created via the GHL API (UI-only); this lists the
+   * sub-account's pipelines so the dashboard can offer a picker.
+   */
+  async listPipelines(): Promise<GhlPipeline[]> {
+    const { data } = await this.http.get('/opportunities/pipelines', {
+      params: { locationId: this.cfg.locationId },
+    });
+    const pipelines = (data.pipelines ?? []) as Array<{
+      id: string; name: string; stages?: Array<{ id: string; name: string }>;
+    }>;
+    return pipelines.map((p) => ({
+      id: p.id,
+      name: p.name,
+      stages: (p.stages ?? []).map((s) => ({ id: s.id, name: s.name })),
+    }));
+  }
+
+  async listCalendars(): Promise<GhlCalendar[]> {
+    const { data } = await this.http.get('/calendars/', {
+      params: { locationId: this.cfg.locationId },
+      headers: { Version: CALENDARS_API_VERSION },
+    });
+    const calendars = (data.calendars ?? []) as Array<{ id: string; name: string }>;
+    return calendars.map((c) => ({ id: c.id, name: c.name }));
+  }
+
+  /**
+   * GHL v2 wants custom fields as [{ key, field_value }]. Internal names go
+   * through customFieldMapping when configured; unmapped names pass through
+   * as-is (valid when they already are GHL field keys).
+   */
+  private mapCustomFields(customFields?: Record<string, unknown>): Record<string, unknown> {
+    if (!customFields || Object.keys(customFields).length === 0) return {};
+    const mapping = this.cfg.customFieldMapping ?? {};
+    return {
+      customFields: Object.entries(customFields).map(([name, value]) => ({
+        key: mapping[name] ?? name,
+        field_value: value,
+      })),
+    };
   }
 }
 
 export const goHighLevelPlugin: Plugin<ICrmAdapter> = {
   manifest: {
     name: 'gohighlevel',
-    version: '1.0.0',
-    description: 'GoHighLevel CRM adapter',
+    version: '2.0.0',
+    description: 'GoHighLevel CRM adapter (v2 API, OAuth)',
     author: 'Gravvia',
   },
   factory: (config) => new GoHighLevelAdapter(config),

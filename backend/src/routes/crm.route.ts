@@ -2,8 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { crmSyncQueue } from '../queues/index.js';
-import { getCrmAdapter } from '../crm/index.js';
-import { encrypt, decrypt } from '../utils/index.js';
+import { getCrmAdapter, resolveAdapterConfig } from '../crm/index.js';
+import { encrypt } from '../utils/index.js';
 import { requirePermission, assertClientAccess } from '../middleware/index.js';
 import { buildIdempotencyKey } from '../utils/index.js';
 import type { JwtPayload } from '../types/index.js';
@@ -33,6 +33,12 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
       if (!assertClientAccess(request.user as JwtPayload, body.clientId)) {
         return reply.code(403).send({ error: 'Forbidden' });
       }
+      // GoHighLevel connects via the marketplace OAuth flow, not raw credentials.
+      if (body.crmType === 'gohighlevel') {
+        return reply.code(422).send({
+          error: 'GoHighLevel uses OAuth — start from GET /crm/gohighlevel/oauth/install',
+        });
+      }
       const credentialsEncrypted = encrypt(JSON.stringify(body.credentials));
 
       const { data, error } = await supabase
@@ -52,8 +58,7 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
       if (error) return reply.code(500).send({ error: error.message });
 
       // Test connection
-      const credentials = JSON.parse(decrypt(data.credentials_encrypted));
-      const adapter = getCrmAdapter(body.crmType, credentials);
+      const adapter = getCrmAdapter(body.crmType, await resolveAdapterConfig(data));
       const ok = await adapter.testConnection();
       if (!ok) return reply.code(422).send({ error: 'CRM connection test failed' });
 

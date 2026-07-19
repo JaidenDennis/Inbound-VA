@@ -242,6 +242,7 @@ CREATE TABLE IF NOT EXISTS crm_connections (
   pipeline_id           TEXT,
   stage_mapping         JSONB NOT NULL DEFAULT '{}',
   custom_field_mapping  JSONB NOT NULL DEFAULT '{}',
+  crm_config            JSONB NOT NULL DEFAULT '{}',
   is_active             BOOLEAN NOT NULL DEFAULT true,
   last_sync_at          TIMESTAMPTZ,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),

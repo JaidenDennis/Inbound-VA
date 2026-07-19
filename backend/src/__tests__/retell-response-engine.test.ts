@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the shared Retell client so we can assert on the exact bodies sent.
-const llmCreate = vi.fn(() => Promise.resolve({ llm_id: 'llm_created' }));
-const llmUpdate = vi.fn(() => Promise.resolve({ llm_id: 'llm_updated' }));
+const llmCreate = vi.fn((..._args: unknown[]) => Promise.resolve({ llm_id: 'llm_created' }));
+const llmUpdate = vi.fn((..._args: unknown[]) => Promise.resolve({ llm_id: 'llm_updated' }));
 vi.mock('../providers/retell/retell.client.js', () => ({
   retell: { llm: { create: llmCreate, update: llmUpdate } },
 }));
