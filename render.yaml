@@ -81,6 +81,16 @@ envVarGroups:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      # ---- GoHighLevel marketplace app ("GI Integration 3") OAuth creds. ----
+      # The OAuth redirect defaults to `${API_BASE_URL}/crm/level/oauth/callback`,
+      # so API_BASE_URL MUST be the deployed API URL (or set GHL_REDIRECT_URI
+      # explicitly). The same URL must be registered on the marketplace app.
+      - key: API_BASE_URL
+        sync: false
+      - key: GHL_CLIENT_ID
+        sync: false
+      - key: GHL_CLIENT_SECRET
+        sync: false
       # ---- Optional: email notifications (nodemailer). Set if used. ----
       - key: SMTP_HOST
         sync: false
