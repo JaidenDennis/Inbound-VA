@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke:ghl": "tsx scripts/ghl-smoke-test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
