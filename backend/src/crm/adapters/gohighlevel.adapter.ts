@@ -196,8 +196,9 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
   }
 
   /**
-   * Pipelines can't be created via the GHL API (UI-only); this lists the
-   * sub-account's pipelines so the dashboard can offer a picker.
+   * Lists the sub-account's pipelines so the dashboard can offer a picker.
+   * Pipeline creation/updates live in the provisioning client
+   * (ghl-provisioning-client.ts), which needs the pipelines.* OAuth scopes.
    */
   async listPipelines(): Promise<GhlPipeline[]> {
     const { data } = await this.http.get('/opportunities/pipelines', {

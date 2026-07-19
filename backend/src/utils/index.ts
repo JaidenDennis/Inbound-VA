@@ -4,3 +4,4 @@ export { buildIdempotencyKey } from './idempotency.js';
 export { initSentry, captureException } from './sentry.js';
 export { sendMail } from './mailer.js';
 export { formatPhone, spellName } from './speech.js';
+export { createRateLimiter } from './rate-limiter.js';
