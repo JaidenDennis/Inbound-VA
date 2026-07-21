@@ -26,6 +26,11 @@ interface GhlConfig {
   stageId?: string;
   /** Calendar that receives AI-booked appointments (crm_config.calendarId). */
   calendarId?: string;
+  /**
+   * Team member appointments are assigned to (crm_config.assignedUserId).
+   * Required by GHL for round-robin calendars ("assignedUserId is missing").
+   */
+  assignedUserId?: string;
   /** Maps internal custom-field names → GHL custom-field keys/ids. */
   customFieldMapping?: Record<string, string>;
   baseUrl?: string;
@@ -139,6 +144,7 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
           startTime: appointment.startTime.toISOString(),
           endTime: appointment.endTime.toISOString(),
           appointmentStatus: 'confirmed',
+          ...(this.cfg.assignedUserId ? { assignedUserId: this.cfg.assignedUserId } : {}),
           // Availability was already checked against the booking source of
           // truth; don't let GHL slot rules reject the write-back.
           ignoreFreeSlotValidation: true,
