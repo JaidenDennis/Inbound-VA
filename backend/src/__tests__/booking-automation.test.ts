@@ -39,6 +39,8 @@ const ghl = {
   createContactTask: vi.fn(async () => ({ id: 'task-1' })),
   searchOpportunitiesByContact: vi.fn(async () => [{ id: 'opp-1', name: 'Deal', pipelineId: 'pipe-1' }]),
   moveOpportunityStage: vi.fn(async () => undefined),
+  listPipelines: vi.fn(async () => [{ id: 'pipe-1', name: 'Sales', stages: [{ id: 'stage-booked', name: 'Booked' }] }]),
+  createOpportunity: vi.fn(async () => ({ id: 'opp-new', name: 'x', pipelineId: 'pipe-1' })),
 };
 vi.mock('../crm/ghl-provisioning-client.js', () => ({
   // Regular function (not an arrow) so `new GhlProvisioningClient()` works;
@@ -96,12 +98,24 @@ describe('runBookingAutomation', () => {
     expect(res).toEqual({ success: true, externalId: 'ghl-contact-1' });
   });
 
-  it('still tags/tasks when the contact has no opportunity to advance', async () => {
+  it('creates an opportunity in the booked stage when the contact has none', async () => {
     ghl.searchOpportunitiesByContact.mockResolvedValueOnce([]);
     const res = await runBookingAutomation(ghlConn, 'c1', adapter, config({ bookedStageId: 'stage-booked' }), payload);
 
     expect(ghl.addContactTags).toHaveBeenCalledOnce();
     expect(ghl.moveOpportunityStage).not.toHaveBeenCalled();
+    expect(ghl.createOpportunity).toHaveBeenCalledWith(
+      expect.objectContaining({ pipelineId: 'pipe-1', pipelineStageId: 'stage-booked', contactId: 'ghl-contact-1' })
+    );
+    expect(res).toEqual({ success: true, externalId: 'opp-new' });
+  });
+
+  it('skips opportunity creation when bookedStageId is not in any pipeline', async () => {
+    ghl.searchOpportunitiesByContact.mockResolvedValueOnce([]);
+    ghl.listPipelines.mockResolvedValueOnce([{ id: 'other', name: 'X', stages: [{ id: 'nope', name: 'N' }] }]);
+    const res = await runBookingAutomation(ghlConn, 'c1', adapter, config({ bookedStageId: 'stage-booked' }), payload);
+
+    expect(ghl.createOpportunity).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true, externalId: 'ghl-contact-1' });
   });
 

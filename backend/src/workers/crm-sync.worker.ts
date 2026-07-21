@@ -54,21 +54,36 @@ export async function runBookingAutomation(
     new Date(Date.now() + 24 * 60 * 60 * 1000)
   );
 
-  let movedOpportunityId: string | undefined;
+  let opportunityId: string | undefined;
   if (bookedStageId) {
     const opps = await ghl.searchOpportunitiesByContact(crmContactId);
     const target = opps[0];
     if (target) {
       await ghl.moveOpportunityStage(target.id, bookedStageId);
-      movedOpportunityId = target.id;
+      opportunityId = target.id;
     } else {
-      logger.warn({ clientId, crmContactId }, 'booking-automation: no opportunity to advance');
+      // Brand-new caller with no opportunity yet (e.g. first inbound booking) —
+      // create one in the booked stage so the booking is reflected in the pipeline.
+      const pipeline = (await ghl.listPipelines()).find((p) =>
+        p.stages.some((s) => s.id === bookedStageId)
+      );
+      if (pipeline) {
+        const created = await ghl.createOpportunity({
+          pipelineId: pipeline.id,
+          pipelineStageId: bookedStageId,
+          contactId: crmContactId,
+          name: title,
+        });
+        opportunityId = created.id;
+      } else {
+        logger.warn({ clientId, bookedStageId }, 'booking-automation: bookedStageId not in any pipeline — opportunity not created');
+      }
     }
   } else {
-    logger.warn({ clientId }, 'booking-automation: no bookedStageId configured — opportunity move skipped');
+    logger.warn({ clientId }, 'booking-automation: no bookedStageId configured — opportunity step skipped');
   }
 
-  return { success: true, externalId: movedOpportunityId ?? crmContactId };
+  return { success: true, externalId: opportunityId ?? crmContactId };
 }
 
 /**
