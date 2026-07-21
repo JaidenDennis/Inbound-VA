@@ -26,7 +26,7 @@ const DEFAULT_BOOKED_TAGS = ['appointment-booked'];
  * crm_config (bookedStageId / bookedTags) so nothing is hardcoded per client;
  * with no bookedStageId configured the opportunity move is skipped.
  */
-async function runBookingAutomation(
+export async function runBookingAutomation(
   conn: CrmConnection,
   clientId: string,
   adapter: ICrmAdapter,
