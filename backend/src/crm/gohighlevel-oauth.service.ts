@@ -42,6 +42,13 @@ export interface GhlOAuthCredentials {
   /** Epoch ms after which the access token is no longer valid. */
   expiresAt: number;
   locationId: string;
+  /**
+   * How the token was obtained. Absent/`'oauth'` → a marketplace OAuth token
+   * that must be refreshed via the rotating refresh-token flow. When
+   * `'private_integration'` the token is a sub-account Private Integration
+   * Token (PIT): long-lived, no refresh token, used verbatim.
+   */
+  authMode?: 'oauth' | 'private_integration';
 }
 
 interface GhlTokenResponse {
@@ -156,6 +163,9 @@ export async function ensureFreshGhlCredentials(
   conn: Pick<CrmConnection, 'id' | 'credentials_encrypted'>
 ): Promise<GhlOAuthCredentials> {
   const creds = JSON.parse(decrypt(conn.credentials_encrypted)) as GhlOAuthCredentials;
+  // Private Integration Tokens are long-lived and have no refresh token; the
+  // adapter uses them verbatim, so there is nothing to refresh.
+  if (creds.authMode === 'private_integration') return creds;
   if (!creds.refreshToken) {
     throw new Error('GoHighLevel connection has no OAuth tokens — reconnect via the OAuth install flow');
   }

@@ -204,7 +204,7 @@ export class GhlProvisioningClient {
         name: field.name,
         dataType: field.dataType,
         model: 'contact',
-        ...(field.options ? { picklistOptions: field.options } : {}),
+        ...(field.options ? { options: field.options } : {}),
       },
     });
     return (data.customField ?? data) as GhlCustomField;
