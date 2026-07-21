@@ -7,8 +7,69 @@ import {
   markRunManualReview,
   loadProvisionRun,
 } from '../crm/ghl-provisioning.service.js';
+import { GhlProvisioningClient } from '../crm/ghl-provisioning-client.js';
 import { logger } from '../utils/index.js';
-import type { CrmConnection, CrmProvisionJobData, CrmSyncJob, CrmSyncJobData } from '../types/index.js';
+import type {
+  CrmConnection,
+  CrmProvisionJobData,
+  CrmSyncJob,
+  CrmSyncJobData,
+  CrmSyncResult,
+} from '../types/index.js';
+
+const DEFAULT_BOOKED_TAGS = ['appointment-booked'];
+
+/**
+ * CRM-side reactions to a booking (GoHighLevel). Advances the contact's
+ * opportunity to the client's configured "booked" stage, tags the contact,
+ * and creates a staff follow-up task. Stage/tags are read from
+ * crm_config (bookedStageId / bookedTags) so nothing is hardcoded per client;
+ * with no bookedStageId configured the opportunity move is skipped.
+ */
+async function runBookingAutomation(
+  conn: CrmConnection,
+  clientId: string,
+  adapter: ICrmAdapter,
+  config: Record<string, unknown>,
+  payload: Record<string, unknown>
+): Promise<CrmSyncResult> {
+  if (conn.crm_type !== 'gohighlevel') {
+    return { success: true, metadata: { skipped: `booking-automation not implemented for ${conn.crm_type}` } };
+  }
+  const crmContactId = await resolveCrmContactId(adapter, clientId, payload.contactId as string);
+  const ghl = new GhlProvisioningClient({
+    accessToken: config.accessToken as string,
+    locationId: config.locationId as string,
+  });
+
+  const bookedTags =
+    (config.bookedTags as string[] | undefined)?.length ? (config.bookedTags as string[]) : DEFAULT_BOOKED_TAGS;
+  const bookedStageId = config.bookedStageId as string | undefined;
+  const title = (payload.title as string) ?? 'Appointment';
+
+  await ghl.addContactTags(crmContactId, bookedTags);
+  await ghl.createContactTask(
+    crmContactId,
+    `Confirm & prep booked appointment: ${title}`,
+    new Date(Date.now() + 24 * 60 * 60 * 1000)
+  );
+
+  let movedOpportunityId: string | undefined;
+  if (bookedStageId) {
+    const opps = await ghl.searchOpportunitiesByContact(crmContactId);
+    const target = opps[0];
+    if (target) {
+      await ghl.moveOpportunityStage(target.id, bookedStageId);
+      movedOpportunityId = target.id;
+    } else {
+      logger.warn({ clientId, crmContactId }, 'booking-automation: no opportunity to advance');
+    }
+  } else {
+    logger.warn({ clientId }, 'booking-automation: no bookedStageId configured — opportunity move skipped');
+  }
+
+  return { success: true, externalId: movedOpportunityId ?? crmContactId };
+}
 
 /**
  * Resolve the CRM's own ID for a contact so appointments/notes attach to the
@@ -130,7 +191,8 @@ export async function processCrmSync(job: Job<CrmSyncJob>): Promise<void> {
 
   // Decrypt + merge connection settings; refreshes OAuth tokens (GHL) if the
   // access token is at/near expiry.
-  const adapter = getCrmAdapter(conn.crm_type, await resolveAdapterConfig(conn));
+  const config = await resolveAdapterConfig(conn);
+  const adapter = getCrmAdapter(conn.crm_type, config);
 
   let result;
   switch (entityType) {
@@ -192,6 +254,9 @@ export async function processCrmSync(job: Job<CrmSyncJob>): Promise<void> {
       );
       break;
     }
+    case 'booking-automation':
+      result = await runBookingAutomation(conn as CrmConnection, clientId, adapter, config, payload);
+      break;
     default:
       throw new Error(`Unknown entity type: ${entityType}`);
   }

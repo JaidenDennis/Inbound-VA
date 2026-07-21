@@ -122,8 +122,37 @@ export async function handleCallSummaryCompleted(event: NormalizedEvent): Promis
 }
 
 /**
- * On booking: schedule a confirmation now and a reminder before the appointment
- * to reduce no-shows. CRM/calendar write-back already happens in booking.service.
+ * Advance the CRM on a booking: move the contact's opportunity to the booked
+ * stage, tag the contact, and create a staff follow-up task. Runs in the
+ * crm-sync worker; no-op when the client has no active CRM connection.
+ */
+async function enqueueBookingCrmAutomation(
+  clientId: string,
+  contactId: string | undefined,
+  appt: { id?: string; title?: string }
+): Promise<void> {
+  if (!contactId || !appt.id) return;
+  const crmConnectionId = await activeCrmConnectionId(clientId);
+  if (!crmConnectionId) return;
+  await crmSyncQueue.add(
+    'booking-automation',
+    {
+      clientId,
+      crmConnectionId,
+      entityType: 'booking-automation',
+      entityId: appt.id,
+      operation: 'update',
+      payload: { contactId, title: appt.title ?? 'Appointment' },
+      idempotencyKey: buildIdempotencyKey('booking-automation', appt.id),
+    },
+    { jobId: buildIdempotencyKey('crm-booking-automation', appt.id) }
+  );
+}
+
+/**
+ * On booking: advance the CRM (stage/tag/task), schedule a confirmation now and
+ * a reminder before the appointment to reduce no-shows. Contact/calendar
+ * write-back already happens in booking.service.
  */
 export async function handleBookingRequested(event: NormalizedEvent): Promise<void> {
   try {
@@ -133,6 +162,10 @@ export async function handleBookingRequested(event: NormalizedEvent): Promise<vo
       title?: string;
     };
     if (!appt.id) return;
+
+    // CRM-side booking reactions (independent of notification recipients).
+    await enqueueBookingCrmAutomation(event.clientId, event.contactId, appt);
+
     const settings = await clientService.getSettings(event.clientId);
     const recipients = settings?.notification_emails ?? [];
     if (!recipients.length) return;

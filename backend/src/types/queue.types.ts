@@ -9,7 +9,7 @@ export type QueueName =
 export interface CrmSyncJobData {
   clientId: string;
   crmConnectionId: string;
-  entityType: 'contact' | 'lead' | 'appointment' | 'transcript' | 'summary' | 'note';
+  entityType: 'contact' | 'lead' | 'appointment' | 'transcript' | 'summary' | 'note' | 'booking-automation';
   entityId: string;
   operation: 'create' | 'update' | 'delete';
   payload: Record<string, unknown>;
