@@ -287,6 +287,70 @@ export class GhlProvisioningClient {
     return (data.opportunity ?? data) as GhlOpportunity;
   }
 
+  /** Move an opportunity to a different stage of its pipeline. */
+  async moveOpportunityStage(opportunityId: string, pipelineStageId: string): Promise<void> {
+    await this.request({
+      method: 'PUT',
+      url: `/opportunities/${opportunityId}`,
+      data: { pipelineStageId },
+    });
+  }
+
+  /** Add tags to an existing contact (additive — GHL merges, does not replace). */
+  async addContactTags(contactId: string, tags: string[]): Promise<string[]> {
+    const data = await this.request<{ tags?: string[] }>({
+      method: 'POST',
+      url: `/contacts/${contactId}/tags`,
+      data: { tags },
+    });
+    return data.tags ?? [];
+  }
+
+  /** Create a task on a contact (e.g. a staff follow-up after a booking). */
+  async createContactTask(
+    contactId: string,
+    title: string,
+    dueDate: Date,
+    body?: string
+  ): Promise<{ id: string }> {
+    const data = await this.request<{ task?: { id: string }; id?: string }>({
+      method: 'POST',
+      url: `/contacts/${contactId}/tasks`,
+      data: { title, dueDate: dueDate.toISOString(), completed: false, ...(body ? { body } : {}) },
+    });
+    const id = data.task?.id ?? data.id;
+    if (!id) throw new GhlApiError('GHL task create returned no id', undefined, data);
+    return { id };
+  }
+
+  /** Read a single opportunity (for confirming a stage move landed). */
+  async getOpportunity(opportunityId: string): Promise<GhlOpportunity & { pipelineStageId?: string }> {
+    const data = await this.request<{ opportunity?: GhlOpportunity & { pipelineStageId?: string } }>({
+      method: 'GET',
+      url: `/opportunities/${opportunityId}`,
+    });
+    if (!data.opportunity) throw new GhlApiError('GHL opportunity not found', 404, data);
+    return data.opportunity;
+  }
+
+  /** Read a contact's tags (for confirming an addContactTags landed). */
+  async getContactTags(contactId: string): Promise<string[]> {
+    const data = await this.request<{ contact?: { tags?: string[] } }>({
+      method: 'GET',
+      url: `/contacts/${contactId}`,
+    });
+    return data.contact?.tags ?? [];
+  }
+
+  /** List a contact's tasks (for confirming a createContactTask landed). */
+  async listContactTasks(contactId: string): Promise<Array<{ id: string; title: string }>> {
+    const data = await this.request<{ tasks?: Array<{ id: string; title: string }> }>({
+      method: 'GET',
+      url: `/contacts/${contactId}/tasks`,
+    });
+    return data.tasks ?? [];
+  }
+
   /** Smoke-test cleanup only. */
   async deleteContact(contactId: string): Promise<void> {
     await this.request({ method: 'DELETE', url: `/contacts/${contactId}` });
