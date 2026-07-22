@@ -47,6 +47,32 @@ export interface CrmSyncResult {
   metadata?: Record<string, unknown>;
 }
 
+// ── Canonical calendar-booking types (CRM-calendar truth, inbound Phase 3) ──
+// The workflow engine and actions never touch vendor-specific shapes; CRM
+// calendar access goes through these adapter methods only.
+
+export interface CrmAvailabilityRequest {
+  /** Window start, ISO 8601. */
+  startDate: string;
+  /** Window end, ISO 8601. */
+  endDate: string;
+  /** IANA timezone the caller thinks in. */
+  timezone: string;
+}
+
+export interface CrmAvailabilitySlot {
+  /** Slot start, ISO 8601. */
+  start: string;
+  /** Slot end when the provider reports one. */
+  end?: string;
+}
+
+export interface CrmBookingUpdate {
+  startTime?: Date;
+  endTime?: Date;
+  title?: string;
+}
+
 export interface CrmConnection {
   id: string;
   client_id: string;

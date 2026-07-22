@@ -2,6 +2,7 @@ import { supabase } from '../db/index.js';
 import { env } from '../config/index.js';
 import { logger } from '../utils/index.js';
 import { clientService } from './client.service.js';
+import { knowledgeService } from './knowledge.service.js';
 import { writeAuditLog } from './audit.service.js';
 import {
   createOrUpdateResponseEngine,
@@ -45,8 +46,11 @@ export class ProvisioningService {
   async provisionClient(clientId: string, opts: ProvisionOptions = {}): Promise<ProvisionResult> {
     const client = await clientService.findById(clientId);
     if (!client) throw new Error(`Client not found: ${clientId}`);
-    const settings = await clientService.getSettings(clientId);
-    if (!settings) throw new Error(`Client settings not found for client: ${clientId}`);
+    const baseSettings = await clientService.getSettings(clientId);
+    if (!baseSettings) throw new Error(`Client settings not found for client: ${clientId}`);
+    // Relational knowledge (services/pricing/faqs tables) overlays the legacy
+    // JSONB columns, so agent prompts render from the live knowledge base.
+    const settings = await knowledgeService.settingsWithKnowledge(clientId, baseSettings);
 
     const vertical = opts.template ?? resolveVertical(client.industry);
     const template = getTemplate(vertical);

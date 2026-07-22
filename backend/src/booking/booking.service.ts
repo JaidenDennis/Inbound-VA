@@ -4,12 +4,13 @@ import { addMinutes, isWithinInterval } from 'date-fns';
 import { supabase } from '../db/index.js';
 import { logger } from '../utils/index.js';
 import { getCalendarAdapter } from '../calendar/index.js';
+import { getCrmAdapter, resolveAdapterConfig, type ICrmAdapter } from '../crm/index.js';
 import { eventBus } from '../events/index.js';
 import { crmSyncQueue } from '../queues/index.js';
 import { buildIdempotencyKey } from '../utils/index.js';
 import type {
   Appointment, BookingRequest, RescheduleRequest,
-  TimeSlot, AvailabilityRequest,
+  TimeSlot, AvailabilityRequest, CrmConnection,
 } from '../types/index.js';
 import type { ClientSettings } from '../types/index.js';
 
@@ -158,6 +159,7 @@ export class BookingService {
     if (data.external_calendar_id) {
       await this.syncCancelToCalendar(data);
     }
+    await this.syncCrmBookingChange(data as Appointment, 'cancel');
 
     await eventBus.publish({
       type: 'booking.cancelled',
@@ -198,6 +200,7 @@ export class BookingService {
     if (data.external_calendar_id) {
       await this.syncRescheduleToCalendar(data);
     }
+    await this.syncCrmBookingChange(data as Appointment, 'reschedule');
 
     await eventBus.publish({
       type: 'booking.rescheduled',
@@ -212,7 +215,60 @@ export class BookingService {
     return data as Appointment;
   }
 
+  /**
+   * The client's CRM-calendar adapter when it is the booking source of truth
+   * (active connection + calendar capability + configured calendar). Null ⇒
+   * fall back to the internal rules engine.
+   */
+  private async crmCalendar(
+    clientId: string
+  ): Promise<{ adapter: ICrmAdapter; config: Record<string, unknown> } | null> {
+    try {
+      const { data: conn } = await supabase
+        .from('crm_connections')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!conn) return null;
+      const config = await resolveAdapterConfig(conn as CrmConnection);
+      const adapter = getCrmAdapter((conn as CrmConnection).crm_type, config);
+      if (!adapter.getAvailability || !config.calendarId) return null;
+      return { adapter, config };
+    } catch (err) {
+      logger.warn({ err, clientId }, 'CRM calendar resolution failed; using internal availability');
+      return null;
+    }
+  }
+
   async getAvailability(req: AvailabilityRequest): Promise<TimeSlot[]> {
+    // CRM calendar (e.g. GoHighLevel) is the availability truth when
+    // configured; its answer stands even when empty. Errors fall back to the
+    // internal rules engine so a CRM outage never strands a caller.
+    const crm = await this.crmCalendar(req.clientId);
+    if (crm) {
+      try {
+        const timezone = req.timezone ?? 'UTC';
+        const dayStart = new Date(`${req.date}T00:00:00.000Z`);
+        const dayEnd = new Date(`${req.date}T23:59:59.999Z`);
+        const slots = await crm.adapter.getAvailability!({
+          startDate: dayStart.toISOString(),
+          endDate: dayEnd.toISOString(),
+          timezone,
+        });
+        return slots.map((s) => ({
+          start: new Date(s.start),
+          end: s.end ? new Date(s.end) : new Date(new Date(s.start).getTime() + 30 * 60_000),
+          available: true,
+        }));
+      } catch (err) {
+        logger.warn({ err, clientId: req.clientId }, 'CRM availability failed; using internal rules');
+      }
+    }
+    return this.internalAvailability(req);
+  }
+
+  private async internalAvailability(req: AvailabilityRequest): Promise<TimeSlot[]> {
     const { data: settings } = await supabase
       .from('client_settings')
       .select('booking_rules')
@@ -322,6 +378,71 @@ export class BookingService {
     const cfg = data?.crm_config as Record<string, unknown> | undefined;
     if (!cfg?.calendar_provider) return null;
     return { provider: cfg.calendar_provider as string, config: cfg.calendar_config as Record<string, unknown> };
+  }
+
+  /**
+   * Push a reschedule/cancel to the CRM calendar (best-effort). The CRM's
+   * event id is mirrored into appointments.metadata.crm_event_id by the
+   * crm-sync worker when the original booking synced.
+   */
+  private async syncCrmBookingChange(
+    appointment: Appointment,
+    kind: 'reschedule' | 'cancel'
+  ): Promise<void> {
+    const eventId = appointment.metadata?.crm_event_id as string | undefined;
+    if (!eventId) return;
+    try {
+      const crm = await this.crmCalendar(appointment.client_id);
+      if (!crm) return;
+      if (kind === 'cancel' && crm.adapter.cancelBooking) {
+        await crm.adapter.cancelBooking(eventId);
+      } else if (kind === 'reschedule' && crm.adapter.updateBooking) {
+        await crm.adapter.updateBooking(eventId, {
+          startTime: new Date(appointment.start_time),
+          endTime: new Date(appointment.end_time),
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, appointmentId: appointment.id, kind }, 'CRM booking change sync failed');
+    }
+  }
+
+  /** Add a caller to the waitlist and audit it. */
+  async addToWaitlist(input: {
+    clientId: string;
+    contactId: string;
+    callId?: string | null;
+    service?: string;
+    preferredDays?: string[];
+    preferredTimes?: string;
+    notes?: string;
+  }): Promise<{ id: string }> {
+    const { data, error } = await supabase
+      .from('waitlist_entries')
+      .insert({
+        client_id: input.clientId,
+        contact_id: input.contactId,
+        call_id: input.callId ?? null,
+        service: input.service ?? null,
+        preferred_days: input.preferredDays ?? [],
+        preferred_times: input.preferredTimes ?? null,
+        notes: input.notes ?? null,
+        status: 'waiting',
+      })
+      .select('id')
+      .single();
+    if (error) throw new Error(`Failed to add waitlist entry: ${error.message}`);
+
+    await eventBus.publish({
+      type: 'waitlist.added',
+      clientId: input.clientId,
+      contactId: input.contactId,
+      callId: input.callId ?? undefined,
+      payload: { waitlist_entry_id: data.id, service: input.service, preferred_days: input.preferredDays },
+      source: 'internal',
+      idempotencyKey: buildIdempotencyKey('waitlist', data.id),
+    });
+    return { id: data.id };
   }
 
   async getAppointment(id: string): Promise<Appointment | null> {

@@ -40,6 +40,8 @@ vi.mock('../db/index.js', () => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           eq: vi.fn(() => ({ order: vi.fn(() => ({ limit: vi.fn(() => Promise.resolve({ data: [] })) })) })),
+          // Scope guard's call_sessions lookup: no session → legacy passthrough.
+          maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
         })),
       })),
       insert: vi.fn(() => Promise.resolve({ error: null })),

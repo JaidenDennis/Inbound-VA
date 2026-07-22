@@ -1,0 +1,58 @@
+import { registerWorkflow } from './engine/workflow-registry.js';
+import { endCallWorkflow } from './definitions/end-call.workflow.js';
+import { emergencyWorkflow } from './definitions/emergency.workflow.js';
+import { faqWorkflow } from './definitions/faq.workflow.js';
+import { pricingWorkflow } from './definitions/pricing.workflow.js';
+import { promotionsWorkflow } from './definitions/promotions.workflow.js';
+import { generalInformationWorkflow } from './definitions/general-information.workflow.js';
+import { bookAppointmentWorkflow } from './definitions/book-appointment.workflow.js';
+import { rescheduleAppointmentWorkflow } from './definitions/reschedule-appointment.workflow.js';
+import { cancelAppointmentWorkflow } from './definitions/cancel-appointment.workflow.js';
+import { waitlistWorkflow } from './definitions/waitlist.workflow.js';
+import { appointmentInquiryWorkflow } from './definitions/appointment-inquiry.workflow.js';
+import { leadQualificationWorkflow } from './definitions/lead-qualification.workflow.js';
+import { newClientIntakeWorkflow } from './definitions/new-client-intake.workflow.js';
+import { intakeFormsWorkflow } from './definitions/intake-forms.workflow.js';
+import { identityVerificationWorkflow } from './definitions/identity-verification.workflow.js';
+import { existingClientLookupWorkflow } from './definitions/existing-client-lookup.workflow.js';
+import { membershipWorkflow } from './definitions/membership.workflow.js';
+import { paymentQuestionsWorkflow } from './definitions/payment-questions.workflow.js';
+import { documentationRequestsWorkflow } from './definitions/documentation-requests.workflow.js';
+import { staffTransferWorkflow } from './definitions/staff-transfer.workflow.js';
+import { callbackRequestWorkflow } from './definitions/callback-request.workflow.js';
+import { complaintWorkflow } from './definitions/complaint.workflow.js';
+import { multiLocationRoutingWorkflow } from './definitions/multi-location-routing.workflow.js';
+import { languageSelectionWorkflow } from './definitions/language-selection.workflow.js';
+
+// Register built-in workflow definitions. New workflows: add one declarative
+// file under ./definitions and one register call here — zero engine changes.
+registerWorkflow(endCallWorkflow);
+registerWorkflow(emergencyWorkflow);
+registerWorkflow(faqWorkflow);
+registerWorkflow(pricingWorkflow);
+registerWorkflow(promotionsWorkflow);
+registerWorkflow(generalInformationWorkflow);
+registerWorkflow(bookAppointmentWorkflow);
+registerWorkflow(rescheduleAppointmentWorkflow);
+registerWorkflow(cancelAppointmentWorkflow);
+registerWorkflow(waitlistWorkflow);
+registerWorkflow(appointmentInquiryWorkflow);
+registerWorkflow(leadQualificationWorkflow);
+registerWorkflow(newClientIntakeWorkflow);
+registerWorkflow(intakeFormsWorkflow);
+registerWorkflow(identityVerificationWorkflow);
+registerWorkflow(existingClientLookupWorkflow);
+registerWorkflow(membershipWorkflow);
+registerWorkflow(paymentQuestionsWorkflow);
+registerWorkflow(documentationRequestsWorkflow);
+registerWorkflow(staffTransferWorkflow);
+registerWorkflow(callbackRequestWorkflow);
+registerWorkflow(complaintWorkflow);
+registerWorkflow(multiLocationRoutingWorkflow);
+registerWorkflow(languageSelectionWorkflow);
+
+export * from './engine/workflow-registry.js';
+export * from './engine/workflow-engine.js';
+export * from './engine/session-store.js';
+export * from './engine/action-metadata.js';
+export * from './engine/scope-guard.js';

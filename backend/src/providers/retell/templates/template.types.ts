@@ -11,6 +11,26 @@ export const RETELL_FUNCTION_NAMES = [
   'leave_staff_message',
   'schedule_callback',
   'request_human_handoff',
+  // Workflow-engine tools (inbound routing agents).
+  'route_intent',
+  'update_workflow',
+  'emergency_flag',
+  'knowledge_search',
+  // Booking suite (inbound Phase 3).
+  'find_appointment',
+  'reschedule_appointment',
+  'cancel_appointment',
+  'waitlist_add',
+  // Lead capture (inbound Phase 4).
+  'forms_send',
+  // Account & ops (inbound Phase 5).
+  'verify_identity',
+  'membership_lookup',
+  'payment_lookup',
+  'documentation_request',
+  'create_complaint',
+  'set_language',
+  'set_location',
 ] as const;
 export type RetellFunctionName = (typeof RETELL_FUNCTION_NAMES)[number];
 

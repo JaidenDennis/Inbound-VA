@@ -17,6 +17,7 @@ import { crmRoutes } from './routes/crm.route.js';
 import { crmOAuthRoutes } from './routes/crm-oauth.route.js';
 import { crmProvisioningRoutes } from './routes/crm-provisioning.route.js';
 import { retellFunctionRoutes } from './routes/functions/retell-functions.route.js';
+import { workflowFunctionRoutes } from './routes/functions/workflow-functions.route.js';
 import { provisioningRoutes } from './routes/provisioning.route.js';
 import { retellWebhookDispatcher } from './routes/webhooks/retell-dispatcher.route.js';
 import { callStartedRoute } from './routes/webhooks/call-started.route.js';
@@ -59,6 +60,21 @@ export async function buildApp() {
   const corsOrigins = env.CORS_ORIGINS
     ? env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
     : ['https://dashboard.gravvia.com'];
+
+  // An unset CORS_ORIGINS in production is the #1 cause of "the dashboard loads
+  // but every request fails" — the browser blocks the calls and the API logs
+  // nothing, because a CORS rejection never reaches a route handler. Say so at
+  // boot, loudly. Deliberately a warning and not a fatal: Retell's webhooks are
+  // server-to-server and unaffected, so a dashboard misconfig must not take
+  // call handling down with it.
+  if (env.NODE_ENV === 'production' && !env.CORS_ORIGINS) {
+    logger.error(
+      { defaultingTo: corsOrigins },
+      'CORS_ORIGINS is not set. Browser calls from any other dashboard URL ' +
+        'WILL be blocked. Set CORS_ORIGINS to your dashboard origin ' +
+        '(e.g. https://gravvia-dashboard.onrender.com) and redeploy.'
+    );
+  }
   await app.register(cors, {
     origin: env.NODE_ENV === 'production' ? corsOrigins : true,
     credentials: true,
@@ -121,6 +137,7 @@ export async function buildApp() {
   await app.register(crmOAuthRoutes);
   await app.register(crmProvisioningRoutes);
   await app.register(retellFunctionRoutes);
+  await app.register(workflowFunctionRoutes);
   await app.register(provisioningRoutes);
   await app.register(retellWebhookDispatcher);
   await app.register(callStartedRoute);
