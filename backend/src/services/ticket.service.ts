@@ -10,6 +10,15 @@ export interface CreateTicketInput {
   priority: TicketPriority;
 }
 
+export interface CreateCallerTicketInput {
+  clientId: string;
+  contactId?: string | null;
+  callId?: string | null;
+  subject: string;
+  description: string;
+  priority: TicketPriority;
+}
+
 export class TicketService {
   /**
    * Insert a ticket (status 'investigating') and write the initial
@@ -41,6 +50,42 @@ export class TicketService {
     if (histErr) logger.error({ err: histErr, ticketId: ticket.id }, 'Failed to write initial ticket history');
 
     logger.info({ ticketId: ticket.id, clientId: input.clientId }, 'Ticket created');
+    return ticket;
+  }
+
+  /**
+   * Create a ticket from a CALLER complaint (no dashboard user). created_by is
+   * left NULL; contact/call/source record who reported it and from where. Uses
+   * the additive columns from migration 014.
+   */
+  async createFromCaller(input: CreateCallerTicketInput): Promise<Ticket> {
+    const { data, error } = await supabase
+      .from('tickets')
+      .insert({
+        client_id: input.clientId,
+        created_by: null,
+        contact_id: input.contactId ?? null,
+        call_id: input.callId ?? null,
+        source: 'voice',
+        subject: input.subject,
+        description: input.description,
+        priority: input.priority,
+        status: 'investigating',
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    const ticket = data as Ticket;
+
+    const { error: histErr } = await supabase.from('ticket_status_history').insert({
+      ticket_id: ticket.id,
+      from_status: null,
+      to_status: 'investigating',
+      changed_by: null,
+    });
+    if (histErr) logger.error({ err: histErr, ticketId: ticket.id }, 'Failed to write initial caller-ticket history');
+
+    logger.info({ ticketId: ticket.id, clientId: input.clientId, source: 'voice' }, 'Caller complaint ticket created');
     return ticket;
   }
 

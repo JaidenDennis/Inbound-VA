@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (typecheck · lint · test · build)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Tests self-provide fallback config via vitest.setup.ts; only Redis needs
+      # to point at the service above.
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      # --include=dev: Actions sets NODE_ENV implicitly on some steps; be explicit
+      # so devDependencies (types, eslint, vitest) are always installed.
+      - run: npm install --include=dev
+      - name: Typecheck
+        run: npm run typecheck --workspace=@gravvia/backend
+      - name: Lint
+        run: npm run lint --workspace=@gravvia/backend
+      - name: Test (with coverage gate)
+        run: npm run test:coverage --workspace=@gravvia/backend
+      - name: Build
+        run: npm run build --workspace=@gravvia/backend
+
+  dashboard:
+    name: Dashboard (typecheck · lint · build)
+    runs-on: ubuntu-latest
+    env:
+      # Inlined into the client bundle at build time; a placeholder is fine for CI.
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm install --include=dev
+      - name: Typecheck
+        run: npm run typecheck --workspace=@gravvia/dashboard
+      - name: Lint
+        run: npm run lint --workspace=@gravvia/dashboard
+      - name: Build
+        run: npm run build --workspace=@gravvia/dashboard

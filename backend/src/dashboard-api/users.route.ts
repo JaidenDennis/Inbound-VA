@@ -45,7 +45,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       const body = createUserSchema.parse(request.body);
 
       let targetClientId: string | null;
-      let targetRole = body.role;
+      const targetRole = body.role;
 
       if (isPlatformUser(actor)) {
         // Platform users may create any role for any tenant (or platform users).

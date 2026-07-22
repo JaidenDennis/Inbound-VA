@@ -20,7 +20,18 @@ export type EventType =
   | 'contact.updated'
   | 'automation.triggered'
   | 'automation.completed'
-  | 'notification.sent';
+  | 'notification.sent'
+  // Inbound workflow engine (additive — every transition is audited).
+  | 'workflow.started'
+  | 'workflow.transitioned'
+  | 'workflow.paused'
+  | 'workflow.resumed'
+  | 'workflow.completed'
+  | 'workflow.cancelled'
+  | 'workflow.failed'
+  | 'workflow.switched'
+  | 'emergency.flagged'
+  | 'waitlist.added';
 
 export interface NormalizedEvent {
   id: string;

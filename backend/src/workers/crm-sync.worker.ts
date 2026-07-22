@@ -224,9 +224,13 @@ export async function processCrmSync(job: Job<CrmSyncJob>): Promise<void> {
       }
       break;
     }
-    case 'lead':
-      result = await adapter.createLead(payload as never);
+    case 'lead': {
+      // Leads attach to the CRM's own contact id, same as notes/appointments.
+      const lead = payload as Record<string, unknown>;
+      const crmContactId = await resolveCrmContactId(adapter, clientId, lead.contactId as string);
+      result = await adapter.createLead({ ...lead, contactId: crmContactId } as never);
       break;
+    }
     case 'appointment': {
       // Dates are serialized to ISO strings across the queue boundary;
       // adapters expect real Date objects, so coerce them back. Also swap the
@@ -239,6 +243,24 @@ export async function processCrmSync(job: Job<CrmSyncJob>): Promise<void> {
         startTime: new Date(appt.startTime as string),
         endTime: new Date(appt.endTime as string),
       } as never);
+      // Mirror the CRM's calendar event id onto the local appointment so
+      // reschedule/cancel can push the change back (booking.service reads
+      // metadata.crm_event_id).
+      if (result.success && result.externalId) {
+        const { data: existingAppt } = await supabase
+          .from('appointments')
+          .select('metadata')
+          .eq('id', entityId)
+          .eq('client_id', clientId)
+          .maybeSingle();
+        await supabase
+          .from('appointments')
+          .update({
+            metadata: { ...(existingAppt?.metadata ?? {}), crm_event_id: result.externalId },
+          })
+          .eq('id', entityId)
+          .eq('client_id', clientId);
+      }
       break;
     }
     case 'transcript': {

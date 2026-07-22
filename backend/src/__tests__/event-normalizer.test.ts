@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeCallStarted,
   normalizeCallEnded,
-  normalizeTranscript,
-  normalizeSummary,
 } from '../providers/retell/retell.normalizer.js';
 import type { RetellCallStartedPayload, RetellCallEndedPayload } from '../providers/retell/retell.types.js';
 

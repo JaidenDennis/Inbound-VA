@@ -30,8 +30,19 @@ export abstract class BaseCrmAdapter {
   }
 
   protected failure(error: unknown): CrmSyncResult {
-    const message = error instanceof Error ? error.message : String(error);
-    return { success: false, error: message };
+    // Surface the CRM's own error body (e.g. GHL's { message }) not just
+    // "Request failed with status code 4xx" — essential for diagnosing sync
+    // failures in production logs and manual-review triage.
+    const ax = error as {
+      response?: { status?: number; data?: { message?: string | string[]; error?: string } };
+    };
+    const body = ax.response?.data;
+    const detail =
+      (Array.isArray(body?.message) ? body?.message.join('; ') : body?.message) ??
+      body?.error ??
+      (error instanceof Error ? error.message : String(error));
+    const status = ax.response?.status;
+    return { success: false, error: status ? `${status}: ${detail}` : detail };
   }
 
   abstract testConnection(): Promise<boolean>;

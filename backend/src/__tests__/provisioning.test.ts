@@ -56,6 +56,12 @@ vi.mock('../services/client.service.js', () => ({
   },
 }));
 vi.mock('../services/audit.service.js', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }));
+// Knowledge overlay is identity here — provisioning renders from settings as-is.
+vi.mock('../services/knowledge.service.js', () => ({
+  knowledgeService: {
+    settingsWithKnowledge: vi.fn((_id: string, s: unknown) => Promise.resolve(s)),
+  },
+}));
 
 // ── Mock supabase (capture clients.update) ───────────────────────────────────
 const clientUpdate = vi.fn();

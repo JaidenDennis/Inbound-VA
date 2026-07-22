@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { validateRetellWebhook } from '../../middleware/index.js';
 import { clientService, callService, contactService, callRecordService } from '../../services/index.js';
 import type { RetellAnalyzedCall } from '../../services/callRecord.service.js';
-import { notificationsQueue, transcriptProcessingQueue, crmSyncQueue } from '../../queues/index.js';
+import { transcriptProcessingQueue, crmSyncQueue } from '../../queues/index.js';
 import { eventBus } from '../../events/index.js';
 import {
   normalizeCallStarted,
@@ -11,6 +11,7 @@ import {
 } from '../../providers/retell/index.js';
 import { buildIdempotencyKey } from '../../utils/index.js';
 import { supabase } from '../../db/index.js';
+import { createSession } from '../../workflows/index.js';
 import type {
   RetellCallStartedPayload,
   RetellCallEndedPayload,
@@ -44,7 +45,7 @@ async function onCallStarted(body: RetellCallStartedPayload, req: FastifyRequest
   const contact = await contactService.upsertByPhone(client.id, call.from_number, {
     phone: call.from_number,
   });
-  await callService.createCall({
+  const created = await callService.createCall({
     client_id: client.id,
     contact_id: contact.id,
     retell_call_id: call.call_id,
@@ -54,6 +55,22 @@ async function onCallStarted(body: RetellCallStartedPayload, req: FastifyRequest
     status: 'in_progress',
     started_at: new Date(call.start_timestamp).toISOString(),
   });
+  // Routing-enabled clients get their workflow session opened at call start so
+  // scope enforcement is active from the first tool invocation (best-effort —
+  // route_intent also self-heals a missing session).
+  try {
+    const settings = await clientService.getSettings(client.id);
+    if (settings?.agent_config?.workflow_routing) {
+      await createSession({
+        clientId: client.id,
+        retellCallId: call.call_id,
+        callId: created?.id ?? null,
+        routingEnabled: true,
+      });
+    }
+  } catch (err) {
+    req.log.warn({ err, callId: call.call_id }, 'Failed to open workflow session at call start');
+  }
   await eventBus.publish(normalizeCallStarted(body, client.id));
   return reply.code(200).send({ ok: true });
 }

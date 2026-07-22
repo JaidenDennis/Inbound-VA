@@ -55,6 +55,17 @@ export interface AgentConfig {
    * TTS-layer safety net that catches digit/name strings regardless of LLM text.
    */
   pronunciation_dictionary?: PronunciationEntry[];
+  /**
+   * Run this client's inbound agent under the workflow engine: the agent
+   * classifies intents via route_intent, and every tool invocation is
+   * scope-checked against the active workflow's grant. Off (default) =
+   * legacy single-prompt behavior.
+   */
+  workflow_routing?: boolean;
+  /** Link to the client's intake/consent forms (sent to callers by forms_send). */
+  intake_form_url?: string;
+  /** Client-specific intake questions the agent asks during new_client_intake. */
+  intake_questions?: string[];
   [key: string]: unknown;
 }
 
@@ -105,6 +116,19 @@ export interface PricingItem {
   price: number;
   unit?: string;
   notes?: string;
+  /** Member/loyalty price when the client distinguishes member vs non-member. */
+  member_price?: number;
+  /** Package/upsell reference surfaced with this price ("3-pack saves 15%"). */
+  upsell_note?: string;
+}
+
+/** An active offer from the relational promotions table (inbound Phase 2). */
+export interface Promotion {
+  title: string;
+  description: string;
+  eligibility?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
 }
 
 export interface BookingRules {
@@ -115,6 +139,10 @@ export interface BookingRules {
   blackout_dates: string[];
   lead_qualification_required: boolean;
   lead_qualification_fields: string[];
+  /** Hours of notice required to cancel without triggering the policy note. */
+  cancellation_notice_hours?: number;
+  /** Spoken cancellation policy ("Cancellations under 24h incur a $50 fee."). */
+  cancellation_policy?: string;
 }
 
 export interface WorkingHours {

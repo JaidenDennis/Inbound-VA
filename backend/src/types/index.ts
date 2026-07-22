@@ -9,3 +9,4 @@ export * from './auth.types.js';
 export * from './ticket.types.js';
 export * from './onboarding.types.js';
 export * from './actionItem.types.js';
+export * from './workflow.types.js';

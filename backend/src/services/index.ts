@@ -9,3 +9,5 @@ export { callRecordService, CallRecordService } from './callRecord.service.js';
 export { provisioningService, ProvisioningService } from './provisioning.service.js';
 export type { ProvisionOptions, ProvisionResult } from './provisioning.service.js';
 export { writeAuditLog } from './audit.service.js';
+export { knowledgeService, KnowledgeService } from './knowledge.service.js';
+export type { ClientKnowledge, KnowledgeSearchResult } from './knowledge.service.js';

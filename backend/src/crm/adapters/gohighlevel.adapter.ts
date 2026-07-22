@@ -2,6 +2,7 @@ import { BaseCrmAdapter } from './base.adapter.js';
 import type {
   CrmContact, CrmLead, CrmNote, CrmTask,
   CrmAppointment, CrmSyncResult,
+  CrmAvailabilityRequest, CrmAvailabilitySlot, CrmBookingUpdate,
 } from '../../types/index.js';
 import type { Plugin } from '../../plugins/index.js';
 import type { ICrmAdapter } from '../crm.interface.js';
@@ -206,6 +207,75 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
    * Pipeline creation/updates live in the provisioning client
    * (ghl-provisioning-client.ts), which needs the pipelines.* OAuth scopes.
    */
+  // ── Calendar booking (GHL calendar is the booking source of truth) ────────
+
+  /**
+   * Free slots from the configured GHL calendar. GHL's free-slots endpoint
+   * answers { "<YYYY-MM-DD>": { slots: [ISO...] }, traceId } — flatten every
+   * day's slots into canonical { start } entries.
+   */
+  async getAvailability(req: CrmAvailabilityRequest): Promise<CrmAvailabilitySlot[]> {
+    if (!this.cfg.calendarId) return [];
+    const { data } = await this.http.get(`/calendars/${this.cfg.calendarId}/free-slots`, {
+      params: {
+        startDate: new Date(req.startDate).getTime(),
+        endDate: new Date(req.endDate).getTime(),
+        timezone: req.timezone,
+      },
+      headers: { Version: CALENDARS_API_VERSION },
+    });
+    const slots: CrmAvailabilitySlot[] = [];
+    for (const [key, value] of Object.entries(data ?? {})) {
+      if (key === 'traceId') continue;
+      const daySlots = (value as { slots?: string[] })?.slots ?? [];
+      for (const start of daySlots) slots.push({ start });
+    }
+    return slots.sort((a, b) => a.start.localeCompare(b.start));
+  }
+
+  /** Booking create — same write path as createAppointment (calendar-aware). */
+  async createBooking(appointment: CrmAppointment): Promise<CrmSyncResult> {
+    return this.createAppointment(appointment);
+  }
+
+  async updateBooking(externalEventId: string, update: CrmBookingUpdate): Promise<CrmSyncResult> {
+    try {
+      await this.http.put(
+        `/calendars/events/appointments/${externalEventId}`,
+        {
+          ...(update.startTime ? { startTime: update.startTime.toISOString() } : {}),
+          ...(update.endTime ? { endTime: update.endTime.toISOString() } : {}),
+          ...(update.title ? { title: update.title } : {}),
+          // Round-robin calendars require an explicit assignee on update: GHL
+          // only auto-assigns when the target is a recognized open slot, so a
+          // reschedule to an arbitrary time 422s ("assignedUserId is missing")
+          // without this (verified live). Mirrors createAppointment.
+          ...(this.cfg.assignedUserId ? { assignedUserId: this.cfg.assignedUserId } : {}),
+          // A reschedule targets a time the booking source of truth already
+          // vetted; without this, GHL's own slot rules reject moving an
+          // appointment to any time it doesn't consider an open slot. Mirrors
+          // createAppointment.
+          ignoreFreeSlotValidation: true,
+        },
+        { headers: { Version: CALENDARS_API_VERSION } }
+      );
+      return this.success(externalEventId);
+    } catch (err) {
+      return this.failure(err);
+    }
+  }
+
+  async cancelBooking(externalEventId: string): Promise<CrmSyncResult> {
+    try {
+      await this.http.delete(`/calendars/events/${externalEventId}`, {
+        headers: { Version: CALENDARS_API_VERSION },
+      });
+      return this.success(externalEventId);
+    } catch (err) {
+      return this.failure(err);
+    }
+  }
+
   async listPipelines(): Promise<GhlPipeline[]> {
     const { data } = await this.http.get('/opportunities/pipelines', {
       params: { locationId: this.cfg.locationId },
