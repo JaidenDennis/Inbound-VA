@@ -246,6 +246,16 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
           ...(update.startTime ? { startTime: update.startTime.toISOString() } : {}),
           ...(update.endTime ? { endTime: update.endTime.toISOString() } : {}),
           ...(update.title ? { title: update.title } : {}),
+          // Round-robin calendars require an explicit assignee on update: GHL
+          // only auto-assigns when the target is a recognized open slot, so a
+          // reschedule to an arbitrary time 422s ("assignedUserId is missing")
+          // without this (verified live). Mirrors createAppointment.
+          ...(this.cfg.assignedUserId ? { assignedUserId: this.cfg.assignedUserId } : {}),
+          // A reschedule targets a time the booking source of truth already
+          // vetted; without this, GHL's own slot rules reject moving an
+          // appointment to any time it doesn't consider an open slot. Mirrors
+          // createAppointment.
+          ignoreFreeSlotValidation: true,
         },
         { headers: { Version: CALENDARS_API_VERSION } }
       );

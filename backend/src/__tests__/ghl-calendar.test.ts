@@ -57,9 +57,15 @@ describe('GoHighLevel calendar-booking methods (canonical types)', () => {
     expect(mockHttp.get).not.toHaveBeenCalled();
   });
 
-  it('updateBooking PUTs the new times to the calendars API', async () => {
+  it('updateBooking PUTs new times with slot-bypass + assignee for round-robin', async () => {
     mockHttp.put.mockResolvedValue({ data: {} });
-    const res = await adapter().updateBooking!('evt_9', {
+    const withAssignee = goHighLevelPlugin.factory({
+      accessToken: 'tok',
+      locationId: 'loc_1',
+      calendarId: 'cal_1',
+      assignedUserId: 'user_7',
+    });
+    const res = await withAssignee.updateBooking!('evt_9', {
       startTime: new Date('2026-08-01T18:00:00.000Z'),
       endTime: new Date('2026-08-01T18:30:00.000Z'),
     });
@@ -67,6 +73,11 @@ describe('GoHighLevel calendar-booking methods (canonical types)', () => {
     const [url, body, cfg] = mockHttp.put.mock.calls[0];
     expect(url).toBe('/calendars/events/appointments/evt_9');
     expect(body.startTime).toBe('2026-08-01T18:00:00.000Z');
+    // Both verified live: a reschedule to a non-slot time otherwise 422s
+    // ("assignedUserId is missing") on round-robin calendars and is rejected by
+    // GHL's free-slot rules.
+    expect(body.ignoreFreeSlotValidation).toBe(true);
+    expect(body.assignedUserId).toBe('user_7');
     expect(cfg.headers.Version).toBe('2021-04-15');
   });
 
