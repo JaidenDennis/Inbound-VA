@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
-import { addMinutes, isWithinInterval } from 'date-fns';
+import { addMinutes } from 'date-fns';
 import { supabase } from '../db/index.js';
 import { logger } from '../utils/index.js';
 import { getCalendarAdapter } from '../calendar/index.js';

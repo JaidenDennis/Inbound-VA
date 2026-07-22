@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { validateRetellWebhook } from '../../middleware/index.js';
 import { clientService, callService, contactService, callRecordService } from '../../services/index.js';
 import type { RetellAnalyzedCall } from '../../services/callRecord.service.js';
-import { notificationsQueue, transcriptProcessingQueue, crmSyncQueue } from '../../queues/index.js';
+import { transcriptProcessingQueue, crmSyncQueue } from '../../queues/index.js';
 import { eventBus } from '../../events/index.js';
 import {
   normalizeCallStarted,

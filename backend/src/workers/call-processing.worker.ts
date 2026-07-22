@@ -7,7 +7,7 @@ import { logger } from '../utils/index.js';
 import type { CallProcessingJobData } from '../types/index.js';
 
 async function processCall(job: Job<CallProcessingJobData>): Promise<void> {
-  const { clientId, callId, retellCallId } = job.data;
+  const { clientId, callId } = job.data;
 
   // Update call status
   await supabase.from('calls').update({ status: 'completed' }).eq('id', callId);

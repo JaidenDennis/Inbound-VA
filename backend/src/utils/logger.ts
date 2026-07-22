@@ -40,6 +40,12 @@ export const LOG_REDACT_PATHS = [
   '*.secret',
   '*.credentials',
   '*.credentials_encrypted',
+  // PII/PHI collected by inbound account workflows (identity verification,
+  // document requests). Never let a caller's date of birth reach the logs.
+  'dob',
+  'date_of_birth',
+  '*.dob',
+  '*.date_of_birth',
 ];
 
 export const logger = pino({
