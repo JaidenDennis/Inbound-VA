@@ -2,7 +2,7 @@ import { contactService, callService } from '../../services/index.js';
 import { bookingService } from '../../booking/index.js';
 import { crmSyncQueue, notificationsQueue } from '../../queues/index.js';
 import { supabase } from '../../db/index.js';
-import { buildIdempotencyKey, formatPhone, spellName, logger } from '../../utils/index.js';
+import { buildIdempotencyKey, formatPhone, spellName, verbatim, logger } from '../../utils/index.js';
 import type { Client, ClientSettings } from '../../types/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,11 +183,6 @@ const leadCapture: WorkflowActionHandler = async (ctx) => {
     data: { contactId: contact.id },
   };
 };
-
-// See retell-functions.route.ts — forces the LLM to speak break-tagged readback verbatim.
-function verbatim(value: string): string {
-  return `say this back to the caller EXACTLY as written, reproducing the "<break ... />" pause markers but NEVER speaking them aloud (they are silent pauses): "${value}"`;
-}
 
 const REGISTRY: Record<string, WorkflowActionHandler> = {
   'booking.create': bookingCreate,

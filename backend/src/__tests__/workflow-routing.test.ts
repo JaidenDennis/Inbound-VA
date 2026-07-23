@@ -301,6 +301,16 @@ describe('inbound workflow routing (Phase 1 exit test)', () => {
     expect(sessions.get('rc-fail')?.state.active?.workflowId).toBe('test_book_action');
   });
 
+  it('hands the agent break-tagged name/phone readback strings (Emily readback fix)', async () => {
+    await callFn(app, 'route_intent', { intent: 'book_with_action' }, 'rc-rb');
+    const res = await callFn(app, 'update_workflow', { slots: { name: 'Jaden Dennis', phone: '+12242431108' } }, 'rc-rb');
+    const rb = res.json().readback;
+    expect(rb.phone).toContain('<break time="0.3s" />'); // hard pause between digits
+    expect(rb.phone).toContain('two'); // digits as words, not "one billion…"
+    expect(rb.name).toContain('J <break time="0.3s" /> A'); // spelled letter by letter
+    expect(res.json().readback_instruction).toMatch(/Did I get that right/);
+  });
+
   it('legacy calls without a routing session pass the scope guard untouched', async () => {
     const res = await callFn(app, 'schedule_callback', { caller_name: 'Jane', phone: '+19998887777' }, 'rc-legacy');
     expect(res.json().scheduled).toBe(true);

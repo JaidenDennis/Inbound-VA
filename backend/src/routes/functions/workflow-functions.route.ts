@@ -5,7 +5,7 @@ import { clientService, callService, knowledgeService, contactService } from '..
 import { notificationsQueue } from '../../queues/index.js';
 import { eventBus } from '../../events/index.js';
 import { supabase } from '../../db/index.js';
-import { buildIdempotencyKey, logger } from '../../utils/index.js';
+import { buildIdempotencyKey, logger, formatPhone, spellName, verbatim } from '../../utils/index.js';
 import {
   findSession,
   createSession,
@@ -156,6 +156,28 @@ export async function workflowFunctionRoutes(app: FastifyInstance): Promise<void
           .join(' ');
       }
       if (contract) response.contract = contract;
+
+      // Hand the agent the EXACT break-tagged readback string for any name/phone
+      // it just reported, so digits/letters never slur (the LLM speaks these
+      // verbatim rather than improvising the pause markers). Mirrors Emily.
+      const phoneVal = args.data.slots.phone ?? args.data.slots.caller_phone;
+      const nameVal = args.data.slots.name ?? args.data.slots.caller_name;
+      const readback: Record<string, string> = {};
+      if (typeof phoneVal === 'string' && phoneVal.replace(/\D/g, '').length >= 3) {
+        readback.phone = verbatim(formatPhone(phoneVal));
+      }
+      if (typeof nameVal === 'string' && nameVal.trim()) {
+        readback.name = verbatim(spellName(nameVal));
+      }
+      if (Object.keys(readback).length) {
+        response.readback = readback;
+        response.readback_instruction =
+          'Read these back to confirm before moving on — ' +
+          [readback.name && `the NAME: ${readback.name}`, readback.phone && `the PHONE: ${readback.phone}`]
+            .filter(Boolean)
+            .join('; and ') +
+          '. Then ask "Did I get that right?" and wait.';
+      }
     }
 
     if (args.data.transition_to) {
