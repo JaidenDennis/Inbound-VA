@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx scripts/migrate.ts",
     "routing:enable": "tsx scripts/enable-inbound-routing.ts",
+    "routing:disable": "tsx scripts/disable-inbound-routing.ts",
     "provision": "tsx scripts/provision-client.ts",
     "verify:ghl": "tsx scripts/ghl-live-verify.ts",
     "smoke:ghl": "tsx scripts/ghl-smoke-test.ts",
