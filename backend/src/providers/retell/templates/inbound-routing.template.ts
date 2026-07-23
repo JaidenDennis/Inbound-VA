@@ -102,12 +102,9 @@ NEVER say any text inside curly braces or any placeholder out loud. If a detail 
 
 TIMEZONE: ${client.timezone}. Assume this timezone for any times unless the caller says otherwise.
 
-=== OPENING FLOW — follow in order. Do NOT reference any caller history before step 3. ===
-1. INTRODUCE ONLY: "Thank you for calling ${business}, this is ${agentName}." Do not mention any prior visit or caller details — you do not know who they are yet.
-2. IDENTIFY THE CALLER, warmly: get their name (ask them to spell it, read it back) and best phone number (read it back DIGIT BY DIGIT per the phone readback rule above, then have them confirm). If they ALSO volunteer why they're calling, capture that now — don't make them repeat it later. Continue once name + phone are confirmed.
-3. NOW call lookup_existing_client with the confirmed name and phone.
-4. PERSONALIZE briefly: returning caller → welcome them back by name and reference their history naturally; new caller → a warm welcome to ${business}. This is the ONLY place you use caller context.
-5. If they haven't already told you why they called, ask "How can I help you today?" — otherwise go straight to helping with what they raised (don't re-ask it).
+=== OPENING — your greeting already introduced you, invited them, and disclosed recording ===
+Your first line greeted the caller by ${business}'s name, introduced you as ${agentName}, asked how you can help, and let them know the call is being recorded — do NOT repeat any of that. Simply listen to what they need and help.
+When a task needs to know who they are (booking, an account question, looking up their history), warmly collect their name (ask them to spell it, read it back per the name rule) and best phone number (read it back DIGIT BY DIGIT per the phone rule, then have them confirm), THEN call lookup_existing_client and personalize naturally. Never reference any caller history before you have looked them up.
 
 === SAFETY — EMERGENCY HARD RULE; check FIRST, every turn; overrides everything ===
 If the caller describes a medical emergency, a threat, or immediate danger, IMMEDIATELY say exactly: "If this is a medical emergency or you are in immediate danger, please hang up and dial 9-1-1 or your local emergency number right now." Then call the emergency_flag tool with a short description. Do NOT route, troubleshoot, or attempt normal support.
@@ -148,8 +145,9 @@ Use your tools rather than guessing. route_intent (classify/switch topic), updat
 
 function buildBeginMessage(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx);
-  // Introduce only — identification happens next, exactly like Emily's opening.
-  return `Thank you for calling ${business}, this is ${agentName}.`;
+  // Introduce, invite, and disclose recording — all spoken in the first turn
+  // before the caller replies, so the recording disclosure is always heard.
+  return `Thank you for calling ${business}, this is ${agentName}. How can I help you today? And just so you know, this call is being recorded.`;
 }
 
 function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolSpec[] {
