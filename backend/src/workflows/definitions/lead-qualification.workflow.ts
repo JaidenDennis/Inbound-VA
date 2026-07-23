@@ -31,15 +31,17 @@ export const leadQualificationWorkflow: WorkflowDefinition = {
     offer_next_step: ['complete'],
     complete: [],
   },
+  action: { state: 'capture', name: 'crm.createLead', outcomeOnSuccess: 'qualified', outcomeOnFailure: 'qualified' },
   outcomes: ['qualified', 'qualified_and_booking', 'not_qualified'],
   guidance: {
     gather:
       'Conversationally collect their name, phone (readback rules), and the service they want; weave in any ' +
       'configured qualification questions (budget, timeline, referral source) naturally — never as an ' +
-      'interrogation. Report with update_workflow (slots), then transition_to "capture".',
+      'interrogation. Report with update_workflow (slots), then transition_to "capture" — the backend records ' +
+      'the lead automatically.',
     capture:
-      'Call qualify_lead with everything collected. The backend records the lead, updates the CRM pipeline, ' +
-      'and alerts the team. Then transition_to "offer_next_step".',
+      'The lead is being recorded by the backend (CRM pipeline + staff alert). Speak the confirmation it ' +
+      'returns, then transition_to "offer_next_step".',
     offer_next_step:
       'Offer the natural next step ONCE — usually booking a consultation (route_intent "book_appointment" if ' +
       'they accept; complete this workflow with outcome "qualified_and_booking" first). If they decline, ' +

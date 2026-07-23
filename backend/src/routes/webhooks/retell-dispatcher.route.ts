@@ -45,15 +45,22 @@ async function onCallStarted(body: RetellCallStartedPayload, req: FastifyRequest
   const contact = await contactService.upsertByPhone(client.id, call.from_number, {
     phone: call.from_number,
   });
+  // Be defensive about the payload: a missing/invalid start_timestamp or an
+  // unexpected direction must NOT throw and lose the whole call row (which
+  // silently breaks the entire calls/conversations/appointments chain for that
+  // call). Default sensibly instead.
+  const startMs = new Date(call.start_timestamp as unknown as number).getTime();
+  const startedAt = Number.isNaN(startMs) ? new Date().toISOString() : new Date(startMs).toISOString();
+  const direction = call.direction === 'outbound' ? 'outbound' : 'inbound';
   const created = await callService.createCall({
     client_id: client.id,
     contact_id: contact.id,
     retell_call_id: call.call_id,
-    direction: call.direction,
+    direction,
     from_number: call.from_number,
     to_number: call.to_number,
     status: 'in_progress',
-    started_at: new Date(call.start_timestamp).toISOString(),
+    started_at: startedAt,
   });
   // Routing-enabled clients get their workflow session opened at call start so
   // scope enforcement is active from the first tool invocation (best-effort —

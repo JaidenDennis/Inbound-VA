@@ -56,3 +56,4 @@ export * from './engine/workflow-engine.js';
 export * from './engine/session-store.js';
 export * from './engine/action-metadata.js';
 export * from './engine/scope-guard.js';
+export * from './engine/workflow-actions.js';

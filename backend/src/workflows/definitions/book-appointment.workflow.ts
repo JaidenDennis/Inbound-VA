@@ -58,6 +58,9 @@ export const bookAppointmentWorkflow: WorkflowDefinition = {
     execute: ['complete'],
     complete: [],
   },
+  // Entering "execute" makes the BACKEND book the appointment from the collected
+  // slots — the agent never calls a separate booking tool.
+  action: { state: 'execute', name: 'booking.create', outcomeOnSuccess: 'booked', outcomeOnFailure: 'no_availability', completeOnSuccess: true },
   outcomes: ['booked', 'no_availability', 'abandoned'],
   guidance: {
     gather:
@@ -71,11 +74,13 @@ export const bookAppointmentWorkflow: WorkflowDefinition = {
       'and transition_to "confirm". If nothing works, offer the waitlist (route_intent "waitlist") or ' +
       'complete with outcome "no_availability".',
     confirm:
-      'Read back the service, date, time, name, and phone and get an explicit yes. Then transition_to "execute".',
+      'Read back the service, date, time, name, and phone and get an explicit yes. Then call update_workflow ' +
+      'with transition_to "execute" — the backend books it automatically and tells you the result. Do NOT ' +
+      'call a separate booking tool.',
     execute:
-      'Call book_appointment (or book_consultation for exploratory visits) with the confirmed details, then ' +
-      'transition_to "complete" and complete with outcome "booked". If the booking fails, return to ' +
-      'offer_alternatives via check_availability — never blame "the system".',
+      'The booking is being finalized by the backend. Speak the confirmation it returns. If it reports the ' +
+      'time is unavailable, use check_availability to offer another slot, update the preferred_time, and ' +
+      'transition_to "execute" again — never blame "the system".',
     complete: 'Recap the booking and any prep or cancellation policy note, then ask if there is anything else.',
   },
 };

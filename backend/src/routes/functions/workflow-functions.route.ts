@@ -16,6 +16,8 @@ import {
   completeActive,
   cancelActive,
   flagEmergency,
+  getWorkflow,
+  runWorkflowAction,
   type WorkflowCallRef,
 } from '../../workflows/index.js';
 import type { CallSessionRecord, Client } from '../../types/index.js';
@@ -163,6 +165,34 @@ export async function workflowFunctionRoutes(app: FastifyInstance): Promise<void
         response.message = res.reason;
       }
       if (res.contract) response.contract = res.contract;
+
+      // Backend-executed action: if the workflow just entered its action state,
+      // run the action HERE (deterministically, from the collected slots) rather
+      // than trusting the agent to call a separate action tool. On success we
+      // complete the workflow; on failure it stays put so the agent can recover.
+      const activeFrame = session.state.active;
+      const def = activeFrame ? getWorkflow(activeFrame.workflowId) : null;
+      if (res.ok && def?.action && def.action.state === activeFrame!.state) {
+        const result = await runWorkflowAction(def.action.name, {
+          client,
+          settings,
+          slots: activeFrame!.slots,
+          callId: session.call_id,
+          retellCallId,
+        });
+        response.action = result;
+        response.message = result.message;
+        if (!result.ok) {
+          response.ok = false;
+        } else if (def.action.completeOnSuccess) {
+          // Terminal action (booking, waitlist): success finishes the workflow.
+          const resumed = await completeActive(ref, session.state, result.outcome ?? def.action.outcomeOnSuccess);
+          response.resumed = resumed;
+          if (resumed) response.message = `${result.message} Then resume: ${resumed.guidance}`;
+        }
+        // Mid-workflow action (lead capture): recorded; the agent continues per
+        // the state guidance (already returned in res.contract).
+      }
     }
 
     if (args.data.cancel) {
