@@ -50,3 +50,14 @@ export function spellName(raw: string): string {
   if (!trimmed) return '';
   return trimmed.toUpperCase().split('').join(` ${PAUSE_TAG} `);
 }
+
+/**
+ * Wrap a break-tagged readback value (from formatPhone/spellName) with the
+ * instruction that forces the LLM to speak it VERBATIM. The <break> pause tags
+ * only survive to the TTS if the model echoes the string exactly rather than
+ * paraphrasing it — hence the explicit framing and the reminder that the
+ * markers are silent and must never be spoken aloud.
+ */
+export function verbatim(value: string): string {
+  return `say this back to the caller EXACTLY as written, reproducing the "<break ... />" pause markers but NEVER speaking them aloud (they are silent pauses): "${value}"`;
+}

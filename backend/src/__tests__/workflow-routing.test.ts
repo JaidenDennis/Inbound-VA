@@ -148,6 +148,27 @@ const bookBotox: WorkflowDefinition = {
 };
 registerWorkflow(bookBotox);
 
+// A workflow with a BACKEND-EXECUTED action: entering "execute" runs
+// booking.create from the collected slots (no separate booking tool).
+const bookWithAction: WorkflowDefinition = {
+  id: 'test_book_action',
+  capability: 'appointments',
+  intents: ['book_with_action'],
+  scopes: ['booking'],
+  slots: [
+    { name: 'name', description: 'Full name', required: true },
+    { name: 'phone', description: 'Phone', required: true },
+    { name: 'service', description: 'Service', required: true },
+    { name: 'preferred_time', description: 'Time', required: true },
+  ],
+  states: ['gather', 'execute', 'complete'],
+  transitions: { gather: ['execute'], execute: ['complete'], complete: [] },
+  action: { state: 'execute', name: 'booking.create', outcomeOnSuccess: 'booked', outcomeOnFailure: 'no_availability', completeOnSuccess: true },
+  outcomes: ['booked', 'no_availability'],
+  guidance: { gather: 'Collect details.', execute: 'Backend is booking.', complete: 'Done.' },
+};
+registerWorkflow(bookWithAction);
+
 // ─── Harness ─────────────────────────────────────────────────────────────────
 function sign(rawBody: string, now = Date.now()): string {
   const d = CryptoJS.HmacSHA256(rawBody + now, process.env.RETELL_API_KEY as string).toString(CryptoJS.enc.Hex);
@@ -240,6 +261,54 @@ describe('inbound workflow routing (Phase 1 exit test)', () => {
       'workflow.completed',
       'workflow.resumed',
     ]);
+  });
+
+  it('backend EXECUTES the booking action on transition — no separate tool call (the live-call bug)', async () => {
+    const booking = await import('../booking/index.js');
+    await callFn(app, 'route_intent', { intent: 'book_with_action' }, 'rc-act');
+    await callFn(
+      app,
+      'update_workflow',
+      { slots: { name: 'Jaden Dennis', phone: '+12242431108', service: 'Consultation', preferred_time: '2026-09-01T14:00:00.000Z' } },
+      'rc-act'
+    );
+    // Transition to "execute" — the backend must book automatically, NOT wait
+    // for the agent to call a booking tool.
+    const res = await callFn(app, 'update_workflow', { transition_to: 'execute' }, 'rc-act');
+    expect(res.json().action.ok).toBe(true);
+    expect(res.json().action.data.appointmentId).toBe('appt1');
+    expect(vi.mocked(booking.bookingService.createAppointment)).toHaveBeenCalledOnce();
+    // Workflow auto-completed (terminal action) → active cleared.
+    expect(sessions.get('rc-act')?.state.active).toBeNull();
+    expect(published.map((e) => e.type)).toContain('workflow.completed');
+  });
+
+  it('booking action failure keeps the workflow active for a retry (no false success)', async () => {
+    const booking = await import('../booking/index.js');
+    vi.mocked(booking.bookingService.createAppointment).mockRejectedValueOnce(new Error('Time slot is not available'));
+    await callFn(app, 'route_intent', { intent: 'book_with_action' }, 'rc-fail');
+    await callFn(
+      app,
+      'update_workflow',
+      { slots: { name: 'Jane Doe', phone: '+12242431108', service: 'Consultation', preferred_time: '2026-09-01T14:00:00.000Z' } },
+      'rc-fail'
+    );
+    const res = await callFn(app, 'update_workflow', { transition_to: 'execute' }, 'rc-fail');
+    expect(res.json().ok).toBe(false);
+    expect(res.json().action.ok).toBe(false);
+    expect(res.json().message).toMatch(/available/i);
+    // Still on the workflow (not completed) so the agent can offer another slot.
+    expect(sessions.get('rc-fail')?.state.active?.workflowId).toBe('test_book_action');
+  });
+
+  it('hands the agent break-tagged name/phone readback strings (Emily readback fix)', async () => {
+    await callFn(app, 'route_intent', { intent: 'book_with_action' }, 'rc-rb');
+    const res = await callFn(app, 'update_workflow', { slots: { name: 'Jaden Dennis', phone: '+12242431108' } }, 'rc-rb');
+    const rb = res.json().readback;
+    expect(rb.phone).toContain('<break time="0.3s" />'); // hard pause between digits
+    expect(rb.phone).toContain('two'); // digits as words, not "one billion…"
+    expect(rb.name).toContain('J <break time="0.3s" /> A'); // spelled letter by letter
+    expect(res.json().readback_instruction).toMatch(/Did I get that right/);
   });
 
   it('legacy calls without a routing session pass the scope guard untouched', async () => {

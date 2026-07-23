@@ -27,13 +27,13 @@ export const waitlistWorkflow: WorkflowDefinition = {
     execute: ['complete'],
     complete: [],
   },
+  action: { state: 'execute', name: 'waitlist.add', outcomeOnSuccess: 'added', outcomeOnFailure: 'added', completeOnSuccess: true },
   outcomes: ['added', 'declined'],
   guidance: {
     gather:
       'Collect their name, phone (readback rules), the service they want, and which days/times work. Report ' +
-      'with update_workflow (slots), then transition_to "execute".',
-    execute:
-      'Call waitlist_add with the collected details, then transition_to "complete" and complete with outcome "added".',
+      'with update_workflow (slots), then transition_to "execute" — the backend adds them automatically.',
+    execute: 'The waitlist entry is being saved by the backend. Speak the confirmation it returns.',
     complete: 'Reassure them the team will reach out the moment an opening appears, and offer further help.',
   },
 };

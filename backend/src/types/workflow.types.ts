@@ -51,6 +51,30 @@ export interface WorkflowGuard {
   failureGuidance: string;
 }
 
+/**
+ * Declares a backend-executed action a workflow runs automatically when it
+ * enters `state` — the whole point being that the BACKEND performs the action
+ * (from the slots the engine already collected + validated), rather than
+ * trusting the LLM to separately invoke an action tool. `name` maps to a
+ * handler in the workflow-actions registry.
+ */
+export interface WorkflowActionSpec {
+  /** State whose entry triggers the action (e.g. 'execute'). */
+  state: string;
+  /** Handler name in the action registry (e.g. 'booking.create'). */
+  name: string;
+  /** Outcome the workflow completes with when the action succeeds. */
+  outcomeOnSuccess: string;
+  /** Outcome recorded when the action fails (workflow stays active for retry). */
+  outcomeOnFailure: string;
+  /**
+   * True when the action IS the workflow's goal (booking, waitlist) — success
+   * auto-completes the workflow. False when the action is a mid-workflow step
+   * (lead capture) and the workflow continues afterward. Default false.
+   */
+  completeOnSuccess?: boolean;
+}
+
 export interface WorkflowDefinition {
   /** Stable id, e.g. 'book_appointment'. */
   id: string;
@@ -65,6 +89,8 @@ export interface WorkflowDefinition {
   /** state → states it may transition to. Terminal states map to []. */
   transitions: Record<string, string[]>;
   guards?: WorkflowGuard[];
+  /** Backend action auto-run on entering action.state (deterministic execution). */
+  action?: WorkflowActionSpec;
   /** Allowed completion outcomes, e.g. 'booked', 'no_availability'. */
   outcomes: string[];
   /** Per-state conversational guidance returned to the agent via route_intent. */

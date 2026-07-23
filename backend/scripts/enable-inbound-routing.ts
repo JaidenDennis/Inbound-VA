@@ -41,7 +41,27 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // 1. Flip the workflow_routing flag (merge into agent_config, never clobber it).
+  // ORDER MATTERS. Provision the routing agent FIRST, then flip the flag.
+  // Once workflow_routing is on, the backend's scope guard denies any tool that
+  // isn't in the active workflow's grant — so if the flag were set while the
+  // agent were still the legacy (non-routing) one, the legacy agent's own tools
+  // would be denied and the line would break. Provisioning first (and only
+  // flipping the flag on success) guarantees the agent already speaks route_intent.
+
+  // 1. Deploy the routing agent (live Retell call). Throws on failure → the
+  //    flag below is never reached, so a failed provision leaves routing OFF.
+  if (doProvision) {
+    console.log('Provisioning the inbound_routing agent (live Retell)…');
+    const result = await provisioningService.provisionClient(clientId, { template: 'inbound_routing' });
+    console.log(`✓ agent ${result.agentId} (v${result.version}) provisioned`);
+    console.log(`  webhook: ${result.webhookUrl}`);
+    console.log(`  numbers: ${result.mappedNumbers.join(', ') || '(none mapped)'}`);
+  } else {
+    console.log('⚠ --provision NOT set: only flipping the flag. Do this ONLY if the agent is');
+    console.log('  already provisioned from the inbound_routing template, or the legacy agent will break.');
+  }
+
+  // 2. Flip the workflow_routing flag (merge into agent_config, never clobber it).
   const settings = await clientService.getSettings(clientId);
   const agentConfig = { ...(settings?.agent_config ?? {}), workflow_routing: true };
   const { error } = await supabase
@@ -50,18 +70,7 @@ async function main(): Promise<void> {
     .eq('client_id', clientId);
   if (error) throw new Error(`Failed to set workflow_routing: ${error.message}`);
   console.log(`✓ workflow_routing = true for client ${clientId}`);
-
-  // 2. Optionally deploy the routing agent (live Retell call).
-  if (doProvision) {
-    console.log('Provisioning the inbound_routing agent (live Retell)…');
-    const result = await provisioningService.provisionClient(clientId, { template: 'inbound_routing' });
-    console.log(`✓ agent ${result.agentId} (v${result.version}) provisioned`);
-    console.log(`  webhook: ${result.webhookUrl}`);
-    console.log(`  numbers: ${result.mappedNumbers.join(', ') || '(none mapped)'}`);
-  } else {
-    console.log('Flag set. Re-run with --provision to deploy the inbound_routing agent,');
-    console.log('or provision via POST /clients/:id/provision { "template": "inbound_routing" }.');
-  }
+  console.log('\nRouting is now ACTIVE for this client. Place a test call to verify.');
 }
 
 main()
