@@ -515,6 +515,8 @@ export const inboundRoutingTemplate: AgentTemplate = {
       end_call_after_silence_ms: 10000,
       reminder_trigger_ms: 5000,
       reminder_max_count: 1,
+      // Hold a steady, even tone across the call (default 1 ranges too far).
+      voice_temperature: 0.6,
     };
     return { responseEngine, agent };
   },
