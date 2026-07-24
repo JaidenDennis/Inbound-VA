@@ -305,9 +305,9 @@ describe('inbound workflow routing (Phase 1 exit test)', () => {
     await callFn(app, 'route_intent', { intent: 'book_with_action' }, 'rc-rb');
     const res = await callFn(app, 'update_workflow', { slots: { name: 'Jaden Dennis', phone: '+12242431108' } }, 'rc-rb');
     const rb = res.json().readback;
-    expect(rb.phone).toContain('<break time="0.3s" />'); // hard pause between digits
+    expect(rb.phone).toContain(' - '); // dash pause between digits (TTS honors it)
     expect(rb.phone).toContain('two'); // digits as words, not "one billion…"
-    expect(rb.name).toContain('J <break time="0.3s" /> A'); // spelled letter by letter
+    expect(rb.name).toContain('J - A'); // spelled letter by letter with dashes
     expect(res.json().readback_instruction).toMatch(/Did I get that right/);
   });
 
