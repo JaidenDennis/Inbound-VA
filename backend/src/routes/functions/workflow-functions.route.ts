@@ -176,7 +176,7 @@ export async function workflowFunctionRoutes(app: FastifyInstance): Promise<void
           [readback.name && `the NAME: ${readback.name}`, readback.phone && `the PHONE: ${readback.phone}`]
             .filter(Boolean)
             .join('; and ') +
-          '. Then ask "Did I get that right?" and wait.';
+          '. Then wait for the caller to confirm — vary how you ask, do not repeat the same phrase.';
       }
     }
 

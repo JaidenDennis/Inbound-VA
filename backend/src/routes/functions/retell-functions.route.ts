@@ -208,7 +208,7 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
     return reply.send({
       qualified: true,
       contact_id: contact.id,
-      message: `Lead captured for ${name}. To confirm the phone, ${verbatim(formatPhone(phone))}. To confirm the name, ${verbatim(spellName(name))}. Then ask "Did I get that right?" and wait before offering to book.`,
+      message: `Lead captured for ${name}. To confirm the phone, ${verbatim(formatPhone(phone))}. To confirm the name, ${verbatim(spellName(name))}. Then wait for them to confirm before offering to book.`,
     });
   });
 

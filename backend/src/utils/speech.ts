@@ -12,26 +12,15 @@ const DIGIT_WORDS: Record<string, string> = {
 };
 
 /**
- * Separator inserted between spoken digits/letters to stop them slurring.
- *
- * We deliberately do NOT use the ElevenLabs `<break time="..."/>` SSML tag:
- * Retell runs a fast 11labs model (Flash/Turbo) that IGNORES `<break>` SSML, so
- * the tags reach the model verbatim (confirmed in live transcripts) but produce
- * NO pause — the digits run together. A plain spaced hyphen is honored as a
- * short, silent pause by that model and is never spoken aloud, which is what
- * reliably separates the digits/letters. Kept as a constant so it's easy to
- * tune (e.g. to " ... " for a longer pause) in one place.
+ * Silent pause used inside spoken readbacks — between number groups, and between
+ * spelled-out name letters. A comma is honored by the 11labs Flash/Turbo model as
+ * a short, UNVOICED prosodic break, and is never spoken aloud. We deliberately
+ * avoid the spaced hyphen: that model renders it as a connecting glide/schwa — an
+ * audible extra syllable ("five-uh five", "ess-uh ay") that sounds like a slur —
+ * and it also ignores ElevenLabs `<break/>` SSML entirely (the tag reaches the
+ * model verbatim but produces no pause).
  */
-export const PAUSE_TAG = '-';
-
-/**
- * Silent pause between number GROUPS. A comma is honored by the 11labs Flash/
- * Turbo model as a short, unvoiced prosodic break — unlike the spaced hyphen,
- * which that model tends to render as a connecting glide/schwa (an audible extra
- * syllable, "five-uh five"). So groups are comma-separated; digits WITHIN a group
- * flow on plain spaces, the way a person actually reads a number.
- */
-export const GROUP_PAUSE = ',';
+export const PAUSE = ',';
 
 /** Split a run of digits into human phone groups: area(3) prefix(3) line(4). */
 function phoneGroups(digits: string): string[] {
@@ -68,29 +57,35 @@ export function formatPhone(raw: string): string {
       .split('')
       .map((d) => DIGIT_WORDS[d])
       .join(' ');
-  return phoneGroups(digits).map(toWords).join(`${GROUP_PAUSE} `);
+  return phoneGroups(digits).map(toWords).join(`${PAUSE} `);
 }
 
 /**
- * Spell a name letter by letter for TTS confirmation readback, with a hard pause
- * between every letter so the TTS reads each one distinctly. Trims, uppercases,
- * then joins each character with a <break> tag. Confirmation contexts only.
+ * Spell a name letter by letter for TTS confirmation readback, with a comma (a
+ * silent pause) between letters so the TTS reads each one distinctly WITHOUT the
+ * hyphen's slur artifact. Multiple words (first + last) are separated by a longer
+ * pause. Trims and uppercases. Confirmation contexts only.
  *
- * "Sarah" → "S - A - R - A - H"
+ * "Sarah"     → "S, A, R, A, H"
+ * "Ana Maria" → "A, N, A ... M, A, R, I, A"
  */
 export function spellName(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return '';
-  return trimmed.toUpperCase().split('').join(` ${PAUSE_TAG} `);
+  return trimmed
+    .toUpperCase()
+    .split(/\s+/)
+    .map((word) => word.split('').join(`${PAUSE} `))
+    .join(' ... ');
 }
 
 /**
  * Wrap a readback value (from formatPhone/spellName) with the instruction that
- * forces the LLM to speak it VERBATIM, keeping the built-in pauses. Commas
- * (between number groups) and dashes (between spelled letters) are SILENT
- * pauses — the LLM must keep them so nothing runs together, must NEVER voice
- * them, and should follow the readback with a confirmation question.
+ * forces the LLM to speak it VERBATIM, keeping the built-in pauses. Commas are
+ * SILENT pauses — the LLM must keep them so nothing runs together and must NEVER
+ * voice them. It should then confirm with the caller, VARYING the phrasing rather
+ * than repeating the same question every time.
  */
 export function verbatim(value: string): string {
-  return `say this back to the caller EXACTLY as written, keeping its pauses so it doesn't run together — the commas and dashes are SILENT pauses (NEVER say them aloud), then ask if you got it right: "${value}"`;
+  return `say this back to the caller EXACTLY as written, keeping its pauses so nothing runs together — the commas are SILENT pauses (NEVER say them aloud). Then check it with the caller, varying how you ask (don't repeat the same confirmation phrase every time): "${value}"`;
 }
