@@ -301,14 +301,15 @@ describe('inbound workflow routing (Phase 1 exit test)', () => {
     expect(sessions.get('rc-fail')?.state.active?.workflowId).toBe('test_book_action');
   });
 
-  it('hands the agent break-tagged name/phone readback strings (Emily readback fix)', async () => {
+  it('hands the agent comma-paused name/phone readback strings (Emily readback fix)', async () => {
     await callFn(app, 'route_intent', { intent: 'book_with_action' }, 'rc-rb');
     const res = await callFn(app, 'update_workflow', { slots: { name: 'Jaden Dennis', phone: '+12242431108' } }, 'rc-rb');
     const rb = res.json().readback;
-    expect(rb.phone).toContain(' - '); // dash pause between digits (TTS honors it)
+    expect(rb.phone).toContain(', '); // comma pause between number groups (TTS honors it)
+    expect(rb.phone).not.toContain(' - '); // no hyphen — it slurred into an extra syllable
     expect(rb.phone).toContain('two'); // digits as words, not "one billion…"
-    expect(rb.name).toContain('J - A'); // spelled letter by letter with dashes
-    expect(res.json().readback_instruction).toMatch(/Did I get that right/);
+    expect(rb.name).toContain('J, A'); // spelled letter by letter with comma pauses
+    expect(res.json().readback_instruction).toMatch(/vary how you ask/);
   });
 
   it('legacy calls without a routing session pass the scope guard untouched', async () => {

@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatPhone, spellName, PAUSE_TAG } from '../utils/speech.js';
-
-// Build the expected output the same way the formatters join tokens, so the
-// tests assert on token mapping + tag placement without hard-coding the long
-// repeated tag string by hand.
-const join = (...parts: string[]): string => parts.join(` ${PAUSE_TAG} `);
+import { formatPhone, spellName } from '../utils/speech.js';
 
 describe('formatPhone', () => {
   // Read the way a person says a number: area / prefix / line, comma between
@@ -41,24 +36,29 @@ describe('formatPhone', () => {
 });
 
 describe('spellName', () => {
-  it('spells a simple first name with pause tags between letters', () => {
-    expect(spellName('Sarah')).toBe(join('S', 'A', 'R', 'A', 'H'));
+  // Comma between letters (a silent pause) instead of the schwa-inducing hyphen.
+  it('spells a simple first name with comma pauses between letters', () => {
+    expect(spellName('Sarah')).toBe('S, A, R, A, H');
   });
 
   it('uppercases lowercase input', () => {
-    expect(spellName('nguyen')).toBe(join('N', 'G', 'U', 'Y', 'E', 'N'));
+    expect(spellName('nguyen')).toBe('N, G, U, Y, E, N');
   });
 
-  it('handles a full name with a space', () => {
-    expect(spellName('Ana Maria')).toBe(join('A', 'N', 'A', ' ', 'M', 'A', 'R', 'I', 'A'));
+  it('separates first + last name with a longer pause', () => {
+    expect(spellName('Ana Maria')).toBe('A, N, A ... M, A, R, I, A');
   });
 
-  it('handles a single letter (no trailing tag)', () => {
+  it('collapses extra whitespace between names', () => {
+    expect(spellName('Ana   Maria')).toBe('A, N, A ... M, A, R, I, A');
+  });
+
+  it('handles a single letter (no trailing pause)', () => {
     expect(spellName('A')).toBe('A');
   });
 
   it('trims surrounding whitespace before spelling', () => {
-    expect(spellName('  Jo  ')).toBe(join('J', 'O'));
+    expect(spellName('  Jo  ')).toBe('J, O');
   });
 
   it('returns empty string for empty input', () => {
