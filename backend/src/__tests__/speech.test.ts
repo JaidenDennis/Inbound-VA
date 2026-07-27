@@ -7,26 +7,28 @@ import { formatPhone, spellName, PAUSE_TAG } from '../utils/speech.js';
 const join = (...parts: string[]): string => parts.join(` ${PAUSE_TAG} `);
 
 describe('formatPhone', () => {
-  it('renders a clean 10-digit number as word-form digits split by pause tags', () => {
-    expect(formatPhone('9045551234')).toBe(
-      join('nine', 'zero', 'four', 'five', 'five', 'five', 'one', 'two', 'three', 'four')
-    );
+  // Read the way a person says a number: area / prefix / line, comma between
+  // groups (a silent pause), digits within a group flowing on spaces.
+  const FULL = 'nine zero four, five five five, one two three four';
+
+  it('renders a 10-digit number in natural groups with comma pauses', () => {
+    expect(formatPhone('9045551234')).toBe(FULL);
   });
 
-  it('strips formatting before mapping (parens, dashes, spaces)', () => {
-    expect(formatPhone('(904) 555-1234')).toBe(
-      join('nine', 'zero', 'four', 'five', 'five', 'five', 'one', 'two', 'three', 'four')
-    );
+  it('strips formatting before grouping (parens, dashes, spaces)', () => {
+    expect(formatPhone('(904) 555-1234')).toBe(FULL);
   });
 
   it('handles a number with dots', () => {
-    expect(formatPhone('904.555.1234')).toBe(
-      join('nine', 'zero', 'four', 'five', 'five', 'five', 'one', 'two', 'three', 'four')
-    );
+    expect(formatPhone('904.555.1234')).toBe(FULL);
   });
 
-  it('handles a partial / short number', () => {
-    expect(formatPhone('904')).toBe(join('nine', 'zero', 'four'));
+  it('splits off a leading country code as its own group', () => {
+    expect(formatPhone('19045551234')).toBe(`one, ${FULL}`);
+  });
+
+  it('reads a short/partial number as a single group (no trailing comma)', () => {
+    expect(formatPhone('904')).toBe('nine zero four');
   });
 
   it('returns empty string for empty input', () => {
