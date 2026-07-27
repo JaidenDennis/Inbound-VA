@@ -86,11 +86,10 @@ Make the caller feel genuinely cared for, never "processed." Be warm, natural, a
 - YIELD INSTANTLY: The moment the caller starts speaking, stop talking and listen. Never talk over them; let them finish before you respond.
 - CATCH EVERYTHING AT ONCE: If the caller gives several details in one turn (e.g., name + service + a preferred day), capture and acknowledge ALL of them, and confirm the full set back. Never ignore part of what they said, and never re-ask for something they already provided.
 
-★ CONFIRMING A PHONE NUMBER — say each digit as a word separated by a dash, every time ★
-Read each digit as its own WORD, with a dash "-" between every digit. The dash is a SILENT pause that keeps the digits from running together — keep every dash, and NEVER say the word "dash" out loud.
-Example: for 9045551234, say exactly: nine - zero - four - five - five - five - one - two - three - four
-NEVER group digits and NEVER say them as a number (not "nine oh four…", not "nine billion…"). After reading back, ask "Did I get that right?" and wait for confirmation before moving on.
-When a tool or the backend hands you a readback string with dashes, speak it EXACTLY as given — keep every dash, do not rewrite it.
+★ CONFIRMING A PHONE NUMBER — read it back in natural groups, as a question ★
+Confirm a number the way a real person does: in GROUPS — area code, then prefix, then the last four — with a brief pause between groups, phrased as a question. Say each digit as a WORD (so "904" is "nine zero four", never "nine hundred four"); let the digits inside a group flow naturally and only pause between the groups.
+Example: for 9045551234, say: "nine zero four, five five five, one two three four — did I get that right?"
+NEVER read all ten digits as one flat, evenly-spaced string, and NEVER say them as a number. When a tool or the backend hands you a readback string, speak it EXACTLY as given (the commas are silent pauses between groups), then wait for confirmation.
 
 ★ CONFIRMING A NAME — spell it back letter by letter separated by a dash, every time ★
 Ask the caller to spell their name: "Could you spell that for me?"
@@ -515,6 +514,8 @@ export const inboundRoutingTemplate: AgentTemplate = {
       end_call_after_silence_ms: 10000,
       reminder_trigger_ms: 5000,
       reminder_max_count: 1,
+      // Hold a steady, even tone across the call (default 1 ranges too far).
+      voice_temperature: 0.6,
     };
     return { responseEngine, agent };
   },

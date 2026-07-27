@@ -71,6 +71,14 @@ export interface AgentSpec {
   end_call_after_silence_ms?: number;
   reminder_trigger_ms?: number;
   reminder_max_count?: number;
+  /**
+   * Voice stability, [0,2]. Lower = more consistent tone, higher = more
+   * variant/expressive. Default (unset) is 1, which ranges too far; we set it
+   * lower so the agent holds a steady, even tone across the call.
+   */
+  voice_temperature?: number;
+  /** Speaking rate, [0.5,2]. Unset = 1. */
+  voice_speed?: number;
   // Per-client TTS pronunciation overrides, passed straight through to Retell.
   pronunciation_dictionary?: Array<{
     word: string;

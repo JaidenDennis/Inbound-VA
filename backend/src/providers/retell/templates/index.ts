@@ -1,6 +1,7 @@
 import type { AgentTemplate } from './template.types.js';
 import { medSpaTemplate } from './med-spa.template.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
+import { medSpaRoutingTemplate } from './med-spa-routing.template.js';
 
 // Vertical → template registry. New verticals register here without touching
 // the provisioning service (open for extension, closed for modification).
@@ -18,6 +19,7 @@ export function listVerticals(): string[] {
 
 registerTemplate(medSpaTemplate);
 registerTemplate(inboundRoutingTemplate);
+registerTemplate(medSpaRoutingTemplate);
 
 /** Map a client's industry to a default template vertical. */
 export function resolveVertical(industry: string): string {

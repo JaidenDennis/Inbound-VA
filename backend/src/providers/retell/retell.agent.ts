@@ -88,6 +88,9 @@ export async function createOrUpdateAgent(input: {
     end_call_after_silence_ms: input.spec.end_call_after_silence_ms,
     reminder_trigger_ms: input.spec.reminder_trigger_ms,
     reminder_max_count: input.spec.reminder_max_count,
+    // Voice stability — keeps the tone consistent across the call (see AgentSpec).
+    voice_temperature: input.spec.voice_temperature,
+    voice_speed: input.spec.voice_speed,
     // TTS-layer pronunciation overrides (omitted when undefined).
     pronunciation_dictionary: input.spec.pronunciation_dictionary,
   };
