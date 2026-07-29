@@ -166,7 +166,10 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
       name: 'route_intent',
       description:
         "Tell the backend what the caller wants. Call as soon as you understand their intent, and again whenever the topic changes. Returns the workflow to follow: its current step, missing details, and guidance.",
-      speak_during_execution: false,
+      // Narrate while this runs (~1-2s backend round-trip) so the caller never
+      // hits dead air on the turn — a brief natural acknowledgment, then the
+      // real reply once the guidance returns.
+      speak_during_execution: true,
       parameters: {
         type: 'object',
         properties: {
@@ -183,7 +186,7 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
       name: 'update_workflow',
       description:
         'Report progress on the active workflow: send collected details (slots), request the next step (transition_to), finish it (complete_outcome), or abandon it (cancel). The backend validates everything and answers with what to do next.',
-      speak_during_execution: false,
+      speak_during_execution: true, // narrate during the round-trip (no dead air)
       parameters: {
         type: 'object',
         properties: {
@@ -209,7 +212,7 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
       name: 'knowledge_search',
       description:
         "Search this business's knowledge base (FAQs, services, pricing, active promotions) for the caller's factual question. Answer only from the results.",
-      speak_during_execution: false,
+      speak_during_execution: true, // "let me check that…" while the lookup runs
       parameters: {
         type: 'object',
         properties: {
@@ -222,7 +225,7 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
     {
       name: 'lookup_existing_client',
       description: 'Look up the caller AFTER collecting and confirming their name and phone. Returns their history so you can personalize.',
-      speak_during_execution: false,
+      speak_during_execution: true, // narrate during the lookup (no dead air)
       parameters: {
         type: 'object',
         properties: {
