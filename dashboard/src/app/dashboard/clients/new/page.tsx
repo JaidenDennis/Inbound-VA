@@ -6,7 +6,12 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 
-const INDUSTRIES = ['dental', 'medical', 'legal', 'real_estate', 'fitness', 'beauty', 'auto', 'other'];
+// Keep in sync with the Industry union in backend/src/types/client.types.ts —
+// the industry picked here selects the client's default agent template.
+const INDUSTRIES = [
+  'dental', 'orthodontic', 'medical', 'legal', 'real_estate',
+  'fitness', 'beauty', 'auto', 'restaurant', 'other',
+];
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
   'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu', 'UTC',

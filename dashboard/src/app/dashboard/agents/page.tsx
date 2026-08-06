@@ -19,7 +19,7 @@ interface AgentRow {
   agent_sync_error: string | null;
   agent_synced_at: string | null;
   phone_numbers: string[] | null;
-  is_active: boolean;
+  status: string;
 }
 
 export default function AgentsPage() {

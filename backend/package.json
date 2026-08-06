@@ -17,6 +17,7 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx scripts/migrate.ts",
+    "seed:data": "tsx scripts/seed-client-data.ts",
     "routing:enable": "tsx scripts/enable-inbound-routing.ts",
     "routing:disable": "tsx scripts/disable-inbound-routing.ts",
     "provision": "tsx scripts/provision-client.ts",
