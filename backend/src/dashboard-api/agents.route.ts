@@ -63,9 +63,11 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     handler: async (_request, reply) => {
       const { data, error } = await supabase
         .from('clients')
+        // `status`, not `is_active` — that column is on `users`. Supabase select
+        // strings are not type-checked, so this only surfaces at runtime.
         .select(
           'id, name, industry, retell_agent_id, retell_voice_id, retell_agent_version, ' +
-            'retell_last_provisioned_at, agent_sync_state, agent_sync_error, agent_synced_at, phone_numbers, is_active'
+            'retell_last_provisioned_at, agent_sync_state, agent_sync_error, agent_synced_at, phone_numbers, status'
         )
         .order('name');
       if (error) return reply.code(500).send({ error: error.message });
