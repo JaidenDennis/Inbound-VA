@@ -1,12 +1,14 @@
 export type ClientStatus = 'active' | 'inactive' | 'suspended';
 export type Industry =
   | 'dental'
+  | 'orthodontic'
   | 'medical'
   | 'legal'
   | 'real_estate'
   | 'fitness'
   | 'beauty'
   | 'auto'
+  | 'restaurant'
   | 'other';
 export type CrmType =
   | 'gohighlevel'
@@ -66,6 +68,38 @@ export interface AgentConfig {
   intake_form_url?: string;
   /** Client-specific intake questions the agent asks during new_client_intake. */
   intake_questions?: string[];
+
+  // ── Vertical offering flags. Each gates what its template's prompt may offer;
+  // an unset flag means "not offered", so an agent never promises something the
+  // client hasn't configured. Verticals that don't use a flag simply omit it.
+
+  /** Insurance plans the practice accepts (dental/orthodontic/medical). */
+  insurance_accepted?: string[];
+  /** Practice reserves same-day slots for urgent/emergency callers. */
+  emergency_same_day?: boolean;
+  /** New-patient offer, e.g. exam + X-rays bundle. */
+  new_patient_special?: { name: string; description?: string; price?: number };
+  /** In-house or third-party payment plans are available (ortho, dental, legal). */
+  financing_available?: boolean;
+  /** Treatment options offered, e.g. metal braces, clear aligners (orthodontic). */
+  treatment_types?: string[];
+  /** Legal practice areas the firm takes, e.g. personal injury, family (legal). */
+  practice_areas?: string[];
+  /** Firm gives a free case evaluation / initial consultation (legal). */
+  free_case_evaluation?: boolean;
+  /** Firm works some matters on contingency ("no fee unless we win") (legal). */
+  contingency_fee?: boolean;
+  /** Restaurant takes table reservations (vs walk-in only). */
+  reservations_enabled?: boolean;
+  /** Restaurant takes takeout/pickup orders by phone. */
+  takeout_enabled?: boolean;
+  /** Restaurant delivers (directly or via a named partner). */
+  delivery_enabled?: boolean;
+  /** Restaurant hosts private events / buyouts (routes to the events team). */
+  private_events?: boolean;
+  /** Largest party the agent may book itself; bigger goes to a human. */
+  max_party_size?: number;
+
   [key: string]: unknown;
 }
 

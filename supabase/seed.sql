@@ -1,14 +1,38 @@
 -- ============================================================
--- GRAVVIA ENGAGE – Seed Data for Development
+-- GRAVVIA ENGAGE – Seed Data for DEVELOPMENT ONLY
+-- ============================================================
+--
+--   >>> NEVER RUN THIS AGAINST A PRODUCTION DATABASE. <<<
+--
+-- This file creates an admin account whose password is published in this repo,
+-- plus three fake clients. It exists so a local dev database is usable in one
+-- command. For production, run supabase/setup.sql instead and create your admin
+-- with the (commented) block at the end of that file.
+--
+-- The guard below aborts unless you explicitly opt in, because the previous
+-- version of this file used ON CONFLICT DO UPDATE on the admin row — meaning
+-- running it against production would have silently RESET a real admin's
+-- password back to the public default. That footgun is now removed twice over:
+-- the guard stops the whole script, and the insert is ON CONFLICT DO NOTHING.
+--
+-- To seed a development database, run this first in the same session:
+--     SET LOCAL gravvia.allow_dev_seed = 'yes';
 -- ============================================================
 
--- Default super admin user — email: admin@gravvia.com  password: Admin1234!
+DO $$
+BEGIN
+  IF coalesce(current_setting('gravvia.allow_dev_seed', true), '') <> 'yes' THEN
+    RAISE EXCEPTION
+      'Refusing to run dev seed. This creates an admin with a PUBLIC password. If this is a development database, run: SET LOCAL gravvia.allow_dev_seed = ''yes''; first.';
+  END IF;
+END $$;
+
+-- Development super admin — email: admin@gravvia.com  password: Admin1234!
 -- Hash generated with bcryptjs rounds=10 and verified with bcrypt.compare.
--- >>> CHANGE THIS PASSWORD before production use. <<<
+-- DO NOTHING (never DO UPDATE) so this can never overwrite a real password.
 INSERT INTO users (email, name, password_hash, role, is_active) VALUES
   ('admin@gravvia.com', 'Gravvia Admin', '$2a$10$mQBESsnBYVga4spwLLR2W.IJBqmBjxEo6L6L6awMGlXtl/JMgu/EG', 'super_admin', true)
-ON CONFLICT (email) DO UPDATE
-  SET password_hash = EXCLUDED.password_hash, is_active = true;
+ON CONFLICT (email) DO NOTHING;
 
 -- Sample Clients
 INSERT INTO clients (id, name, slug, industry, timezone, phone_numbers, status, retell_agent_id) VALUES

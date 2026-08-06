@@ -5,6 +5,7 @@ import { startCallProcessingWorker } from './call-processing.worker.js';
 import { startTranscriptProcessingWorker } from './transcript-processing.worker.js';
 import { startAnalyticsWorker } from './analytics.worker.js';
 import { startBookingWorker } from './booking.worker.js';
+import { startAgentProvisioningWorker } from './agent-provisioning.worker.js';
 import { startMaintenanceWorker, scheduleMaintenance } from './maintenance.worker.js';
 import { onFinalFailure } from './failure-alerts.js';
 import { logger } from '../utils/index.js';
@@ -26,6 +27,7 @@ export function startWorkers(): Worker[] {
     startTranscriptProcessingWorker(),
     startAnalyticsWorker(),
     startBookingWorker(),
+    startAgentProvisioningWorker(),
     startMaintenanceWorker(),
   ];
 

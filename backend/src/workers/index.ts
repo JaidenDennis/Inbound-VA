@@ -1,10 +1,12 @@
 import { startWorkers } from './start.js';
 import { registerAutomationSubscribers } from '../automation/index.js';
 import { logger, initSentry } from '../utils/index.js';
+import { installFatalHandlers } from '../utils/fatal-handlers.js';
 
 // Standalone worker process entrypoint (separate Render service).
 // Report worker crashes/job failures to Sentry (no-op without SENTRY_DSN).
 initSentry('workers');
+installFatalHandlers('worker');
 
 // No API in this process, so wire the post-call automation subscribers here.
 registerAutomationSubscribers();

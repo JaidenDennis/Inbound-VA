@@ -67,6 +67,8 @@ export interface GhlCustomField {
   id: string;
   name: string;
   dataType: string;
+  /** Dotted key GHL also accepts on writes, e.g. "contact.company_industry". */
+  fieldKey?: string;
 }
 
 export interface GhlTag {

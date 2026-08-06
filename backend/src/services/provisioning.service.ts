@@ -4,6 +4,7 @@ import { logger } from '../utils/index.js';
 import { clientService } from './client.service.js';
 import { knowledgeService } from './knowledge.service.js';
 import { writeAuditLog } from './audit.service.js';
+import { agentSyncService } from './agentSync.service.js';
 import {
   createOrUpdateResponseEngine,
   createOrUpdateAgent,
@@ -11,6 +12,8 @@ import {
   purchaseNumber,
 } from '../providers/retell/retell.agent.js';
 import { getTemplate, resolveVertical } from '../providers/retell/templates/index.js';
+import type { AgentSpec, ResponseEngineSpec } from '../providers/retell/templates/index.js';
+import type { Client, ClientSettings } from '../types/index.js';
 
 function baseUrl(): string {
   // Prefer an explicit webhook base; fall back to API_BASE_URL.
@@ -38,12 +41,27 @@ export interface ProvisionResult {
   mappedNumbers: string[];
 }
 
+/** Practical ceiling for a rendered prompt before quality degrades badly. */
+const MAX_PROMPT_CHARS = 120_000;
+
+export interface RenderedAgent {
+  client: Client;
+  settings: ClientSettings;
+  vertical: string;
+  responseEngine: ResponseEngineSpec;
+  agent: AgentSpec;
+  webhookUrl: string;
+}
+
 export class ProvisioningService {
   /**
-   * Idempotently create OR update a client's Retell agent from its settings.
-   * Re-running updates the existing agent + response engine in place.
+   * Build exactly what would be sent to Retell, without sending it.
+   *
+   * One code path serves three callers — the prompt preview, the pre-flight
+   * validation gate, and the version snapshot — so what staff read in the
+   * dashboard is byte-for-byte what the agent runs with.
    */
-  async provisionClient(clientId: string, opts: ProvisionOptions = {}): Promise<ProvisionResult> {
+  async renderClient(clientId: string, opts: { template?: string } = {}): Promise<RenderedAgent> {
     const client = await clientService.findById(clientId);
     if (!client) throw new Error(`Client not found: ${clientId}`);
     const baseSettings = await clientService.getSettings(clientId);
@@ -56,15 +74,63 @@ export class ProvisioningService {
     const template = getTemplate(vertical);
     if (!template) throw new Error(`No agent template registered for vertical: ${vertical}`);
 
-    const functionBaseUrl = `${baseUrl()}/functions/retell`;
-    const webhookUrl = `${baseUrl()}/webhooks/retell`;
-
-    const { responseEngine, agent } = template.build({
+    const built = template.build({
       client,
       settings,
-      functionBaseUrl,
+      functionBaseUrl: `${baseUrl()}/functions/retell`,
       defaultVoiceId: env.RETELL_DEFAULT_VOICE_ID,
     });
+
+    return {
+      client,
+      settings,
+      vertical,
+      responseEngine: built.responseEngine,
+      agent: built.agent,
+      webhookUrl: `${baseUrl()}/webhooks/retell`,
+    };
+  }
+
+  /**
+   * Pre-flight check run before a sync is queued. Catching this here means bad
+   * configuration fails visibly in the dashboard instead of silently degrading
+   * every call until someone notices.
+   */
+  async validateClient(clientId: string, opts: { template?: string } = {}): Promise<string[]> {
+    const problems: string[] = [];
+    let rendered: RenderedAgent;
+
+    try {
+      rendered = await this.renderClient(clientId, opts);
+    } catch (err) {
+      return [(err as Error).message];
+    }
+
+    const settings = rendered.settings as unknown as Record<string, unknown>;
+    if (!settings.business_name) problems.push('Business name is not set');
+    if (!settings.agent_name) problems.push('Agent name is not set');
+
+    const prompt = rendered.responseEngine.general_prompt ?? '';
+    if (!prompt.trim()) problems.push('The rendered prompt is empty');
+    if (prompt.length > MAX_PROMPT_CHARS) {
+      problems.push(`The rendered prompt is ${prompt.length} characters, over the ${MAX_PROMPT_CHARS} limit`);
+    }
+    // A raw {{placeholder}} means the agent would read the variable name aloud.
+    const unresolved = prompt.match(/\{\{\s*[\w.]+\s*\}\}/g);
+    if (unresolved) {
+      problems.push(`Prompt still contains unresolved placeholders: ${[...new Set(unresolved)].join(', ')}`);
+    }
+
+    return problems;
+  }
+
+  /**
+   * Idempotently create OR update a client's Retell agent from its settings.
+   * Re-running updates the existing agent + response engine in place.
+   */
+  async provisionClient(clientId: string, opts: ProvisionOptions = {}): Promise<ProvisionResult> {
+    const rendered = await this.renderClient(clientId, { template: opts.template });
+    const { client, settings, vertical, responseEngine, agent, webhookUrl } = rendered;
 
     // 1. Response Engine (Retell LLM) — update in place if one exists.
     const llmId = await createOrUpdateResponseEngine(responseEngine, client.retell_llm_id);
@@ -118,6 +184,19 @@ export class ProvisioningService {
       entityId: clientId,
       newValue: { agentId, llmId, vertical, version },
     });
+
+    // Snapshot what actually shipped. Only on success, so the history is a
+    // record of configurations the agent really ran with — not attempts.
+    await agentSyncService.recordVersion({
+      clientId,
+      settingsSnapshot: settings as unknown as Record<string, unknown>,
+      renderedPrompt: responseEngine.general_prompt,
+      retellAgentId: agentId,
+      retellAgentVersion: version,
+      vertical,
+      createdBy: opts.userId ?? null,
+    });
+    await agentSyncService.markSynced(clientId);
 
     logger.info({ clientId, agentId, llmId, vertical, version }, 'Client provisioned with Retell agent');
     return { clientId, agentId, llmId, version, vertical, webhookUrl, mappedNumbers };

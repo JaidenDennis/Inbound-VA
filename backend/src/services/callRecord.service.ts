@@ -40,6 +40,8 @@ export interface CallStats {
   leadsRecaptured: number;
   appointmentsBooked: number;
   avgCallDurationSeconds: number;
+  /** Every call in the period, including voicemails. */
+  totalCalls: number;
 }
 
 export class CallRecordService {
@@ -93,35 +95,89 @@ export class CallRecordService {
     if (error) logger.error({ err: error, retellCallId }, 'Failed to upsert call_record');
   }
 
-  /** Aggregate stats for a client over [from, to] (by started_at). */
+  /**
+   * Aggregate stats for a client over [from, to] (by started_at).
+   *
+   * Aggregated in Postgres via report_kpis (migration 020). The previous
+   * implementation pulled rows and counted them in JavaScript, which silently
+   * under-reported past PostgREST's 1000-row response cap — so any client with
+   * more than 1000 calls in the period was shown wrong numbers, with no error.
+   */
   async getStats(clientId: string, from: string, to: string): Promise<CallStats> {
-    const { data } = await supabase
-      .from('call_records')
-      .select('in_voicemail, missed_call_recovered, lead_recaptured, appointment_booked, duration_seconds')
-      .eq('client_id', clientId)
-      .gte('started_at', from)
-      .lte('started_at', to);
+    const { data, error } = await supabase.rpc('report_kpis', {
+      p_client_id: clientId,
+      p_from: from,
+      p_to: to,
+    });
 
-    const rows = (data ?? []) as Array<{
-      in_voicemail: boolean;
-      missed_call_recovered: boolean;
-      lead_recaptured: boolean;
-      appointment_booked: boolean;
-      duration_seconds: number | null;
-    }>;
+    if (error) {
+      logger.error({ err: error, clientId }, 'report_kpis failed');
+      throw new Error(`Failed to load call stats: ${error.message}`);
+    }
 
-    const answered = rows.filter((r) => !r.in_voicemail);
-    const avgCallDurationSeconds = answered.length
-      ? Math.round(answered.reduce((acc, r) => acc + (r.duration_seconds ?? 0), 0) / answered.length)
-      : 0;
+    const row = (data as Array<{
+      calls_answered: number;
+      missed_calls_recovered: number;
+      leads_recaptured: number;
+      appointments_booked: number;
+      avg_call_duration_seconds: number;
+      total_calls: number;
+    }> | null)?.[0];
 
     return {
-      callsAnswered: answered.length,
-      missedCallsRecovered: rows.filter((r) => r.missed_call_recovered).length,
-      leadsRecaptured: rows.filter((r) => r.lead_recaptured).length,
-      appointmentsBooked: rows.filter((r) => r.appointment_booked).length,
-      avgCallDurationSeconds,
+      callsAnswered: Number(row?.calls_answered ?? 0),
+      missedCallsRecovered: Number(row?.missed_calls_recovered ?? 0),
+      leadsRecaptured: Number(row?.leads_recaptured ?? 0),
+      appointmentsBooked: Number(row?.appointments_booked ?? 0),
+      avgCallDurationSeconds: Number(row?.avg_call_duration_seconds ?? 0),
+      totalCalls: Number(row?.total_calls ?? 0),
     };
+  }
+
+  /** Calls per day or week, split answered vs voicemail, in the client's timezone. */
+  async getVolume(
+    clientId: string,
+    from: string,
+    to: string,
+    bucket: 'day' | 'week'
+  ): Promise<Array<{ bucket: string; answered: number; voicemail: number; total: number }>> {
+    const { data, error } = await supabase.rpc('report_volume', {
+      p_client_id: clientId,
+      p_from: from,
+      p_to: to,
+      p_bucket: bucket,
+    });
+    if (error) {
+      logger.error({ err: error, clientId }, 'report_volume failed');
+      throw new Error(`Failed to load call volume: ${error.message}`);
+    }
+    return (data ?? []).map((r: { bucket: string; answered: number; voicemail: number; total: number }) => ({
+      bucket: r.bucket,
+      answered: Number(r.answered),
+      voicemail: Number(r.voicemail),
+      total: Number(r.total),
+    }));
+  }
+
+  /** Where calls ended up. See call_outcome() in migration 020 for precedence. */
+  async getOutcomes(
+    clientId: string,
+    from: string,
+    to: string
+  ): Promise<Array<{ outcome: string; count: number }>> {
+    const { data, error } = await supabase.rpc('report_outcomes', {
+      p_client_id: clientId,
+      p_from: from,
+      p_to: to,
+    });
+    if (error) {
+      logger.error({ err: error, clientId }, 'report_outcomes failed');
+      throw new Error(`Failed to load call outcomes: ${error.message}`);
+    }
+    return (data ?? []).map((r: { outcome: string; count: number }) => ({
+      outcome: r.outcome,
+      count: Number(r.count),
+    }));
   }
 }
 

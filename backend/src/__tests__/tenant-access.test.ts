@@ -3,7 +3,7 @@ import { assertClientAccess, isPlatformUser } from '../middleware/auth.middlewar
 import type { JwtPayload } from '../types/index.js';
 
 function jwt(clientId: string | null): JwtPayload {
-  return { sub: 'u1', email: 'u@x.com', role: clientId ? 'admin' : 'super_admin', clientId, iat: 0, exp: 0 };
+  return { sub: 'u1', email: 'u@x.com', role: clientId ? 'client_owner' : 'super_admin', clientId, iat: 0, exp: 0 };
 }
 
 describe('tenant isolation guards', () => {

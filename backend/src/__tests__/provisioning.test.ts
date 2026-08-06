@@ -63,16 +63,32 @@ vi.mock('../services/knowledge.service.js', () => ({
   },
 }));
 
-// ── Mock supabase (capture clients.update) ───────────────────────────────────
+// ── Mock supabase ────────────────────────────────────────────────────────────
+// Captures clients.update and the agent_config_versions insert. A successful
+// provision now also snapshots its configuration and stamps the sync state, so
+// the mock has to answer the version lookup too.
 const clientUpdate = vi.fn();
+const versionInsert = vi.fn();
 vi.mock('../db/index.js', () => ({
   supabase: {
-    from: vi.fn(() => ({
+    from: vi.fn((table: string) => ({
       update: vi.fn((patch: Record<string, unknown>) => {
-        clientUpdate(patch);
+        if (table === 'clients') clientUpdate(patch);
         return { eq: vi.fn().mockResolvedValue({ error: null }) };
       }),
       upsert: vi.fn().mockResolvedValue({ error: null }),
+      insert: vi.fn((row: Record<string, unknown>) => {
+        if (table === 'agent_config_versions') versionInsert(row);
+        return Promise.resolve({ error: null });
+      }),
+      // Version lookup: no prior versions, so the next one is 1.
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) })),
+          })),
+        })),
+      })),
     })),
   },
 }));
@@ -86,6 +102,31 @@ describe('ProvisioningService', () => {
     agent.createOrUpdateAgent.mockResolvedValue({ agentId: 'ag_new', version: 1 });
     agent.purchaseNumber.mockResolvedValue('+14159990000');
     clientRow = { ...baseClient };
+  });
+
+  it('snapshots the configuration that actually shipped', async () => {
+    // Only successful provisions are recorded, so the history answers "what was
+    // the agent running with on Tuesday" — otherwise unanswerable, because a bad
+    // prompt degrades every call silently.
+    await provisioningService.provisionClient('c1', { userId: 'u-staff' });
+
+    expect(versionInsert).toHaveBeenCalledTimes(1);
+    const row = versionInsert.mock.calls[0][0];
+    expect(row).toMatchObject({
+      client_id: 'c1',
+      version: 1,
+      retell_agent_id: 'ag_new',
+      retell_agent_version: 1,
+      vertical: 'med_spa',
+      created_by: 'u-staff',
+    });
+    // The rendered prompt is stored verbatim — the snapshot is only useful if it
+    // holds the text Retell received, not a reference to regenerate it from.
+    expect(typeof row.rendered_prompt).toBe('string');
+    expect((row.rendered_prompt as string).length).toBeGreaterThan(0);
+
+    // And the client is marked in sync, which is what clears the dashboard badge.
+    expect(clientUpdate).toHaveBeenCalledWith(expect.objectContaining({ agent_sync_state: 'synced' }));
   });
 
   it('CREATES a new agent when the client has none, with config-driven URLs', async () => {

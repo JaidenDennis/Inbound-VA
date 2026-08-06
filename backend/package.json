@@ -22,7 +22,8 @@
     "provision": "tsx scripts/provision-client.ts",
     "verify:ghl": "tsx scripts/ghl-live-verify.ts",
     "smoke:ghl": "tsx scripts/ghl-smoke-test.ts",
-    "connect:ghl": "tsx scripts/ghl-connect-pit.ts"
+    "connect:ghl": "tsx scripts/ghl-connect-pit.ts",
+    "map:ghl-fields": "tsx scripts/ghl-map-custom-fields.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",

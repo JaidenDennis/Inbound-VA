@@ -16,22 +16,34 @@ const createTicketSchema = z.object({
   clientId: z.string().uuid().optional(),
 });
 
-const messageSchema = z.object({ body: z.string().min(1).max(5000) });
+const messageSchema = z.object({
+  body: z.string().min(1).max(5000),
+  // Internal notes are staff-only and never reach the client thread. Defaulting
+  // to 'client' keeps the existing client-reply behaviour unchanged; staff must
+  // opt in to internal explicitly, and the route re-checks their permission.
+  visibility: z.enum(['client', 'internal']).default('client'),
+});
 
 const patchSchema = z
   .object({
     status: z.enum(TICKET_STATUSES as [string, ...string[]]).optional(),
+    priority: z.enum(TICKET_PRIORITIES as [string, ...string[]]).optional(),
     assignedTo: z.string().uuid().nullable().optional(),
     note: z.string().optional(),
   })
-  .refine((b) => b.status !== undefined || b.assignedTo !== undefined, {
-    message: 'Provide status and/or assignedTo',
+  .refine((b) => b.status !== undefined || b.assignedTo !== undefined || b.priority !== undefined, {
+    message: 'Provide status, priority and/or assignedTo',
   });
 
 export async function ticketRoutes(app: FastifyInstance): Promise<void> {
   // List tickets — client users see only their tenant; platform users see all
   // (optionally filtered by clientId). The tenant scoping is the active boundary.
-  app.get<{ Querystring: { status?: string; clientId?: string; page?: string } }>('/tickets', {
+  app.get<{
+    Querystring: {
+      status?: string; clientId?: string; page?: string;
+      priority?: string; assignedTo?: string; source?: string; slaState?: string; sort?: string;
+    };
+  }>('/tickets', {
     preHandler: requirePermission('tickets:read'),
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
@@ -42,6 +54,13 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
       const result = await ticketService.list({
         clientId,
         status: request.query.status,
+        priority: request.query.priority,
+        assignedTo: request.query.assignedTo,
+        source: request.query.source,
+        slaState: request.query.slaState,
+        // Staff get the self-prioritising queue; clients get their own tickets
+        // newest-first, which is what they expect from a support history.
+        sortByDue: isPlatformUser(user) && request.query.sort !== 'newest',
         page: Number(request.query.page ?? 1),
       });
       reply.send(result);
@@ -58,11 +77,19 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
       if (!assertClientAccess(user, ticket.client_id)) {
         return reply.code(403).send({ error: 'Forbidden' });
       }
+      // Internal notes require tickets:triage, which no client role holds. The
+      // flag is derived here and enforced inside the service — a route cannot
+      // leak internal notes by forgetting to filter, only by explicitly asking.
+      const includeInternal = request.jwtPermissions.has('tickets:triage');
+
       const [messages, history] = await Promise.all([
-        ticketService.getMessages(ticket.id),
+        ticketService.getMessages(ticket.id, { includeInternal }),
         ticketService.getHistory(ticket.id),
       ]);
-      reply.send({ ...ticket, messages, history });
+
+      // Clients see "Gravvia Support", not which staff member is handling them.
+      const visible = isPlatformUser(user) ? ticket : { ...ticket, assigned_to: null };
+      reply.send({ ...visible, messages, history });
     },
   });
 
@@ -132,8 +159,22 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
       if (!assertClientAccess(user, ticket.client_id)) {
         return reply.code(403).send({ error: 'Forbidden' });
       }
-      const { body } = messageSchema.parse(request.body);
-      const message = await ticketService.addMessage({ ticketId: ticket.id, authorId: user.sub, body });
+      const { body, visibility } = messageSchema.parse(request.body);
+
+      // Only triage holders may write internal notes. Without this check a
+      // client could set visibility:'internal' and hide a message from staff —
+      // or worse, learn the field exists and probe for the read side.
+      if (visibility === 'internal' && !request.jwtPermissions.has('tickets:triage')) {
+        return reply.code(403).send({ error: 'Cannot post internal notes' });
+      }
+
+      const message = await ticketService.addMessage({
+        ticketId: ticket.id,
+        authorId: user.sub,
+        body,
+        visibility,
+        fromStaff: isPlatformUser(user),
+      });
       reply.code(201).send(message);
     },
   });
@@ -141,7 +182,9 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
   // Triage: assign and/or change status. Staff-only (platform users). A status
   // change writes a ticket_status_history row via the service.
   app.patch<{ Params: { id: string } }>('/tickets/:id', {
-    preHandler: requirePermission('tickets:write'),
+    // Triage is a distinct grant, held only by platform roles — status,
+    // assignment and priority are ours to set, not the client's.
+    preHandler: requirePermission('tickets:triage'),
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
       if (!isPlatformUser(user)) return reply.code(403).send({ error: 'Forbidden' });
@@ -151,6 +194,13 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
       const body = patchSchema.parse(request.body);
 
       let updated = ticket;
+      if (body.priority && body.priority !== ticket.priority) {
+        updated = await ticketService.changePriority({
+          ticketId: ticket.id,
+          priority: body.priority as typeof TICKET_PRIORITIES[number],
+          changedBy: user.sub,
+        });
+      }
       if (body.status && body.status !== ticket.status) {
         updated = await ticketService.changeStatus({
           ticketId: ticket.id,
@@ -170,8 +220,8 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
         action: 'ticket.updated',
         entityType: 'ticket',
         entityId: ticket.id,
-        oldValue: { status: ticket.status, assigned_to: ticket.assigned_to },
-        newValue: { status: updated.status, assigned_to: updated.assigned_to },
+        oldValue: { status: ticket.status, assigned_to: ticket.assigned_to, priority: ticket.priority },
+        newValue: { status: updated.status, assigned_to: updated.assigned_to, priority: updated.priority },
         ipAddress: request.ip,
       });
       reply.send(updated);

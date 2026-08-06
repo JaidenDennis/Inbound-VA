@@ -27,6 +27,13 @@ const db = vi.hoisted(() => {
 });
 vi.mock('../db/index.js', () => ({ supabase: db.supabase }));
 
+// requirePermission resolves grants from the database; serve them from the
+// migration instead so route tests stay offline.
+vi.mock('../services/permission.service.js', async () => {
+  const { permissionServiceMock } = await import('./helpers/rbac.js');
+  return permissionServiceMock();
+});
+
 // ── Route-level mocks: stub the service barrel + notify so the endpoint test
 //    asserts orchestration (create + notification attempt) in isolation. ───────
 const routeMocks = vi.hoisted(() => ({
@@ -102,7 +109,7 @@ describe('POST /tickets', () => {
 
   it('creates a ticket for the caller’s tenant and attempts a notification', async () => {
     const app = await buildApp();
-    const token = app.jwt.sign({ sub: 'user-1', email: 'c@acme.com', role: 'viewer', clientId: 'client-a' });
+    const token = app.jwt.sign({ sub: 'user-1', email: 'c@acme.com', role: 'client_viewer', clientId: 'client-a' });
 
     const res = await app.inject({
       method: 'POST',

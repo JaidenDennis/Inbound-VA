@@ -43,6 +43,30 @@ export const analyticsQueue = new Queue<AnalyticsJobData>('analytics', {
   defaultJobOptions: { ...defaultJobOptions, attempts: 1 },
 });
 
+/**
+ * Re-provisions a client's Retell agent after a knowledge or config change.
+ *
+ * Jobs are added with a fixed jobId per client and a delay, which coalesces a
+ * burst of edits into one sync: the first write schedules the run, later writes
+ * within the window are dropped as duplicates. Deliberately coalescing rather
+ * than true debouncing — a continuously-edited client would otherwise never
+ * sync, and a guaranteed upper bound matters more than batching perfectly.
+ *
+ * attempts is 2, not 3: a failing provision is usually a config problem that
+ * retrying cannot fix, and the failure needs to reach the dashboard quickly.
+ */
+export const agentProvisioningQueue = new Queue<{ clientId: string; userId?: string }>(
+  'agent-provisioning',
+  {
+    connection: redis,
+    defaultJobOptions: {
+      ...defaultJobOptions,
+      attempts: 2,
+      removeOnComplete: { count: 200 },
+    },
+  }
+);
+
 // Internal housekeeping (daily retention purge). No payload; not tenant-scoped.
 export const maintenanceQueue = new Queue<Record<string, never>>('maintenance', {
   connection: redis,
@@ -56,6 +80,7 @@ export const allQueues = [
   callProcessingQueue,
   transcriptProcessingQueue,
   analyticsQueue,
+  agentProvisioningQueue,
   maintenanceQueue,
 ];
 

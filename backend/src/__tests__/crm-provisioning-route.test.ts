@@ -79,7 +79,7 @@ function platformUser(): JwtPayload {
 }
 
 function scopedUser(clientId: string): JwtPayload {
-  return { sub: 'u2', email: 'a@x.com', role: 'admin', clientId, iat: 0, exp: 0 };
+  return { sub: 'u2', email: 'a@x.com', role: 'client_owner', clientId, iat: 0, exp: 0 };
 }
 
 function connection(overrides: Partial<CrmConnection> = {}): CrmConnection {

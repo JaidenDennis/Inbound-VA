@@ -3,7 +3,10 @@ export interface CrmContact {
   firstName: string;
   lastName: string;
   email?: string;
+  /** Empty for sources that have no phone number (e.g. enriched outbound leads). */
   phone: string;
+  /** Company name — set by B2B/outbound sources; ignored by adapters without one. */
+  company?: string;
   tags?: string[];
   customFields?: Record<string, unknown>;
 }

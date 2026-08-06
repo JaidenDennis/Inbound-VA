@@ -2,10 +2,16 @@ import { Worker } from 'bullmq';
 import { redis, maintenanceQueue } from '../queues/index.js';
 import { supabase } from '../db/index.js';
 import { env } from '../config/index.js';
-import { logger } from '../utils/index.js';
+import { logger, sendMail } from '../utils/index.js';
+import { systemErrorService } from '../services/systemError.service.js';
+import { systemAlertService } from '../services/systemAlert.service.js';
+import { ticketService } from '../services/ticket.service.js';
 
 const PURGE_JOB = 'purge';
+const SLA_JOB = 'sla-sweep';
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Fixed 90 days — not tied to AUDIT_RETENTION_DAYS. See processMaintenance. */
+const SYSTEM_ERROR_RETENTION_DAYS = 90;
 
 /**
  * Register the daily retention purge. Idempotent: the stable repeat jobId means
@@ -19,7 +25,54 @@ export async function scheduleMaintenance(): Promise<void> {
     { pattern: '0 3 * * *' },
     { name: PURGE_JOB }
   );
-  logger.info({ retentionDays: env.AUDIT_RETENTION_DAYS }, 'Scheduled daily retention purge (03:00)');
+
+  // SLA breaches need catching within minutes, not once a day. A sweep every
+  // five minutes is cheap (one indexed UPDATE) and keeps the queue honest.
+  await maintenanceQueue.upsertJobScheduler(
+    'sla-sweep',
+    { pattern: '*/5 * * * *' },
+    { name: SLA_JOB }
+  );
+
+  logger.info({ retentionDays: env.AUDIT_RETENTION_DAYS }, 'Scheduled retention purge (03:00) and SLA sweep (5m)');
+}
+
+/**
+ * Flag tickets past their first-response deadline and tell whoever owns them.
+ * An unassigned breach emails ALERT_EMAIL instead — nobody owning it is exactly
+ * the case that needs escalating.
+ */
+async function processSlaSweep(): Promise<void> {
+  const breached = await ticketService.sweepBreaches();
+  if (breached.length === 0) return;
+
+  logger.warn({ count: breached.length }, 'Tickets breached their response SLA');
+
+  for (const ticket of breached) {
+    const recipient = await resolveBreachRecipient(ticket.assigned_to);
+    if (!recipient) continue;
+    try {
+      await sendMail({
+        from: env.EMAIL_FROM,
+        to: recipient,
+        subject: `[Gravvia] SLA breached: ${ticket.subject}`,
+        text:
+          `A support ticket passed its first-response deadline without a reply.\n\n` +
+          `Subject:  ${ticket.subject}\n` +
+          `Priority: ${ticket.priority}\n` +
+          `Due:      ${ticket.sla_response_due_at}\n\n` +
+          `${env.DASHBOARD_URL}/dashboard/support/${ticket.id}`,
+      });
+    } catch (err) {
+      logger.error({ err, ticketId: ticket.id }, 'Failed to send SLA breach email');
+    }
+  }
+}
+
+async function resolveBreachRecipient(assignedTo: string | null): Promise<string | null> {
+  if (!assignedTo) return env.ALERT_EMAIL ?? null;
+  const { data } = await supabase.from('users').select('email').eq('id', assignedTo).maybeSingle();
+  return (data as { email: string } | null)?.email ?? env.ALERT_EMAIL ?? null;
 }
 
 /**
@@ -52,6 +105,15 @@ async function processMaintenance(): Promise<void> {
     .lt('created_at', cutoff);
   if (e3) logger.error({ error: e3.message }, 'Retention purge failed: failed_jobs');
 
+  // system_errors keeps its own 90-day window regardless of review state. It is
+  // the highest-volume table in the schema — one bad deploy can add thousands of
+  // rows in minutes — so it must not inherit the (longer) audit retention.
+  const purgedErrors = await systemErrorService.purgeOlderThan(SYSTEM_ERROR_RETENTION_DAYS);
+
+  // Close auto-opened tickets whose fault has stopped and that nobody picked up,
+  // so the support queue reflects real work rather than resolved noise.
+  const autoClosed = await systemAlertService.autoCloseQuietTickets();
+
   logger.info(
     {
       cutoff,
@@ -59,15 +121,22 @@ async function processMaintenance(): Promise<void> {
       audit_logs: audit ?? 0,
       events: events ?? 0,
       resolved_failed_jobs: failed ?? 0,
+      system_errors: purgedErrors,
+      auto_closed_tickets: autoClosed,
     },
     'Retention purge complete'
   );
 }
 
 export function startMaintenanceWorker(): Worker {
-  // Queue name is 'maintenance'; the repeatable job's name is PURGE_JOB.
-  return new Worker('maintenance', processMaintenance, {
-    connection: redis,
-    concurrency: 1,
-  });
+  // One worker, two schedules: the nightly purge and the five-minute SLA sweep.
+  // Dispatch on job name so they cannot be confused for one another.
+  return new Worker(
+    'maintenance',
+    async (job) => {
+      if (job.name === SLA_JOB) return processSlaSweep();
+      return processMaintenance();
+    },
+    { connection: redis, concurrency: 1 }
+  );
 }

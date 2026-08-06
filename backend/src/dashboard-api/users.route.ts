@@ -2,25 +2,43 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { userService, writeAuditLog } from '../services/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
-import type { JwtPayload } from '../types/index.js';
+import { ALL_ROLES, CLIENT_ROLES, roleScope, type JwtPayload, type UserRole } from '../types/index.js';
+
+const roleEnum = z.enum(ALL_ROLES as unknown as [UserRole, ...UserRole[]]);
 
 const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
   password: z.string().min(8),
-  role: z.enum(['super_admin', 'admin', 'agent', 'viewer']),
+  role: roleEnum,
   clientId: z.string().uuid().nullable().optional(),
 });
 
 const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
-  role: z.enum(['super_admin', 'admin', 'agent', 'viewer']).optional(),
+  role: roleEnum.optional(),
   is_active: z.boolean().optional(),
   password: z.string().min(8).optional(),
 });
 
-// Roles a client-scoped admin is allowed to assign (no platform escalation).
-const TENANT_ASSIGNABLE_ROLES = new Set(['admin', 'agent', 'viewer']);
+// Roles a client-scoped owner may assign. Platform roles are absent by
+// construction, so there is no path from a tenant account to staff access.
+const TENANT_ASSIGNABLE_ROLES = new Set<UserRole>(CLIENT_ROLES);
+
+/**
+ * A platform role requires no tenant; a client role requires one. Returns an
+ * error message when the pairing is invalid, or null when it is fine.
+ */
+function validateRoleScope(role: UserRole, clientId: string | null): string | null {
+  const scope = roleScope(role);
+  if (scope === 'platform' && clientId !== null) {
+    return `Role ${role} is a platform role and cannot be scoped to a client`;
+  }
+  if (scope === 'client' && clientId === null) {
+    return `Role ${role} is a client role and requires a client`;
+  }
+  return null;
+}
 
 export async function userRoutes(app: FastifyInstance): Promise<void> {
   // List users — scoped to tenant for client-scoped admins
@@ -51,8 +69,8 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         // Platform users may create any role for any tenant (or platform users).
         targetClientId = body.clientId ?? null;
       } else {
-        // Client-scoped admins may only create users within their own tenant
-        // and may not escalate to platform/super_admin roles.
+        // Client-scoped owners may only create users within their own tenant
+        // and may not escalate to a platform role.
         targetClientId = actor.clientId;
         if (!TENANT_ASSIGNABLE_ROLES.has(targetRole)) {
           return reply.code(403).send({ error: 'Cannot assign that role' });
@@ -61,6 +79,12 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(403).send({ error: 'Cannot create users for another client' });
         }
       }
+
+      // Role family must match tenancy. Migration 016 enforces this in the
+      // database too; rejecting here gives a usable error instead of a 500 from
+      // a constraint violation, and keeps the two rules stated in one place.
+      const scopeError = validateRoleScope(targetRole, targetClientId);
+      if (scopeError) return reply.code(400).send({ error: scopeError });
 
       try {
         const created = await userService.create({
@@ -100,9 +124,16 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       if (!assertClientAccess(actor, target.client_id)) {
         return reply.code(403).send({ error: 'Forbidden' });
       }
-      // No privilege escalation by client-scoped admins.
+      // No privilege escalation by client-scoped owners.
       if (!isPlatformUser(actor) && body.role && !TENANT_ASSIGNABLE_ROLES.has(body.role)) {
         return reply.code(403).send({ error: 'Cannot assign that role' });
+      }
+      // A role change must not move the user across role families — that would
+      // either strand a staff account inside a tenant or hand a tenant user
+      // cross-tenant reach.
+      if (body.role) {
+        const scopeError = validateRoleScope(body.role, target.client_id);
+        if (scopeError) return reply.code(400).send({ error: scopeError });
       }
       // Prevent locking yourself out.
       if (body.is_active === false && target.id === actor.sub) {

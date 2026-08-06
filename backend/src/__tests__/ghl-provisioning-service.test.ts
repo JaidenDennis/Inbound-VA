@@ -196,6 +196,63 @@ describe('applyBlueprint — happy path', () => {
   });
 });
 
+// The adapter sends internal field names; GHL only understands ids/keys and
+// silently drops anything else. Provisioning is the only place that knows both,
+// so it has to write the translation onto the connection.
+describe('applyBlueprint — custom field mapping', () => {
+  it('persists field name → GHL field id on the connection', async () => {
+    mockClient.listPipelines.mockResolvedValue([fullPipeline]);
+    mockClient.listCustomFields.mockResolvedValue([
+      { id: 'f1', name: 'Interest', dataType: 'SINGLE_OPTIONS' },
+      // Fields the location already had, not in the blueprint — mapping them
+      // too is what lets a client use their own field names.
+      { id: 'f2', name: 'Company Industry', dataType: 'TEXT' },
+    ]);
+    mockClient.listTags.mockResolvedValue([{ id: 't1', name: 'inbound' }]);
+    mockClient.upsertContact.mockResolvedValue({ id: 'ct1', isNew: false });
+    mockClient.searchOpportunitiesByContact.mockResolvedValue([
+      { id: 'o1', name: 'Acme', pipelineId: 'p1' },
+    ]);
+
+    const run = await apply();
+
+    expect(run.status).toBe('success');
+    expect(connUpdates).toContainEqual({
+      custom_field_mapping: { Interest: 'f1', 'Company Industry': 'f2' },
+    });
+    expect(run.steps.find((s) => s.step === 'customFields')?.detail).toMatchObject({
+      fieldMappingPersisted: true,
+    });
+  });
+
+  it('keeps hand-added mappings and lets live ids win on the same name', async () => {
+    mockClient.listPipelines.mockResolvedValue([fullPipeline]);
+    mockClient.listCustomFields.mockResolvedValue([
+      { id: 'f1-new', name: 'Interest', dataType: 'SINGLE_OPTIONS' },
+    ]);
+    mockClient.listTags.mockResolvedValue([{ id: 't1', name: 'inbound' }]);
+    mockClient.upsertContact.mockResolvedValue({ id: 'ct1', isNew: false });
+    mockClient.searchOpportunitiesByContact.mockResolvedValue([
+      { id: 'o1', name: 'Acme', pipelineId: 'p1' },
+    ]);
+
+    await ghlProvisioningService.applyBlueprint({
+      clientId: 'client_1',
+      runId: 'run_1',
+      blueprint: blueprint(),
+      conn: {
+        ...conn,
+        custom_field_mapping: { Interest: 'f1-stale', 'Legacy Field': 'contact.legacy' },
+      } as CrmConnection,
+      attempt: 1,
+    });
+
+    expect(connUpdates).toContainEqual({
+      custom_field_mapping: { Interest: 'f1-new', 'Legacy Field': 'contact.legacy' },
+    });
+  });
+});
+
 describe('applyBlueprint — pipeline update', () => {
   it('appends missing stages while retaining every existing stage id in order', async () => {
     const partial = { id: 'p1', name: 'Sales', stages: [{ id: 's1', name: 'New' }] };
