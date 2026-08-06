@@ -50,6 +50,31 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
 
+  # ─── Admin dashboard (Next.js) ─────────────────────────────────────────────
+  # NEXT_PUBLIC_API_URL is inlined into the client bundle AT BUILD TIME (see
+  # dashboard/next.config.js), so it must be present during the build, not just
+  # at runtime — changing it later requires a redeploy, not just a restart.
+  #
+  # After this service first deploys, copy its URL into the backend's
+  # CORS_ORIGINS env var, or every dashboard request will be blocked by the
+  # browser. The two services reference each other, so one redeploy of the
+  # backend after the dashboard's first deploy is expected.
+  - type: web
+    name: gravvia-dashboard
+    runtime: node
+    plan: starter
+    buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/dashboard
+    startCommand: npm run start --workspace=@gravvia/dashboard
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      # Set to the deployed backend URL, e.g. https://gravvia-backend.onrender.com
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared secrets — set these ONCE in the Render dashboard (Env Groups →
 # gravvia-secrets). Both services above reference this group via `fromGroup`.
@@ -90,6 +115,13 @@ envVarGroups:
       - key: GHL_CLIENT_ID
         sync: false
       - key: GHL_CLIENT_SECRET
+        sync: false
+      # ---- Optional: Clay → CRM outbound lead ingest. ----
+      # Unset disables POST /webhooks/clay/lead (503). CLAY_DEFAULT_CLIENT_ID
+      # is the client whose CRM connection Clay leads land in.
+      - key: CLAY_INGEST_SECRET
+        sync: false
+      - key: CLAY_DEFAULT_CLIENT_ID
         sync: false
       # ---- Optional: email notifications (nodemailer). Set if used. ----
       - key: SMTP_HOST

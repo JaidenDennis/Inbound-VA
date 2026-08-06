@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Plus, UserPlus } from 'lucide-react';
+import { useSession } from '@/lib/SessionProvider';
+import { PLATFORM_ROLES, CLIENT_ROLES, roleLabel, type UserRole } from '@/lib/session';
 
 interface AppUser {
   id: string;
@@ -14,9 +16,13 @@ interface AppUser {
   last_login_at: string | null;
 }
 
-const ROLES = ['admin', 'agent', 'viewer', 'super_admin'];
-
 export default function UsersPage() {
+  const { isPlatform } = useSession();
+  // Only roles from the caller's own family are offered. The API rejects the
+  // other family anyway; showing them would just produce a confusing 403.
+  const roles: readonly UserRole[] = isPlatform ? PLATFORM_ROLES : CLIENT_ROLES;
+  const defaultRole: UserRole = isPlatform ? 'support_agent' : 'client_viewer';
+
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -26,8 +32,10 @@ export default function UsersPage() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('agent');
+  const [role, setRole] = useState<UserRole>(defaultRole);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => setRole(defaultRole), [defaultRole]);
 
   const load = () => {
     setLoading(true);
@@ -42,7 +50,7 @@ export default function UsersPage() {
     setSaving(true);
     try {
       await api.post('/users', { email, name, password, role });
-      setEmail(''); setName(''); setPassword(''); setRole('agent');
+      setEmail(''); setName(''); setPassword(''); setRole(defaultRole);
       setShowForm(false);
       load();
     } catch (err: unknown) {
@@ -76,10 +84,18 @@ export default function UsersPage() {
           <input className={inputCls} placeholder="Name" required value={name} onChange={(e) => setName(e.target.value)} />
           <input className={inputCls} type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <input className={inputCls} type="password" placeholder="Temp password (min 8)" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
-          <select className={inputCls} value={role} onChange={(e) => setRole(e.target.value)}>
-            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          {error && <p className="col-span-2 text-red-500 text-sm">{error}</p>}
+          <div>
+            <label htmlFor="new-user-role" className="sr-only">Role</label>
+            <select
+              id="new-user-role"
+              className={inputCls}
+              value={role}
+              onChange={(e) => setRole(e.target.value as UserRole)}
+            >
+              {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+            </select>
+          </div>
+          {error && <p role="alert" className="col-span-2 text-sm text-red-600">{error}</p>}
           <div className="col-span-2">
             <button type="submit" disabled={saving}
               className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">
@@ -108,7 +124,7 @@ export default function UsersPage() {
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-800">{u.name}</td>
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3"><span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs">{u.role}</span></td>
+                  <td className="px-4 py-3"><span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs">{roleLabel(u.role as UserRole)}</span></td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
                       {u.is_active ? 'active' : 'disabled'}

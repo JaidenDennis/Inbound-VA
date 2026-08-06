@@ -4,7 +4,8 @@ import bcrypt from 'bcryptjs';
 import { supabase } from '../db/index.js';
 import { env } from '../config/index.js';
 import { writeAuditLog } from '../services/index.js';
-import type { User } from '../types/index.js';
+import { listRolePermissions } from '../services/permission.service.js';
+import { roleScope, type User, type UserRole } from '../types/index.js';
 
 // bcryptjs is a pure JS impl – add to package.json
 const loginSchema = z.object({
@@ -60,14 +61,24 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ token, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
   });
 
+  // Returns the caller plus their resolved permissions. The dashboard uses the
+  // permission list to decide which nav items and controls to render; it is a
+  // convenience for the UI, never a security boundary — every route re-checks.
   app.get('/auth/me', {
     preHandler: async (req, reply) => {
       try { await req.jwtVerify(); } catch { reply.code(401).send({ error: 'Unauthorized' }); }
     },
     handler: async (request, reply) => {
       const payload = request.user as { sub: string };
-      const { data: user } = await supabase.from('users').select('id,email,name,role,client_id').eq('id', payload.sub).single();
-      reply.send(user);
+      const { data: user } = await supabase
+        .from('users')
+        .select('id,email,name,role,client_id')
+        .eq('id', payload.sub)
+        .single();
+      if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+      const permissions = await listRolePermissions(user.role as UserRole);
+      reply.send({ ...user, scope: roleScope(user.role as UserRole), permissions });
     },
   });
 }

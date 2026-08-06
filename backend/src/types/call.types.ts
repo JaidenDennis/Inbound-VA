@@ -74,6 +74,8 @@ export interface Contact {
   last_name: string;
   email: string | null;
   phone: string;
+  /** B2B/outbound leads only; null for inbound callers. */
+  company: string | null;
   notes: string | null;
   tags: string[];
   custom_fields: Record<string, unknown>;

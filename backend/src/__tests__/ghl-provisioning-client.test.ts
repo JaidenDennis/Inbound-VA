@@ -86,14 +86,17 @@ describe('GhlProvisioningClient', () => {
     );
   });
 
-  it('maps SINGLE_OPTIONS options to picklistOptions on field create', async () => {
+  // GHL renamed `picklistOptions` to `options` on the custom-field API; the
+  // stale name made every picklist field 422 during blueprint provisioning
+  // (fixed in fc7f074, verified against a live sub-account via npm run smoke:ghl).
+  it('sends SINGLE_OPTIONS choices as `options` on field create', async () => {
     const client = makeClient();
     mockHttp.request.mockResolvedValue({ data: { customField: { id: 'f1', name: 'Interest', dataType: 'SINGLE_OPTIONS' } } });
     await client.createCustomField({ name: 'Interest', dataType: 'SINGLE_OPTIONS', options: ['Hot', 'Cold'] });
     expect(mockHttp.request).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'POST',
-        data: expect.objectContaining({ dataType: 'SINGLE_OPTIONS', model: 'contact', picklistOptions: ['Hot', 'Cold'] }),
+        data: expect.objectContaining({ dataType: 'SINGLE_OPTIONS', model: 'contact', options: ['Hot', 'Cold'] }),
       })
     );
   });

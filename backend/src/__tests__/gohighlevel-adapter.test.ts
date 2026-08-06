@@ -53,17 +53,28 @@ describe('GoHighLevel adapter (v2 API)', () => {
     }));
   });
 
+  // GHL resolves a custom field by id OR by dotted field key, and silently
+  // ignores anything it can't resolve — so the adapter must send each mapped
+  // value under the right property. Ids never contain a dot; keys always do.
   it('maps custom fields through customFieldMapping into v2 format', async () => {
     mockHttp.post.mockResolvedValue({ data: { contact: { id: 'ghl_c1' } } });
-    const adapter = makeAdapter({ customFieldMapping: { source_detail: 'contact.source_detail' } });
+    const adapter = makeAdapter({
+      customFieldMapping: {
+        source_detail: 'contact.source_detail',
+        // What GHL provisioning persists: field name → field id.
+        'Company Industry': '3sv6UEo5PoErAAyF9Yxi',
+      },
+    });
     await adapter.createOrUpdateContact({
       firstName: 'A', lastName: 'B', phone: '+15550000000',
-      customFields: { source_detail: 'voice-agent', unmapped: 'x' },
+      customFields: { source_detail: 'voice-agent', 'company industry': 'Dental', unmapped: 'x' },
     });
     const body = mockHttp.post.mock.calls[0][1];
     expect(body.customFields).toEqual([
       { key: 'contact.source_detail', field_value: 'voice-agent' },
-      { key: 'unmapped', field_value: 'x' },
+      // Matched case-insensitively, then sent as an id rather than a key.
+      { id: '3sv6UEo5PoErAAyF9Yxi', field_value: 'Dental' },
+      { id: 'unmapped', field_value: 'x' },
     ]);
   });
 

@@ -2,8 +2,12 @@ import type { Worker } from 'bullmq';
 import { buildApp } from './app.js';
 import { env } from './config/index.js';
 import { logger } from './utils/index.js';
+import { installFatalHandlers } from './utils/fatal-handlers.js';
 
 async function start(): Promise<void> {
+  // Installed before anything else so a fault during boot is still recorded.
+  installFatalHandlers('api');
+
   const app = await buildApp();
 
   // Budget mode: co-locate the BullMQ workers in the API process so background

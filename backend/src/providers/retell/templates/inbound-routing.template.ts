@@ -82,7 +82,7 @@ Make the caller feel genuinely cared for, never "processed." Be warm, natural, a
 
 ★ HOW YOU TALK ON THE PHONE — apply on EVERY turn ★
 - SHORT: Keep each reply to ONE or TWO short, natural sentences, then stop and let the caller talk. Never deliver a paragraph, a monologue, or a long list out loud. This is a live phone call — speak the way a real person does.
-- DON'T REPEAT YOURSELF: Keep track of what you've already said, asked, and confirmed. Never restate your own earlier sentences and never re-ask a question that's already been answered. Always move the conversation forward. Only repeat something to confirm a detail back to the caller, or when they ask you to.
+- DON'T REPEAT YOURSELF: Keep track of what you've already said, asked, and confirmed. Never restate your own earlier sentences and never re-ask a question that's already been answered. Always move the conversation forward. Only repeat something to confirm a detail back to the caller, or when they ask you to. When a tool returns guidance, deliver it ONCE in your own words — never say it and then immediately say the same thing again in different words.
 - YIELD INSTANTLY: The moment the caller starts speaking, stop talking and listen. Never talk over them; let them finish before you respond.
 - CATCH EVERYTHING AT ONCE: If the caller gives several details in one turn (e.g., name + service + a preferred day), capture and acknowledge ALL of them, and confirm the full set back. Never ignore part of what they said, and never re-ask for something they already provided.
 
@@ -114,7 +114,7 @@ Once you understand what the caller needs, the backend guides you step by step �
 3. ADVANCE with update_workflow (transition_to) when the guidance says to move on. THE BACKEND PERFORMS THE ACTION FOR YOU — for booking, waitlisting, and lead capture you do NOT call a separate tool; when you transition to the step the guidance names (e.g. "execute"), the backend does it and returns the confirmation for you to speak warmly. Never call book_appointment/book_consultation/qualify_lead/waitlist_add yourself.
 4. TOPIC SWITCH: if the caller changes subject, call route_intent again with the new intent — the backend pauses the current task and brings it back automatically. Never abandon a task silently.
 5. STAY IN YOUR LANE: only use tools the backend granted. If a tool answers "denied", call route_intent with the caller's current intent and continue from its guidance.
-6. NEVER invent facts, services, prices, or availability. For factual questions (hours, prices, policies, offers), call knowledge_search and answer ONLY from its results. If you truly can't help, offer a callback (schedule_callback) or take a message (leave_staff_message) — never blame "the system."
+6. NEVER invent facts, services, prices, or availability. If the answer is ALREADY in your SERVICES / PRICING / HOURS / POLICIES / FAQs sections below, answer straight from those, ONCE — do NOT call knowledge_search for it, and never repeat the same answer a second time. Use knowledge_search only for factual questions those sections do not cover (for example current promotions or offers), then give its answer once. If you truly can't help, offer a callback (schedule_callback) or take a message (leave_staff_message) — never blame "the system."
 
 === WHAT YOU CAN OFFER — STRICT ===
 The SERVICES list below is the COMPLETE and ONLY set of services ${business} offers. Only discuss, recommend, or book something on that list. If a caller asks about something not listed, warmly say it's not something you offer and steer them to the closest listed service or offer to take a message. If unsure, treat it as NOT offered.
@@ -166,6 +166,10 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
       name: 'route_intent',
       description:
         "Tell the backend what the caller wants. Call as soon as you understand their intent, and again whenever the topic changes. Returns the workflow to follow: its current step, missing details, and guidance.",
+      // SILENT during execution. This fires on EVERY turn and returns in ~1-2s;
+      // narrating here makes the agent speak a filler AND then the returned
+      // guidance, which the caller hears as repeating itself. Only genuinely
+      // slow, external-facing tools (availability, booking, handoff) narrate.
       speak_during_execution: false,
       parameters: {
         type: 'object',
@@ -183,7 +187,7 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
       name: 'update_workflow',
       description:
         'Report progress on the active workflow: send collected details (slots), request the next step (transition_to), finish it (complete_outcome), or abandon it (cancel). The backend validates everything and answers with what to do next.',
-      speak_during_execution: false,
+      speak_during_execution: false, // silent: per-turn tool, narrating doubles the reply
       parameters: {
         type: 'object',
         properties: {
@@ -209,7 +213,7 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
       name: 'knowledge_search',
       description:
         "Search this business's knowledge base (FAQs, services, pricing, active promotions) for the caller's factual question. Answer only from the results.",
-      speak_during_execution: false,
+      speak_during_execution: false, // silent: fast lookup, narrating doubles the reply
       parameters: {
         type: 'object',
         properties: {
@@ -222,7 +226,7 @@ function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolS
     {
       name: 'lookup_existing_client',
       description: 'Look up the caller AFTER collecting and confirming their name and phone. Returns their history so you can personalize.',
-      speak_during_execution: false,
+      speak_during_execution: false, // silent: fast lookup, narrating doubles the reply
       parameters: {
         type: 'object',
         properties: {

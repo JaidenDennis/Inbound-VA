@@ -63,12 +63,16 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
 
   async createOrUpdateContact(contact: CrmContact): Promise<CrmSyncResult> {
     try {
+      // GHL dedupes the upsert on email/phone and rejects empty strings for
+      // them, so send only the identifiers this contact actually has (outbound
+      // leads are frequently email-only, inbound calls phone-only).
       const { data } = await this.http.post('/contacts/upsert', {
         locationId: this.cfg.locationId,
         firstName: contact.firstName,
         lastName: contact.lastName,
-        email: contact.email,
-        phone: contact.phone,
+        ...(contact.email ? { email: contact.email } : {}),
+        ...(contact.phone ? { phone: contact.phone } : {}),
+        ...(contact.company ? { companyName: contact.company } : {}),
         tags: contact.tags ?? [],
         ...this.mapCustomFields(contact.customFields),
       });
@@ -300,18 +304,28 @@ class GoHighLevelAdapter extends BaseCrmAdapter {
   }
 
   /**
-   * GHL v2 wants custom fields as [{ key, field_value }]. Internal names go
-   * through customFieldMapping when configured; unmapped names pass through
-   * as-is (valid when they already are GHL field keys).
+   * GHL v2 identifies a custom field by either its id ("3sv6UEo5PoErAAyF9Yxi")
+   * or its dotted field key ("contact.company_industry") — and quietly ignores
+   * an entry it cannot resolve, so sending the wrong one loses data without an
+   * error. Ids carry no dot, which makes the two unambiguous to tell apart.
+   *
+   * Internal names are translated by customFieldMapping, which GHL provisioning
+   * populates with name → field id. Unmapped names pass through as-is, which is
+   * correct when the caller already used a real key or id.
    */
   private mapCustomFields(customFields?: Record<string, unknown>): Record<string, unknown> {
     if (!customFields || Object.keys(customFields).length === 0) return {};
-    const mapping = this.cfg.customFieldMapping ?? {};
+    // Provisioning stores GHL's own field casing; callers rarely match it.
+    const mapping = new Map(
+      Object.entries(this.cfg.customFieldMapping ?? {}).map(([k, v]) => [k.toLowerCase(), v])
+    );
     return {
-      customFields: Object.entries(customFields).map(([name, value]) => ({
-        key: mapping[name] ?? name,
-        field_value: value,
-      })),
+      customFields: Object.entries(customFields).map(([name, value]) => {
+        const field = mapping.get(name.toLowerCase()) ?? name;
+        return field.includes('.')
+          ? { key: field, field_value: value }
+          : { id: field, field_value: value };
+      }),
     };
   }
 }

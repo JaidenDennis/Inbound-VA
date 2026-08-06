@@ -2,6 +2,8 @@ import type { Job } from 'bullmq';
 import { supabase } from '../db/index.js';
 import { env } from '../config/index.js';
 import { logger, captureException, sendMail } from '../utils/index.js';
+import { systemErrorService, fingerprintFor } from '../services/systemError.service.js';
+import { systemAlertService } from '../services/systemAlert.service.js';
 
 /**
  * Shared terminal-failure handler for EVERY queue. BullMQ fires 'failed' on each
@@ -38,7 +40,46 @@ export async function onFinalFailure(queueName: string, job: Job | undefined, er
     logger.error({ e, queue: queueName, jobId: job.id }, 'Failed to record failed_job row');
   }
 
+  await recordSystemError(queueName, job, err);
   await sendAlertEmail(queueName, job, err);
+}
+
+/**
+ * Mirror the terminal failure into system_errors so the console shows queue
+ * faults beside API and webhook faults, and open a ticket immediately.
+ *
+ * `immediate` is right here in a way it would not be for a 500: reaching this
+ * function already means the job retried and still failed, so the recurrence
+ * threshold has effectively been met.
+ */
+async function recordSystemError(queueName: string, job: Job, err: Error): Promise<void> {
+  const data = (job.data ?? {}) as Record<string, unknown>;
+  const clientId =
+    (typeof data.clientId === 'string' && data.clientId) ||
+    (typeof data.client_id === 'string' && data.client_id) ||
+    null;
+
+  await systemErrorService.record({
+    source: 'worker',
+    severity: 'error',
+    clientId,
+    route: queueName,
+    error: err,
+    context: { queue: queueName, jobId: job.id, attempts: job.attemptsMade, jobData: data },
+  });
+
+  await systemAlertService.maybeOpenTicket({
+    fingerprint: fingerprintFor({
+      source: 'worker',
+      errorName: err.name || 'Error',
+      route: queueName,
+      message: err.message ?? '',
+    }),
+    clientId,
+    title: `${queueName} job failed`,
+    detail: err.message ?? 'Job exhausted retries',
+    immediate: true,
+  });
 }
 
 async function sendAlertEmail(queueName: string, job: Job, err: Error): Promise<void> {

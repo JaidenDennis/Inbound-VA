@@ -1,4 +1,4 @@
-import Fastify, { type FastifyError } from 'fastify';
+import Fastify, { type FastifyError, type FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -8,6 +8,8 @@ import { env } from './config/index.js';
 import { logger, LOG_REDACT_PATHS, initSentry, captureException } from './utils/index.js';
 import { redis } from './queues/index.js';
 import { registerAutomationSubscribers } from './automation/index.js';
+import { systemErrorService, fingerprintFor } from './services/systemError.service.js';
+import { systemAlertService } from './services/systemAlert.service.js';
 
 // Routes
 import { healthRoutes } from './routes/health.route.js';
@@ -24,6 +26,7 @@ import { callStartedRoute } from './routes/webhooks/call-started.route.js';
 import { callEndedRoute } from './routes/webhooks/call-ended.route.js';
 import { transcriptRoute } from './routes/webhooks/transcript.route.js';
 import { summaryRoute } from './routes/webhooks/summary.route.js';
+import { clayLeadRoute } from './routes/webhooks/clay-lead.route.js';
 import { authRoutes } from './dashboard-api/auth.route.js';
 import { analyticsRoutes } from './dashboard-api/analytics.route.js';
 import { adminRoutes } from './dashboard-api/admin.route.js';
@@ -32,6 +35,53 @@ import { ticketRoutes } from './dashboard-api/tickets.route.js';
 import { onboardingRoutes } from './dashboard-api/onboarding.route.js';
 import { actionItemRoutes } from './dashboard-api/action-items.route.js';
 import { statsRoutes } from './dashboard-api/stats.route.js';
+import { systemRoutes } from './dashboard-api/system.route.js';
+import { knowledgeRoutes } from './dashboard-api/knowledge.route.js';
+import { agentRoutes } from './dashboard-api/agents.route.js';
+import { reportRoutes } from './dashboard-api/reports.route.js';
+
+/**
+ * Record a 5xx in `system_errors`, tagged with the tenant when the request
+ * carried one. The client is taken from the verified JWT first and only then
+ * from the URL/body, so a caller cannot mislabel someone else's error.
+ */
+async function recordRequestError(
+  request: FastifyRequest,
+  error: FastifyError,
+  status: number
+): Promise<void> {
+  const jwtUser = (request as { jwtUser?: { clientId?: string | null } }).jwtUser;
+  const params = (request.params ?? {}) as Record<string, string>;
+  const query = (request.query ?? {}) as Record<string, string>;
+  const clientId = jwtUser?.clientId ?? query.clientId ?? params.clientId ?? null;
+
+  const fault = {
+    source: 'api' as const,
+    severity: status >= 500 ? ('error' as const) : ('warn' as const),
+    clientId,
+    requestId: request.id,
+    // routerPath is the pattern ("/clients/:id"), so every id hits one
+    // fingerprint instead of one per record.
+    route: request.routeOptions?.url ?? request.url,
+    method: request.method,
+    statusCode: status,
+    error,
+    context: { query, params },
+  };
+
+  await systemErrorService.record(fault);
+  await systemAlertService.maybeOpenTicket({
+    fingerprint: fingerprintFor({
+      source: 'api',
+      errorName: error.name || 'Error',
+      route: fault.route,
+      message: error.message ?? '',
+    }),
+    clientId,
+    title: `${request.method} ${fault.route}`,
+    detail: error.message ?? 'Request failed',
+  });
+}
 
 export async function buildApp() {
   // Report unhandled request errors to Sentry (no-op without SENTRY_DSN).
@@ -120,6 +170,9 @@ export async function buildApp() {
     const status = error.statusCode ?? 500;
     if (status >= 500) {
       captureException(error, { url: request.url, method: request.method });
+      // Persist for the system console. Fire-and-forget: the reply must not wait
+      // on a log write, and a failure here is swallowed inside the service.
+      void recordRequestError(request, error, status);
     }
     if (error.statusCode) {
       reply.code(error.statusCode).send({ error: error.message });
@@ -144,6 +197,7 @@ export async function buildApp() {
   await app.register(callEndedRoute);
   await app.register(transcriptRoute);
   await app.register(summaryRoute);
+  await app.register(clayLeadRoute);
   await app.register(analyticsRoutes);
   await app.register(adminRoutes);
   await app.register(userRoutes);
@@ -151,6 +205,10 @@ export async function buildApp() {
   await app.register(onboardingRoutes);
   await app.register(actionItemRoutes);
   await app.register(statsRoutes);
+  await app.register(systemRoutes);
+  await app.register(knowledgeRoutes);
+  await app.register(agentRoutes);
+  await app.register(reportRoutes);
 
   return app;
 }

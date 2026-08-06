@@ -1,8 +1,45 @@
-// Client-side view of the signed-in user, derived by DECODING (not verifying)
-// the JWT in localStorage. The backend verifies the signature on every API
-// call — this is only used to choose what UI to show (e.g. client vs admin
-// nav), never as a security boundary.
-export type UserRole = 'super_admin' | 'admin' | 'agent' | 'viewer';
+// Client-side view of the signed-in user.
+//
+// Identity (role, tenant) is DECODED — not verified — from the JWT in
+// localStorage. Permissions come from GET /auth/me, which resolves them from the
+// database. Neither is a security boundary: the backend verifies the signature
+// and re-checks the permission on every request. This exists only to decide what
+// UI to render, so a tampered token buys a broken-looking page and nothing more.
+
+export type RoleScope = 'platform' | 'client';
+
+export const PLATFORM_ROLES = ['super_admin', 'support_agent', 'analyst'] as const;
+export const CLIENT_ROLES = ['client_owner', 'client_manager', 'client_viewer'] as const;
+
+export type PlatformRole = (typeof PLATFORM_ROLES)[number];
+export type ClientRole = (typeof CLIENT_ROLES)[number];
+export type UserRole = PlatformRole | ClientRole;
+
+export type Permission =
+  | 'clients:read'
+  | 'clients:write'
+  | 'calls:read'
+  | 'calls:write'
+  | 'bookings:read'
+  | 'bookings:write'
+  | 'crm:read'
+  | 'crm:write'
+  | 'analytics:read'
+  | 'settings:read'
+  | 'settings:write'
+  | 'users:read'
+  | 'users:write'
+  | 'tickets:read'
+  | 'tickets:write'
+  | 'tickets:triage'
+  | 'transcripts:read'
+  | 'recordings:read'
+  | 'knowledge:read'
+  | 'knowledge:write'
+  | 'agents:read'
+  | 'agents:write'
+  | 'system:read'
+  | 'system:write';
 
 export interface Session {
   sub: string;
@@ -10,6 +47,25 @@ export interface Session {
   role: UserRole;
   clientId: string | null;
   exp: number;
+}
+
+/** Session plus the permissions fetched from the API. */
+export interface AuthState extends Session {
+  name: string;
+  permissions: Permission[];
+}
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  super_admin: 'Super Admin',
+  support_agent: 'Support',
+  analyst: 'Analyst',
+  client_owner: 'Owner',
+  client_manager: 'Manager',
+  client_viewer: 'Viewer',
+};
+
+export function roleLabel(role: UserRole): string {
+  return ROLE_LABELS[role] ?? role;
 }
 
 export function getSession(): Session | null {
@@ -33,7 +89,7 @@ export function getSession(): Session | null {
     return {
       sub: payload.sub,
       email: payload.email ?? '',
-      role: (payload.role as UserRole) ?? 'viewer',
+      role: (payload.role as UserRole) ?? 'client_viewer',
       clientId: payload.clientId ?? null,
       exp: payload.exp ?? 0,
     };
@@ -43,6 +99,15 @@ export function getSession(): Session | null {
 }
 
 /** Platform staff (no tenant) vs a client-scoped user. */
-export function isPlatformUser(session: Session | null): boolean {
+export function isPlatformUser(session: Pick<Session, 'clientId'> | null): boolean {
   return !!session && (session.clientId === null || session.clientId === undefined);
+}
+
+export function scopeOf(session: Pick<Session, 'clientId'> | null): RoleScope {
+  return isPlatformUser(session) ? 'platform' : 'client';
+}
+
+export function clearSession(): void {
+  localStorage.removeItem('gravvia_token');
+  document.cookie = 'gravvia_token=; max-age=0; path=/';
 }

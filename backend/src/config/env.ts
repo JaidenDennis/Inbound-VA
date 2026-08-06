@@ -42,6 +42,17 @@ const envSchema = z.object({
   ZOHO_CLIENT_ID: z.string().optional(),
   ZOHO_CLIENT_SECRET: z.string().optional(),
 
+  // Clay → CRM outbound lead ingest (POST /webhooks/clay/lead). Clay sends the
+  // secret as `Authorization: Bearer <secret>`; leaving it unset disables the
+  // endpoint (503) rather than leaving an unauthenticated write path open.
+  CLAY_INGEST_SECRET: z.string().min(16).optional(),
+  // Client whose active CRM connection receives Clay leads when the payload
+  // omits clientId — Gravvia's own sub-account for outbound sales.
+  CLAY_DEFAULT_CLIENT_ID: z.string().uuid().optional(),
+  // Clay fires one request per table row, so a table run bursts far past the
+  // global cap. This endpoint is secret-authenticated and gets its own limit.
+  CLAY_RATE_LIMIT_MAX: z.coerce.number().default(600),
+
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),

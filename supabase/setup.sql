@@ -22,7 +22,7 @@
 --     Create your first super_admin explicitly — see the block at the end.
 --   • Any sample/demo client data. See supabase/seed.sql for that (dev only).
 --
--- Generated from 14 migrations: 001_initial_schema.sql, 002_rls_policies.sql, 003_seed_roles.sql, 004_multitenant_hardening.sql, 005_retell_provisioning.sql, 006_agent_identity_config.sql, 007_grants.sql, 008_client_dashboard.sql, 009_crm_config.sql, 010_ghl_provisioning.sql, 011_call_sessions.sql, 012_knowledge_tables.sql, 013_waitlist.sql, 014_account_ops.sql
+-- Generated from 20 migrations: 001_initial_schema.sql, 002_rls_policies.sql, 003_seed_roles.sql, 004_multitenant_hardening.sql, 005_retell_provisioning.sql, 006_agent_identity_config.sql, 007_grants.sql, 008_client_dashboard.sql, 009_crm_config.sql, 010_ghl_provisioning.sql, 011_call_sessions.sql, 012_knowledge_tables.sql, 013_waitlist.sql, 014_account_ops.sql, 015_contact_company.sql, 016_rbac_role_families.sql, 017_system_errors.sql, 018_agent_versions.sql, 019_support_ops.sql, 020_reporting.sql
 -- ============================================================================
 
 
@@ -1306,6 +1306,732 @@ ALTER TABLE tickets ADD COLUMN IF NOT EXISTS source     TEXT NOT NULL DEFAULT 'd
 
 CREATE INDEX IF NOT EXISTS idx_tickets_contact ON tickets(contact_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_source  ON tickets(source);
+
+
+-- ============================================================================
+-- SOURCE: migrations/015_contact_company.sql
+-- ============================================================================
+
+-- Company name on contacts. Inbound voice callers are individuals, but
+-- outbound/enriched leads (Clay) are B2B prospects whose company is the
+-- primary thing a rep sorts and searches on — and it is the one field the CRM
+-- contact record has that we had nowhere to store.
+ALTER TABLE contacts
+  ADD COLUMN IF NOT EXISTS company TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company);
+
+
+-- ============================================================================
+-- SOURCE: migrations/016_rbac_role_families.sql
+-- ============================================================================
+
+-- ============================================================
+-- GRAVVIA ENGAGE – RBAC role families
+-- Run order: 016  (NEVER edit earlier migrations)
+--
+-- Splits roles into two scopes:
+--   platform  – Gravvia staff, users.client_id IS NULL
+--   client    – tenant users, users.client_id IS NOT NULL
+--
+-- Also makes the `permissions` table the single source of truth at runtime.
+-- Until this migration, backend/src/types/auth.types.ts held a hardcoded
+-- ROLE_PERMISSIONS map that was the ONLY thing read at request time, while this
+-- table sat unused and had already drifted (tickets:* existed in code, never
+-- seeded here). That map is deleted in the same change that ships this file.
+--
+-- Rollback: supabase/rollbacks/016_rbac_role_families_rollback.sql
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. Role scope
+-- ------------------------------------------------------------
+ALTER TABLE roles ADD COLUMN IF NOT EXISTS scope TEXT;
+
+INSERT INTO roles (name, description) VALUES
+  ('support_agent',  'Platform staff: support queue, calls, recordings, system logs, agent config'),
+  ('analyst',        'Platform staff: read-only across all tenants'),
+  ('client_owner',   'Client: owns their account, users, knowledge base and reports'),
+  ('client_manager', 'Client: reports, transcripts, tickets, bookings'),
+  ('client_viewer',  'Client: reports only')
+ON CONFLICT (name) DO NOTHING;
+
+UPDATE roles SET scope = 'platform' WHERE name IN ('super_admin', 'support_agent', 'analyst');
+UPDATE roles SET scope = 'client'   WHERE name IN ('client_owner', 'client_manager', 'client_viewer');
+
+-- ------------------------------------------------------------
+-- 2. Backfill users onto the new role names
+--
+-- The old role set (super_admin/admin/agent/viewer) was shared by staff and
+-- tenant users, so the same name meant different things depending on client_id.
+-- Split on client_id, which is what actually distinguished them.
+-- ------------------------------------------------------------
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+
+UPDATE users SET role = CASE
+  WHEN role = 'super_admin' AND client_id IS NULL THEN 'super_admin'
+  WHEN role = 'super_admin'                       THEN 'client_owner'
+  WHEN role = 'admin'       AND client_id IS NULL THEN 'support_agent'
+  WHEN role = 'admin'                             THEN 'client_owner'
+  WHEN role = 'agent'       AND client_id IS NULL THEN 'support_agent'
+  WHEN role = 'agent'                             THEN 'client_manager'
+  WHEN role = 'viewer'      AND client_id IS NULL THEN 'analyst'
+  WHEN role = 'viewer'                            THEN 'client_viewer'
+  ELSE role
+END
+WHERE role IN ('super_admin', 'admin', 'agent', 'viewer');
+
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (
+  role IN ('super_admin', 'support_agent', 'analyst',
+           'client_owner', 'client_manager', 'client_viewer')
+);
+
+-- Retire the old role rows now that no user references them.
+DELETE FROM roles WHERE name IN ('admin', 'agent', 'viewer');
+
+-- ------------------------------------------------------------
+-- 3. Reseed permissions
+--
+-- Full rebuild rather than an incremental patch: the table had drifted from the
+-- code it was supposed to mirror, so the only safe state is a known one.
+-- ------------------------------------------------------------
+DELETE FROM permissions;
+
+-- super_admin — everything in the vocabulary.
+INSERT INTO permissions (role_id, permission)
+SELECT r.id, p.permission FROM roles r
+CROSS JOIN (VALUES
+  ('clients:read'), ('clients:write'),
+  ('calls:read'), ('calls:write'),
+  ('bookings:read'), ('bookings:write'),
+  ('crm:read'), ('crm:write'),
+  ('analytics:read'),
+  ('settings:read'), ('settings:write'),
+  ('users:read'), ('users:write'),
+  ('tickets:read'), ('tickets:write'), ('tickets:triage'),
+  ('transcripts:read'), ('recordings:read'),
+  ('knowledge:read'), ('knowledge:write'),
+  ('agents:read'), ('agents:write'),
+  ('system:read'), ('system:write')
+) AS p(permission)
+WHERE r.name = 'super_admin';
+
+-- support_agent — operates and troubleshoots every tenant. No users:write and
+-- no settings:write: staff accounts and platform settings stay with super_admin.
+INSERT INTO permissions (role_id, permission)
+SELECT r.id, p.permission FROM roles r
+CROSS JOIN (VALUES
+  ('clients:read'), ('clients:write'),
+  ('calls:read'), ('calls:write'),
+  ('bookings:read'), ('bookings:write'),
+  ('crm:read'), ('crm:write'),
+  ('analytics:read'),
+  ('settings:read'),
+  ('users:read'),
+  ('tickets:read'), ('tickets:write'), ('tickets:triage'),
+  ('transcripts:read'), ('recordings:read'),
+  ('knowledge:read'), ('knowledge:write'),
+  ('agents:read'), ('agents:write'),
+  ('system:read'), ('system:write')
+) AS p(permission)
+WHERE r.name = 'support_agent';
+
+-- analyst — read-only across all tenants. Deliberately no transcripts:read and
+-- no recordings:read: cross-tenant caller PII is not needed to read aggregates.
+INSERT INTO permissions (role_id, permission)
+SELECT r.id, p.permission FROM roles r
+CROSS JOIN (VALUES
+  ('clients:read'),
+  ('calls:read'),
+  ('bookings:read'),
+  ('crm:read'),
+  ('analytics:read'),
+  ('settings:read'),
+  ('users:read'),
+  ('tickets:read'),
+  ('knowledge:read'),
+  ('agents:read'),
+  ('system:read')
+) AS p(permission)
+WHERE r.name = 'analyst';
+
+-- client_owner — full control of their own tenant. No agents:* (behavior is
+-- staff-owned) and no recordings:read (call audio is staff-only).
+INSERT INTO permissions (role_id, permission)
+SELECT r.id, p.permission FROM roles r
+CROSS JOIN (VALUES
+  ('clients:read'),
+  ('calls:read'),
+  ('bookings:read'), ('bookings:write'),
+  ('analytics:read'),
+  ('settings:read'),
+  ('users:read'), ('users:write'),
+  ('tickets:read'), ('tickets:write'),
+  ('transcripts:read'),
+  ('knowledge:read'), ('knowledge:write')
+) AS p(permission)
+WHERE r.name = 'client_owner';
+
+-- client_manager — day-to-day use, no user administration, no knowledge edits.
+INSERT INTO permissions (role_id, permission)
+SELECT r.id, p.permission FROM roles r
+CROSS JOIN (VALUES
+  ('clients:read'),
+  ('calls:read'),
+  ('bookings:read'), ('bookings:write'),
+  ('analytics:read'),
+  ('tickets:read'), ('tickets:write'),
+  ('transcripts:read'),
+  ('knowledge:read')
+) AS p(permission)
+WHERE r.name = 'client_manager';
+
+-- client_viewer — reports only. Keeps tickets:write so they can still raise a
+-- support request; triage stays platform-only.
+INSERT INTO permissions (role_id, permission)
+SELECT r.id, p.permission FROM roles r
+CROSS JOIN (VALUES
+  ('clients:read'),
+  ('calls:read'),
+  ('bookings:read'),
+  ('analytics:read'),
+  ('tickets:read'), ('tickets:write')
+) AS p(permission)
+WHERE r.name = 'client_viewer';
+
+-- ------------------------------------------------------------
+-- 4. Verification — abort the transaction rather than half-migrate
+--
+-- A partially applied role migration locks people out of the dashboard with no
+-- obvious cause, so every invariant is asserted here while we can still roll back.
+-- ------------------------------------------------------------
+DO $$
+DECLARE
+  bad_scope   INTEGER;
+  bad_role    INTEGER;
+  no_scope    INTEGER;
+  no_grants   INTEGER;
+BEGIN
+  -- Every user's role must exist in roles, with a scope matching their tenancy.
+  SELECT COUNT(*) INTO bad_role
+  FROM users u LEFT JOIN roles r ON r.name = u.role
+  WHERE r.id IS NULL;
+  IF bad_role > 0 THEN
+    RAISE EXCEPTION 'Migration 016: % user(s) hold a role with no matching roles row', bad_role;
+  END IF;
+
+  SELECT COUNT(*) INTO bad_scope
+  FROM users u JOIN roles r ON r.name = u.role
+  WHERE (u.client_id IS NULL AND r.scope <> 'platform')
+     OR (u.client_id IS NOT NULL AND r.scope <> 'client');
+  IF bad_scope > 0 THEN
+    RAISE EXCEPTION 'Migration 016: % user(s) hold a role in the wrong scope for their client_id', bad_scope;
+  END IF;
+
+  SELECT COUNT(*) INTO no_scope FROM roles WHERE scope IS NULL;
+  IF no_scope > 0 THEN
+    RAISE EXCEPTION 'Migration 016: % role(s) have no scope', no_scope;
+  END IF;
+
+  SELECT COUNT(*) INTO no_grants
+  FROM roles r LEFT JOIN permissions p ON p.role_id = r.id
+  WHERE p.id IS NULL;
+  IF no_grants > 0 THEN
+    RAISE EXCEPTION 'Migration 016: % role(s) have zero permissions', no_grants;
+  END IF;
+END $$;
+
+-- Scope is only NOT NULL once every row is known good.
+ALTER TABLE roles ALTER COLUMN scope SET NOT NULL;
+ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_scope_check;
+ALTER TABLE roles ADD CONSTRAINT roles_scope_check CHECK (scope IN ('platform', 'client'));
+
+CREATE INDEX IF NOT EXISTS idx_permissions_role ON permissions(role_id);
+
+
+-- ============================================================================
+-- SOURCE: migrations/017_system_errors.sql
+-- ============================================================================
+
+-- ============================================================
+-- GRAVVIA ENGAGE – System error capture + unified activity view
+-- Run order: 017  (NEVER edit earlier migrations)
+--
+-- Before this migration nothing recorded runtime faults. failed_jobs captured
+-- exhausted queue jobs and crm_sync_logs captured CRM failures, but a 500 from a
+-- route, a rejected webhook signature, or an unhandled rejection left no trace
+-- anywhere — the process logged a line to stdout and that was it.
+--
+-- system_errors is the missing writer. system_activity is the single read model
+-- the console queries, unioning this table with the four that already existed.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS system_errors (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  occurred_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  source        TEXT NOT NULL CHECK (source IN ('api', 'worker', 'webhook', 'startup')),
+  severity      TEXT NOT NULL DEFAULT 'error' CHECK (severity IN ('warn', 'error', 'fatal')),
+  -- NULL means platform-wide: the fault had no tenant, or we could not tell.
+  client_id     UUID REFERENCES clients(id) ON DELETE SET NULL,
+  request_id    TEXT,
+  route         TEXT,
+  method        TEXT,
+  status_code   INTEGER,
+  error_name    TEXT NOT NULL DEFAULT 'Error',
+  message       TEXT NOT NULL,
+  stack         TEXT,
+  context       JSONB NOT NULL DEFAULT '{}',
+  -- Hash of source + error_name + route + normalized message. Groups one outage
+  -- into a single console row instead of thousands of near-identical ones.
+  fingerprint   TEXT NOT NULL,
+  reviewed_at   TIMESTAMPTZ,
+  reviewed_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  ticket_id     UUID REFERENCES tickets(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_errors_occurred    ON system_errors(occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_system_errors_client      ON system_errors(client_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_system_errors_fingerprint ON system_errors(fingerprint, occurred_at DESC);
+-- Partial: the console's default view is "what still needs attention".
+CREATE INDEX IF NOT EXISTS idx_system_errors_unreviewed  ON system_errors(occurred_at DESC)
+  WHERE reviewed_at IS NULL;
+
+-- Backlink so a fingerprint that already has a ticket attaches to it instead of
+-- opening a new one on every recurrence.
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS error_fingerprint TEXT;
+CREATE INDEX IF NOT EXISTS idx_tickets_error_fingerprint ON tickets(error_fingerprint)
+  WHERE error_fingerprint IS NOT NULL;
+
+-- ------------------------------------------------------------
+-- Unified read model
+--
+-- Five sources, one shape. The four pre-existing tables gain no new writes —
+-- the console reads them through here, so nothing is duplicated and nothing
+-- has to be kept in sync.
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW system_activity AS
+  SELECT
+    e.id,
+    'system_error'::TEXT           AS kind,
+    e.source,
+    e.severity,
+    e.client_id,
+    e.occurred_at,
+    COALESCE(e.error_name, 'Error') AS title,
+    e.message                       AS detail,
+    e.fingerprint,
+    e.reviewed_at,
+    e.id::TEXT                      AS ref_id
+  FROM system_errors e
+
+  UNION ALL
+
+  SELECT
+    j.id,
+    'failed_job'::TEXT,
+    'worker'::TEXT,
+    CASE WHEN j.status = 'resolved' THEN 'warn' ELSE 'error' END,
+    -- failed_jobs predates tenant tagging; most payloads carry clientId, so
+    -- recover it when the value actually looks like a UUID.
+    CASE
+      WHEN j.job_data->>'clientId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        THEN (j.job_data->>'clientId')::UUID
+      WHEN j.job_data->>'client_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        THEN (j.job_data->>'client_id')::UUID
+    END,
+    j.created_at,
+    j.queue_name,
+    j.error_message,
+    NULL::TEXT,
+    CASE WHEN j.status = 'resolved' THEN j.updated_at END,
+    j.id::TEXT
+  FROM failed_jobs j
+
+  UNION ALL
+
+  SELECT
+    c.id,
+    'crm_sync'::TEXT,
+    'worker'::TEXT,
+    'error'::TEXT,
+    c.client_id,
+    c.created_at,
+    c.entity_type || ' ' || c.operation,
+    COALESCE(c.error_message, 'CRM sync failed'),
+    NULL::TEXT,
+    NULL::TIMESTAMPTZ,
+    c.id::TEXT
+  FROM crm_sync_logs c
+  WHERE c.status = 'failed'
+
+  UNION ALL
+
+  SELECT
+    a.id,
+    'automation_run'::TEXT,
+    'worker'::TEXT,
+    'error'::TEXT,
+    a.client_id,
+    a.started_at,
+    'automation run'::TEXT,
+    COALESCE(a.error_message, 'Automation run failed'),
+    NULL::TEXT,
+    a.completed_at,
+    a.id::TEXT
+  FROM automation_runs a
+  WHERE a.status = 'failed'
+
+  UNION ALL
+
+  SELECT
+    v.id,
+    'event'::TEXT,
+    'webhook'::TEXT,
+    'warn'::TEXT,
+    v.client_id,
+    v.created_at,
+    v.event_type,
+    COALESCE(v.payload->>'error', v.event_type),
+    NULL::TEXT,
+    CASE WHEN v.processed THEN v.created_at END,
+    v.id::TEXT
+  FROM events v
+  WHERE v.event_type LIKE '%failed%' OR v.event_type LIKE '%error%';
+
+
+-- ============================================================================
+-- SOURCE: migrations/018_agent_versions.sql
+-- ============================================================================
+
+-- ============================================================
+-- GRAVVIA ENGAGE – Agent sync state, prompt overrides, version history
+-- Run order: 018  (NEVER edit earlier migrations)
+--
+-- provisionClient() renders the knowledge base into the agent prompt and pushes
+-- it to Retell, but until now it only ran on demand. A client editing an FAQ
+-- changed the database while the live agent kept answering with the old text.
+--
+-- These columns make the gap visible and closeable: a knowledge or config write
+-- marks the client 'pending', a debounced job re-provisions, and every
+-- successful provision snapshots what was actually sent.
+-- ============================================================
+
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS agent_sync_state TEXT NOT NULL DEFAULT 'never';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS agent_sync_error TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS agent_sync_requested_at TIMESTAMPTZ;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS agent_synced_at TIMESTAMPTZ;
+
+ALTER TABLE clients DROP CONSTRAINT IF EXISTS clients_agent_sync_state_check;
+ALTER TABLE clients ADD CONSTRAINT clients_agent_sync_state_check
+  CHECK (agent_sync_state IN ('never', 'pending', 'synced', 'failed'));
+
+-- Clients already provisioned are 'synced' — they have an agent live on Retell.
+UPDATE clients
+SET agent_sync_state = 'synced',
+    agent_synced_at = retell_last_provisioned_at
+WHERE retell_agent_id IS NOT NULL AND agent_sync_state = 'never';
+
+CREATE INDEX IF NOT EXISTS idx_clients_agent_sync_state ON clients(agent_sync_state)
+  WHERE agent_sync_state IN ('pending', 'failed');
+
+-- ------------------------------------------------------------
+-- Prompt overrides
+--
+-- Appended sections keyed by slot, never a wholesale prompt replacement. The
+-- per-vertical template stays authoritative, so bespoke wording for one client
+-- does not become a branch in source — which the multi-tenant rule forbids.
+-- Shape: { "<slot>": "<text>" }
+-- ------------------------------------------------------------
+ALTER TABLE client_settings ADD COLUMN IF NOT EXISTS prompt_overrides JSONB NOT NULL DEFAULT '{}';
+
+-- ------------------------------------------------------------
+-- Version history
+--
+-- Written only on a SUCCESSFUL provision, so the table is a record of what the
+-- agent actually ran with. Answers "what changed on Tuesday" — otherwise
+-- unanswerable, because a degraded prompt affects every call silently.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS agent_config_versions (
+  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id             UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  version               INTEGER NOT NULL,
+  settings_snapshot     JSONB NOT NULL DEFAULT '{}',
+  rendered_prompt       TEXT,
+  retell_agent_id       TEXT,
+  retell_agent_version  INTEGER,
+  vertical              TEXT,
+  created_by            UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(client_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_versions_client ON agent_config_versions(client_id, version DESC);
+
+
+-- ============================================================================
+-- SOURCE: migrations/019_support_ops.sql
+-- ============================================================================
+
+-- ============================================================
+-- GRAVVIA ENGAGE – Support operations: internal notes, SLA, auto-tickets
+-- Run order: 019  (NEVER edit earlier migrations)
+--
+-- tickets/ticket_messages/ticket_status_history already exist (008), and 014
+-- added contact_id/call_id/source. This migration adds what turns them from a
+-- record into a queue: staff-only notes, response clocks, and the columns the
+-- auto-ticket bridge in 017 needs.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- Internal notes
+--
+-- Default 'client' is deliberate. Every message written before this migration
+-- was visible to the client, so defaulting to 'internal' would retroactively
+-- hide history that clients have already read. New writes always pass
+-- visibility explicitly — see TicketService.addMessage.
+-- ------------------------------------------------------------
+ALTER TABLE ticket_messages ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'client';
+
+ALTER TABLE ticket_messages DROP CONSTRAINT IF EXISTS ticket_messages_visibility_check;
+ALTER TABLE ticket_messages ADD CONSTRAINT ticket_messages_visibility_check
+  CHECK (visibility IN ('client', 'internal'));
+
+-- The client thread query filters on this; a partial index keeps it cheap.
+CREATE INDEX IF NOT EXISTS idx_ticket_messages_client_visible
+  ON ticket_messages(ticket_id, created_at)
+  WHERE visibility = 'client';
+
+-- ------------------------------------------------------------
+-- SLA clocks
+--
+-- Stored rather than computed on read so a priority change re-baselines the
+-- deadline once, and the breach sweep is a plain indexed query instead of a
+-- full scan with per-row arithmetic.
+-- ------------------------------------------------------------
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS first_response_at       TIMESTAMPTZ;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_at             TIMESTAMPTZ;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_response_due_at     TIMESTAMPTZ;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_resolution_due_at   TIMESTAMPTZ;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_breached_at         TIMESTAMPTZ;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS auto_closed_at          TIMESTAMPTZ;
+
+-- Open tickets sorted by how close they are to breaching: the queue's default
+-- ordering, so it prioritises itself.
+CREATE INDEX IF NOT EXISTS idx_tickets_open_by_due
+  ON tickets(sla_response_due_at)
+  WHERE status IN ('investigating', 'waiting_on_client', 'waiting_on_third_party');
+
+CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to)
+  WHERE assigned_to IS NOT NULL;
+
+-- ------------------------------------------------------------
+-- Backfill deadlines for tickets that predate the SLA
+--
+-- Calendar hours, matching SLA_TARGETS in ticket.service.ts. Existing tickets
+-- get a deadline measured from when they were created, so the queue is not
+-- split between rows that have a clock and rows that never will.
+-- ------------------------------------------------------------
+UPDATE tickets SET
+  sla_response_due_at = created_at + (CASE priority
+    WHEN 'urgent' THEN INTERVAL '1 hour'
+    WHEN 'high'   THEN INTERVAL '4 hours'
+    WHEN 'normal' THEN INTERVAL '24 hours'
+    ELSE               INTERVAL '3 days'
+  END),
+  sla_resolution_due_at = created_at + (CASE priority
+    WHEN 'urgent' THEN INTERVAL '8 hours'
+    WHEN 'high'   THEN INTERVAL '24 hours'
+    WHEN 'normal' THEN INTERVAL '5 days'
+    ELSE               INTERVAL '14 days'
+  END)
+WHERE sla_response_due_at IS NULL;
+
+-- Tickets already closed should not sit in the queue looking overdue.
+UPDATE tickets SET resolved_at = updated_at
+WHERE status IN ('resolved', 'closed') AND resolved_at IS NULL;
+
+
+-- ============================================================================
+-- SOURCE: migrations/020_reporting.sql
+-- ============================================================================
+
+-- ============================================================
+-- GRAVVIA ENGAGE – Client reporting: SQL aggregation + call log view
+-- Run order: 020  (NEVER edit earlier migrations)
+--
+-- Fixes a correctness bug, not just a performance one. getStats() selected raw
+-- rows and aggregated them in JavaScript; PostgREST caps responses at 1000 rows
+-- by default, so past 1000 calls in the selected period every figure shown to a
+-- client was silently wrong and always under-counted. A 30-day range on a busy
+-- client already exceeds that.
+--
+-- All aggregation now happens in Postgres, where there is no row cap.
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_call_records_client_started ON call_records(client_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_calls_client_started        ON calls(client_id, started_at DESC);
+
+-- ------------------------------------------------------------
+-- Outcome derivation
+--
+-- Precedence, first match wins. Voicemail is checked BEFORE "question
+-- answered": Retell can mark a voicemail call_successful, and the reverse order
+-- would file voicemails as answered questions — inflating the number clients
+-- care about most.
+--
+-- "Question answered" is INFERRED, not measured: the schema carries no FAQ-hit
+-- signal. It means "the call succeeded and was not any of the above".
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION call_outcome(
+  p_appointment_booked BOOLEAN,
+  p_lead_recaptured    BOOLEAN,
+  p_call_status        TEXT,
+  p_in_voicemail       BOOLEAN,
+  p_call_successful    BOOLEAN
+) RETURNS TEXT
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE
+    WHEN p_appointment_booked           THEN 'appointment_booked'
+    WHEN p_lead_recaptured              THEN 'lead_captured'
+    WHEN p_call_status = 'transferred'  THEN 'transferred'
+    WHEN p_in_voicemail                 THEN 'voicemail'
+    WHEN p_call_successful              THEN 'question_answered'
+    ELSE 'abandoned'
+  END;
+$$;
+
+-- ------------------------------------------------------------
+-- KPI cards
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION report_kpis(
+  p_client_id UUID,
+  p_from      TIMESTAMPTZ,
+  p_to        TIMESTAMPTZ
+) RETURNS TABLE (
+  calls_answered           BIGINT,
+  missed_calls_recovered   BIGINT,
+  leads_recaptured         BIGINT,
+  appointments_booked      BIGINT,
+  avg_call_duration_seconds INTEGER,
+  total_calls              BIGINT
+)
+LANGUAGE sql STABLE SECURITY INVOKER AS $$
+  SELECT
+    COUNT(*) FILTER (WHERE NOT in_voicemail),
+    COUNT(*) FILTER (WHERE missed_call_recovered),
+    COUNT(*) FILTER (WHERE lead_recaptured),
+    COUNT(*) FILTER (WHERE appointment_booked),
+    -- Averaged over answered calls only; voicemails would drag it to nonsense.
+    COALESCE(ROUND(AVG(duration_seconds) FILTER (WHERE NOT in_voicemail))::INTEGER, 0),
+    COUNT(*)
+  FROM call_records
+  WHERE client_id = p_client_id
+    AND started_at >= p_from
+    AND started_at <= p_to;
+$$;
+
+-- ------------------------------------------------------------
+-- Volume trend
+--
+-- Bucketed in the CLIENT's timezone. Bucketing in UTC puts a 7pm Monday call
+-- into Tuesday for a west-coast client, making the chart wrong at every day
+-- boundary — an error nobody reports and everybody notices.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION report_volume(
+  p_client_id UUID,
+  p_from      TIMESTAMPTZ,
+  p_to        TIMESTAMPTZ,
+  p_bucket    TEXT DEFAULT 'day'
+) RETURNS TABLE (
+  bucket    TIMESTAMPTZ,
+  answered  BIGINT,
+  voicemail BIGINT,
+  total     BIGINT
+)
+LANGUAGE plpgsql STABLE SECURITY INVOKER AS $$
+DECLARE
+  v_tz TEXT;
+  v_unit TEXT;
+BEGIN
+  SELECT COALESCE(timezone, 'UTC') INTO v_tz FROM clients WHERE id = p_client_id;
+  -- Whitelist rather than interpolating caller input into date_trunc.
+  v_unit := CASE WHEN p_bucket = 'week' THEN 'week' ELSE 'day' END;
+
+  RETURN QUERY
+  SELECT
+    date_trunc(v_unit, r.started_at AT TIME ZONE v_tz) AT TIME ZONE v_tz AS bucket,
+    COUNT(*) FILTER (WHERE NOT r.in_voicemail),
+    COUNT(*) FILTER (WHERE r.in_voicemail),
+    COUNT(*)
+  FROM call_records r
+  WHERE r.client_id = p_client_id
+    AND r.started_at >= p_from
+    AND r.started_at <= p_to
+  GROUP BY 1
+  ORDER BY 1;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- Outcome breakdown
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION report_outcomes(
+  p_client_id UUID,
+  p_from      TIMESTAMPTZ,
+  p_to        TIMESTAMPTZ
+) RETURNS TABLE (
+  outcome TEXT,
+  count   BIGINT
+)
+LANGUAGE sql STABLE SECURITY INVOKER AS $$
+  SELECT
+    call_outcome(r.appointment_booked, r.lead_recaptured, c.status, r.in_voicemail, COALESCE(r.call_successful, FALSE)),
+    COUNT(*)
+  FROM call_records r
+  LEFT JOIN calls c ON c.retell_call_id = r.retell_call_id
+  WHERE r.client_id = p_client_id
+    AND r.started_at >= p_from
+    AND r.started_at <= p_to
+  GROUP BY 1
+  ORDER BY 2 DESC;
+$$;
+
+-- ------------------------------------------------------------
+-- Call log
+--
+-- `calls` and `call_records` are parallel tables both keyed on retell_call_id:
+-- `calls` holds the caller number, recording and transcript FK, `call_records`
+-- holds the Retell analysis flags. The join hides that seam; no data migration.
+--
+-- recording_url is deliberately NOT in this view. The client call log selects
+-- from here, so a future `SELECT *` on the client path cannot leak call audio.
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW client_call_log AS
+  SELECT
+    r.id                AS id,
+    r.client_id,
+    r.retell_call_id,
+    c.id                AS call_id,
+    c.from_number,
+    c.to_number,
+    c.direction,
+    c.status            AS call_status,
+    r.started_at,
+    r.ended_at,
+    r.duration_seconds,
+    r.user_sentiment,
+    r.in_voicemail,
+    r.appointment_booked,
+    r.lead_recaptured,
+    r.missed_call_recovered,
+    call_outcome(
+      r.appointment_booked, r.lead_recaptured, c.status, r.in_voicemail, COALESCE(r.call_successful, FALSE)
+    )                   AS outcome,
+    (t.id IS NOT NULL)  AS has_transcript
+  FROM call_records r
+  LEFT JOIN calls c ON c.retell_call_id = r.retell_call_id
+  LEFT JOIN call_transcripts t ON t.call_id = c.id;
 
 
 -- ============================================================================

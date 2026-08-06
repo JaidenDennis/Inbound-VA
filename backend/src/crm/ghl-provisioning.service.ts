@@ -234,7 +234,8 @@ async function runPipelineStep(
 async function runCustomFieldsStep(
   client: GhlProvisioningClient,
   blueprint: GhlBlueprint,
-  result: ProvisionStepResult
+  result: ProvisionStepResult,
+  conn: Pick<CrmConnection, 'id' | 'custom_field_mapping'>
 ): Promise<void> {
   const existing = await client.listCustomFields();
   const byName = new Map(existing.map((f) => [f.name.toLowerCase(), f]));
@@ -257,8 +258,34 @@ async function runCustomFieldsStep(
     }
   }
 
+  // Persist field name → GHL field id on the connection. This is what makes
+  // custom fields actually land: the adapter sends whatever internal names a
+  // caller uses, and without a mapping those names go to GHL verbatim, which
+  // matches no field — so every custom field is silently dropped on every sync.
+  // Keyed by GHL's own field name (original casing); the adapter matches
+  // case-insensitively. Live ids win over stale entries, hand-added mappings
+  // for other names are preserved.
+  const fieldMapping: Record<string, string> = {
+    ...(conn.custom_field_mapping ?? {}),
+    ...Object.fromEntries([...byName.values()].map((f) => [f.name, f.id])),
+  };
+  const { error } = await supabase
+    .from('crm_connections')
+    .update({ custom_field_mapping: fieldMapping })
+    .eq('id', conn.id);
+  if (error) {
+    // The fields exist in GHL either way, so don't fail the run over this —
+    // but syncs would quietly drop custom fields, so say so loudly.
+    logger.error(
+      { error, connectionId: conn.id },
+      'Failed to persist custom_field_mapping — custom fields will not sync until this is fixed'
+    );
+    warnings.push('Custom field mapping could not be saved to the connection');
+  }
+
   result.detail = {
     fieldIdByName: Object.fromEntries([...byName].map(([name, f]) => [name, f.id])),
+    fieldMappingPersisted: !error,
     ...(warnings.length ? { warnings } : {}),
   };
 }
@@ -414,7 +441,7 @@ export class GhlProvisioningService {
             await runPipelineStep(client, blueprint, step);
             break;
           case 'customFields':
-            await runCustomFieldsStep(client, blueprint, step);
+            await runCustomFieldsStep(client, blueprint, step, conn);
             break;
           case 'tags':
             await runTagsStep(client, blueprint, step);

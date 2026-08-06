@@ -115,6 +115,11 @@ export async function resolveCrmContactId(
     lastName: contact.last_name,
     email: contact.email ?? undefined,
     phone: contact.phone,
+    company: contact.company ?? undefined,
+    // Tags carry the segmentation the CRM's automations key off (lead source,
+    // interest level), so they have to travel with this first-touch upsert —
+    // it is the only contact write on the lead/note/appointment paths.
+    tags: (contact.tags as string[] | null) ?? undefined,
     customFields: (contact.custom_fields as Record<string, unknown>) ?? undefined,
   });
 

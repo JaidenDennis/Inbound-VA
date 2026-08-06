@@ -13,6 +13,12 @@ vi.mock('../services/index.js', () => ({
   actionItemService: { findById: svc.findById, create: svc.create, update: svc.update },
   writeAuditLog: svc.writeAuditLog,
 }));
+// requirePermission resolves grants from the database; serve them from the
+// migration instead so route tests stay offline.
+vi.mock('../services/permission.service.js', async () => {
+  const { permissionServiceMock } = await import('./helpers/rbac.js');
+  return permissionServiceMock();
+});
 
 import { actionItemRoutes } from '../dashboard-api/action-items.route.js';
 
@@ -51,12 +57,12 @@ describe('action-items authorization', () => {
     await app.close();
   });
 
-  it('a tenant admin (non-platform) cannot create items', async () => {
+  it('a client owner (non-platform) cannot create items', async () => {
     const app = await buildApp();
     const res = await app.inject({
       method: 'POST',
       url: '/action-items',
-      headers: { authorization: `Bearer ${tokenFor(app, 'admin', CLIENT)}` },
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
       payload: { clientId: CLIENT, title: 'x' },
     });
     expect(res.statusCode).toBe(403);
@@ -69,7 +75,7 @@ describe('action-items authorization', () => {
     const res = await app.inject({
       method: 'PATCH',
       url: '/action-items/a1',
-      headers: { authorization: `Bearer ${tokenFor(app, 'viewer', CLIENT)}` },
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_viewer', CLIENT)}` },
       payload: { status: 'done' },
     });
     expect(res.statusCode).toBe(200);
@@ -82,7 +88,7 @@ describe('action-items authorization', () => {
     const res = await app.inject({
       method: 'PATCH',
       url: '/action-items/a1',
-      headers: { authorization: `Bearer ${tokenFor(app, 'viewer', CLIENT)}` },
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_viewer', CLIENT)}` },
       payload: { title: 'rewritten' },
     });
     expect(res.statusCode).toBe(403);
@@ -96,7 +102,7 @@ describe('action-items authorization', () => {
     const res = await app.inject({
       method: 'PATCH',
       url: '/action-items/a1',
-      headers: { authorization: `Bearer ${tokenFor(app, 'viewer', CLIENT)}` },
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_viewer', CLIENT)}` },
       payload: { status: 'done' },
     });
     expect(res.statusCode).toBe(403);

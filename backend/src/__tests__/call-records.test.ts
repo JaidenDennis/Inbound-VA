@@ -4,8 +4,10 @@ const db = vi.hoisted(() => {
   const state: {
     upsertRow?: Record<string, unknown>;
     upsertOpts?: Record<string, unknown>;
-    statsRows: Array<Record<string, unknown>>;
-  } = { statsRows: [] };
+    rpcCalls: Array<[string, Record<string, unknown>]>;
+    rpcResult: Array<Record<string, unknown>>;
+    rpcError: { message: string } | null;
+  } = { rpcCalls: [], rpcResult: [], rpcError: null };
   const supabase = {
     from: () => ({
       upsert: (row: Record<string, unknown>, opts: Record<string, unknown>) => {
@@ -13,14 +15,11 @@ const db = vi.hoisted(() => {
         state.upsertOpts = opts;
         return Promise.resolve({ error: null });
       },
-      select: () => ({
-        eq: () => ({
-          gte: () => ({
-            lte: () => Promise.resolve({ data: state.statsRows }),
-          }),
-        }),
-      }),
     }),
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      state.rpcCalls.push([fn, args]);
+      return Promise.resolve({ data: state.rpcError ? null : state.rpcResult, error: state.rpcError });
+    },
   };
   return { state, supabase };
 });
@@ -109,23 +108,44 @@ describe('CallRecordService.recordFromAnalyzed', () => {
   });
 });
 
+/**
+ * Aggregation moved into Postgres (migration 020). It used to happen here in
+ * JavaScript over selected rows, which silently under-counted past PostgREST's
+ * 1000-row cap — so any client with more than 1000 calls in the period was shown
+ * wrong numbers with no error. These tests now cover the contract with the RPC:
+ * the arguments it is called with, and the mapping of what comes back. The
+ * arithmetic itself is the SQL function's job.
+ */
 describe('CallRecordService.getStats', () => {
-  it('aggregates counts and avg duration, excluding voicemail', async () => {
-    db.state.statsRows = [
-      { in_voicemail: false, missed_call_recovered: true, lead_recaptured: false, appointment_booked: true, duration_seconds: 120 },
-      { in_voicemail: false, missed_call_recovered: false, lead_recaptured: true, appointment_booked: false, duration_seconds: 60 },
-      { in_voicemail: true, missed_call_recovered: false, lead_recaptured: false, appointment_booked: false, duration_seconds: 5 },
-    ];
-    const stats = await new CallRecordService().getStats('client-a', '2026-01-01', '2026-12-31');
-    expect(stats.callsAnswered).toBe(2); // voicemail excluded
-    expect(stats.appointmentsBooked).toBe(1);
-    expect(stats.leadsRecaptured).toBe(1);
-    expect(stats.missedCallsRecovered).toBe(1);
-    expect(stats.avgCallDurationSeconds).toBe(90); // (120 + 60) / 2
+  beforeEach(() => {
+    db.state.rpcCalls.length = 0;
+    db.state.rpcError = null;
   });
 
-  it('returns zeros (no divide-by-zero) when there are no calls', async () => {
-    db.state.statsRows = [];
+  it('delegates to report_kpis with the client and period', async () => {
+    db.state.rpcResult = [{
+      calls_answered: 2, missed_calls_recovered: 1, leads_recaptured: 1,
+      appointments_booked: 1, avg_call_duration_seconds: 90, total_calls: 3,
+    }];
+
+    const stats = await new CallRecordService().getStats('client-a', '2026-01-01', '2026-12-31');
+
+    expect(db.state.rpcCalls[0]).toEqual([
+      'report_kpis',
+      { p_client_id: 'client-a', p_from: '2026-01-01', p_to: '2026-12-31' },
+    ]);
+    expect(stats).toEqual({
+      callsAnswered: 2,
+      missedCallsRecovered: 1,
+      leadsRecaptured: 1,
+      appointmentsBooked: 1,
+      avgCallDurationSeconds: 90,
+      totalCalls: 3,
+    });
+  });
+
+  it('returns zeros when the period has no calls', async () => {
+    db.state.rpcResult = [];
     const stats = await new CallRecordService().getStats('client-a', '2026-01-01', '2026-12-31');
     expect(stats).toEqual({
       callsAnswered: 0,
@@ -133,6 +153,42 @@ describe('CallRecordService.getStats', () => {
       leadsRecaptured: 0,
       appointmentsBooked: 0,
       avgCallDurationSeconds: 0,
+      totalCalls: 0,
     });
+  });
+
+  it('coerces the bigint counts Postgres returns as strings', async () => {
+    // COUNT(*) comes back over PostgREST as a string; without Number() the KPI
+    // cards would concatenate rather than add downstream.
+    db.state.rpcResult = [{
+      calls_answered: '12', missed_calls_recovered: '3', leads_recaptured: '4',
+      appointments_booked: '5', avg_call_duration_seconds: '90', total_calls: '15',
+    }];
+    const stats = await new CallRecordService().getStats('client-a', '2026-01-01', '2026-12-31');
+    expect(stats.callsAnswered).toBe(12);
+    expect(stats.totalCalls).toBe(15);
+  });
+
+  it('throws rather than reporting zeros when the query fails', async () => {
+    // Silently showing "0 calls answered" for a database error would read as a
+    // catastrophic drop in service to a client looking at their own numbers.
+    db.state.rpcError = { message: 'connection reset' };
+    await expect(new CallRecordService().getStats('client-a', '2026-01-01', '2026-12-31'))
+      .rejects.toThrow(/connection reset/);
+  });
+});
+
+describe('CallRecordService.getVolume', () => {
+  beforeEach(() => {
+    db.state.rpcCalls.length = 0;
+    db.state.rpcError = null;
+  });
+
+  it('passes the bucket through to report_volume', async () => {
+    db.state.rpcResult = [{ bucket: '2026-08-01T00:00:00Z', answered: '4', voicemail: '1', total: '5' }];
+    const rows = await new CallRecordService().getVolume('client-a', '2026-01-01', '2026-12-31', 'week');
+
+    expect(db.state.rpcCalls[0][1]).toMatchObject({ p_bucket: 'week' });
+    expect(rows).toEqual([{ bucket: '2026-08-01T00:00:00Z', answered: 4, voicemail: 1, total: 5 }]);
   });
 });

@@ -99,3 +99,56 @@
     }
   }
 }
+
+/* ============================================================
+   Data-visualisation tokens
+   ------------------------------------------------------------
+   Charts read colour by role, never raw hex, so light/dark swap
+   in one place. The dark column is a SELECTED set of steps for
+   the dark surface — not an automatic flip of the light values,
+   which would fail the lightness-band and contrast gates.
+
+   Categorical slots 1–2 validated against both surfaces (all six
+   checks pass; worst adjacent CVD ΔE 24.7 light / 26.8 dark,
+   target ≥ 8). Slot order is fixed and never cycled.
+   ============================================================ */
+.viz-root {
+  color-scheme: light;
+  --surface-1: #ffffff;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+  }
+}
+
+:root[data-theme='dark'] .viz-root {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+}
+
+/* Recharts suppresses the default focus ring on its SVG surface. */
+.viz-root .recharts-surface:focus-visible {
+  outline: 2px solid var(--series-1);
+  outline-offset: 2px;
+}
