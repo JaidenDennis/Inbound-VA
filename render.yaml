@@ -1,21 +1,36 @@
-# Render Blueprint — deploys the Gravvia BACKEND: API (web) + workers (worker).
-# The dashboard (@gravvia/dashboard) is deployed separately later.
+# Render Blueprint — API (web) + admin dashboard (web). TWO services, not three:
+# there is no separate worker service. The BullMQ workers run inside the API
+# process via RUN_WORKERS_IN_API — see the note on that key below, because it is
+# the difference between background jobs running and silently never running.
+#
+# ⚠️  THIS FILE IS NOT CURRENTLY THE SOURCE OF TRUTH FOR THE LIVE SERVICES.
+#     The running services were created by hand in the Render dashboard, so
+#     editing this file changes nothing about them — env vars added here must
+#     ALSO be set in the dashboard. The service names below were corrected on
+#     2026-08-06 to match what is actually deployed, so that if this blueprint
+#     is ever connected it adopts the existing services instead of creating a
+#     second copy of each. Names are the matching key: a mismatched `name` makes
+#     Render build a NEW service rather than adopt the existing one.
+#
+# Live URLs (verified 2026-08-06):
+#   API        https://inbound-va.onrender.com
+#   Dashboard  https://inbound-va-dashboard.onrender.com
 #
 # This is a native Node build (not Docker). The build runs from the repo root,
-# so we use npm workspaces to build/start only @gravvia/backend.
+# so we use npm workspaces to build/start only the workspace we want.
 #
 # IMPORTANT:
 #  - `--include=dev` is required: Render sets NODE_ENV=production, which makes
 #    `npm install` skip devDependencies — including the @types/* needed by tsc.
 #  - Node 22+ is required: @supabase/supabase-js needs native WebSocket, absent
 #    in Node 20. NODE_VERSION pins it (the repo-root package.json has no engines).
-#  - Secrets live in a shared env group (`gravvia-secrets`) so the web service
-#    and the worker share ONE copy. Set the values once in the Render dashboard.
+#  - Secrets live in a shared env group (`gravvia-secrets`). Set the values once
+#    in the Render dashboard.
 
 services:
   # ─── API (handles webhooks, custom functions, dashboard API) ────────────────
   - type: web
-    name: gravvia-backend
+    name: inbound-va
     runtime: node
     plan: starter
     buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/backend
@@ -30,37 +45,34 @@ services:
         value: "22"
       - key: JWT_EXPIRES_IN
         value: 7d
-
-  # ─── Workers (BullMQ: crm-sync, notifications, call/transcript, analytics,
-  #     booking). Without this, queued jobs (post-call automations, CRM sync,
-  #     confirmations) never run. Same build; only the start command differs. ──
-  - type: worker
-    name: gravvia-workers
-    runtime: node
-    plan: starter
-    buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/backend
-    startCommand: npm run start:workers --workspace=@gravvia/backend
-    autoDeploy: true
-    envVars:
-      - fromGroup: gravvia-secrets
-      - key: NODE_ENV
-        value: production
-      - key: NODE_VERSION
-        value: "22"
-      - key: JWT_EXPIRES_IN
-        value: 7d
+      # ⚠️  LOAD-BEARING. There is NO separate worker service, so the BullMQ
+      #     workers run inside this web process (server.ts starts them only
+      #     when this is true). Set it to false and every queued job stops
+      #     silently: CRM sync, post-call automations, booking confirmations,
+      #     notification emails, agent re-publishing after a knowledge edit,
+      #     the 5-minute SLA sweep and the nightly retention purge. Nothing
+      #     errors — the jobs simply queue up forever.
+      #
+      #     This only works because the plan is `starter`, which stays warm.
+      #     A free web service spins down when idle and takes the queue
+      #     workers with it.
+      #
+      #     If a dedicated worker service is ever added back, flip this to
+      #     false in the same change, or both processes drain the same queues
+      #     and every job runs twice.
+      - key: RUN_WORKERS_IN_API
+        value: "true"
 
   # ─── Admin dashboard (Next.js) ─────────────────────────────────────────────
   # NEXT_PUBLIC_API_URL is inlined into the client bundle AT BUILD TIME (see
   # dashboard/next.config.js), so it must be present during the build, not just
   # at runtime — changing it later requires a redeploy, not just a restart.
   #
-  # After this service first deploys, copy its URL into the backend's
-  # CORS_ORIGINS env var, or every dashboard request will be blocked by the
-  # browser. The two services reference each other, so one redeploy of the
-  # backend after the dashboard's first deploy is expected.
+  # The two services reference each other: this one needs the API's URL, and the
+  # API needs this one's URL in CORS_ORIGINS. Expect one redeploy of the backend
+  # after this service's first deploy.
   - type: web
-    name: gravvia-dashboard
+    name: inbound-va-dashboard
     runtime: node
     plan: starter
     buildCommand: npm install --include=dev && npm run build --workspace=@gravvia/dashboard
@@ -71,13 +83,14 @@ services:
         value: production
       - key: NODE_VERSION
         value: "22"
-      # Set to the deployed backend URL, e.g. https://gravvia-backend.onrender.com
+      # The deployed backend URL: https://inbound-va.onrender.com
       - key: NEXT_PUBLIC_API_URL
         sync: false
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared secrets — set these ONCE in the Render dashboard (Env Groups →
-# gravvia-secrets). Both services above reference this group via `fromGroup`.
+# gravvia-secrets). The API service references this group via `fromGroup`; the
+# dashboard needs none of it, since it talks to the API rather than the database.
 # `sync: false` means Render prompts for the value and never stores it in git.
 envVarGroups:
   - name: gravvia-secrets
@@ -88,6 +101,22 @@ envVarGroups:
       # MUST be the deployed API URL, e.g. https://inbound-va.onrender.com —
       # if unset/wrong, provisioning bakes placeholder URLs and calls 404.
       - key: WEBHOOK_BASE_URL
+        sync: false
+      # Browser origins allowed to call the API — the dashboard's URL,
+      # comma-separated for more than one. Optional in code, but leaving it
+      # unset in production is the #1 cause of "the dashboard loads and every
+      # request fails": the browser blocks the calls and the API logs nothing,
+      # because a CORS rejection never reaches a route handler.
+      #   https://inbound-va-dashboard.onrender.com
+      - key: CORS_ORIGINS
+        sync: false
+      # Base URL used to BUILD links the user actually follows, not just to
+      # display: the GoHighLevel OAuth callback redirects the browser here
+      # (crm-oauth.route.ts), and ticket + SLA-breach emails link here.
+      # It defaults to http://localhost:3000, so leaving it unset in production
+      # sends clients to localhost after they connect their CRM.
+      #   https://inbound-va-dashboard.onrender.com
+      - key: DASHBOARD_URL
         sync: false
       - key: SUPABASE_URL
         sync: false
@@ -124,6 +153,10 @@ envVarGroups:
       - key: CLAY_DEFAULT_CLIENT_ID
         sync: false
       # ---- Optional: email notifications (nodemailer). Set if used. ----
+      # With SMTP_PASS unset, sendMail is a logged no-op rather than an error,
+      # so missing email is silent. A WRONG password is not silent but is just
+      # as invisible without somewhere to look: it fails the queued job, which
+      # lands in failed_jobs and surfaces at /dashboard/system.
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -133,4 +166,11 @@ envVarGroups:
       - key: SMTP_PASS
         sync: false
       - key: EMAIL_FROM
+        sync: false
+      # Where terminal job failures and unassigned SLA breaches are emailed.
+      # Unset means those alerts have nowhere to go and are dropped.
+      - key: ALERT_EMAIL
+        sync: false
+      # ---- Optional: error reporting. Unset disables Sentry entirely. ----
+      - key: SENTRY_DSN
         sync: false

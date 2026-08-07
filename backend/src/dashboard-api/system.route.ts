@@ -3,8 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePlatform } from '../middleware/index.js';
 import { systemErrorService, writeAuditLog } from '../services/index.js';
-import { crmSyncQueue, bookingQueue, notificationsQueue, callProcessingQueue,
-  transcriptProcessingQueue, analyticsQueue } from '../queues/index.js';
+import { allQueues } from '../queues/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 const listQuerySchema = z.object({
@@ -20,14 +19,17 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
-const QUEUES_BY_NAME = {
-  'crm-sync': crmSyncQueue,
-  booking: bookingQueue,
-  notifications: notificationsQueue,
-  'call-processing': callProcessingQueue,
-  'transcript-processing': transcriptProcessingQueue,
-  analytics: analyticsQueue,
-} as const;
+/**
+ * Every queue, keyed by name, derived from the single registry in queues/.
+ *
+ * Previously this was a hand-written subset, which silently omitted
+ * `agent-provisioning` and `maintenance` — so the console under-reported queue
+ * depth and, worse, refused to retry a failed agent publish with "Unknown
+ * queue". Deriving it means a queue added in queues.ts cannot be forgotten here.
+ */
+const QUEUES_BY_NAME: Record<string, (typeof allQueues)[number]> = Object.fromEntries(
+  allQueues.map((q) => [q.name, q])
+);
 
 /**
  * The system console. Platform-only, in both senses: `system:read` is granted to
@@ -182,7 +184,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(409).send({ error: 'This job was already resolved' });
       }
 
-      const queue = QUEUES_BY_NAME[row.queue_name as keyof typeof QUEUES_BY_NAME];
+      const queue = QUEUES_BY_NAME[row.queue_name];
       if (!queue) {
         return reply.code(400).send({ error: `Unknown queue: ${row.queue_name}` });
       }
