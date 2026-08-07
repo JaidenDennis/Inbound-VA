@@ -7,10 +7,17 @@ import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { FilterBar, type FilterSpec } from '@/components/FilterBar';
-import { SeverityPill, StatusPill } from '@/components/StatusPill';
+import { SeverityLamp, ReviewLamp, StatusLamp } from '@/components/StatusLamp';
 import { Drawer } from '@/components/Drawer';
 import { useSession } from '@/lib/SessionProvider';
-import { Layers, List, RefreshCw, ExternalLink, Check } from 'lucide-react';
+import { Layers, List, RefreshCw, ExternalLink, Check, CheckCheck } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Hint, HintedHeading } from '@/components/Hint';
+import { Table, TableEmpty, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
+import {
+  ACTIVITY_KIND, ACTIVITY_SOURCE, SEVERITY, REVIEW_STATE,
+  kindTerm, severityTerm, shortFingerprint, FINGERPRINT_HINT,
+} from '@/lib/vocabulary';
 
 interface ActivityRow {
   id: string;
@@ -51,49 +58,28 @@ interface ErrorDetail extends ActivityRow {
   ticket_id: string | null;
 }
 
-const KIND_LABELS: Record<string, string> = {
-  system_error: 'Error',
-  failed_job: 'Failed job',
-  crm_sync: 'CRM sync',
-  automation_run: 'Automation',
-  event: 'Event',
-};
+/** Every option label is read from the shared glossary, so the filter and the
+ *  row it filters can never drift apart (they previously did: `startup` was
+ *  "Process" in the filter and "Startup" everywhere else). */
+const optionsFrom = (table: Record<string, { label: string }>) =>
+  Object.entries(table).map(([value, term]) => ({ value, label: term.label }));
 
 const filters: FilterSpec[] = [
-  {
-    key: 'kind',
-    label: 'Type',
-    type: 'select',
-    options: Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })),
-  },
+  { key: 'kind', label: 'Type', type: 'select', options: optionsFrom(ACTIVITY_KIND) },
   {
     key: 'severity',
     label: 'Severity',
     type: 'select',
-    options: [
-      { value: 'fatal', label: 'Fatal' },
-      { value: 'error', label: 'Error' },
-      { value: 'warn', label: 'Warning' },
-    ],
+    options: optionsFrom(SEVERITY).filter((o) => o.value !== 'info'),
   },
-  {
-    key: 'source',
-    label: 'Source',
-    type: 'select',
-    options: [
-      { value: 'api', label: 'API' },
-      { value: 'worker', label: 'Worker' },
-      { value: 'webhook', label: 'Webhook' },
-      { value: 'startup', label: 'Process' },
-    ],
-  },
+  { key: 'source', label: 'Source', type: 'select', options: optionsFrom(ACTIVITY_SOURCE) },
   {
     key: 'reviewed',
     label: 'Reviewed',
     type: 'select',
     options: [
-      { value: 'false', label: 'Needs attention' },
-      { value: 'true', label: 'Reviewed' },
+      { value: 'false', label: REVIEW_STATE.unreviewed.label },
+      { value: 'true', label: REVIEW_STATE.reviewed.label },
     ],
   },
   { key: 'q', label: 'Search', type: 'search', placeholder: 'Message contains…' },
@@ -211,7 +197,7 @@ function SystemPageInner() {
           ))}
         </div>
       ) : view === 'grouped' ? (
-        <GroupedTable groups={groups} />
+        <GroupedTable groups={groups} canWrite={canWrite} onReviewed={load} />
       ) : (
         <ActivityTable
           rows={rows}
@@ -244,62 +230,132 @@ function SystemPageInner() {
   );
 }
 
-function GroupedTable({ groups }: { groups: GroupedRow[] }) {
+/**
+ * The grouped view is where an operator actually decides, because the unit of
+ * judgement is the fingerprint, not the row. Clearing a 96-occurrence group one
+ * row at a time was the single worst ergonomic failure in the console, so the
+ * group carries its own action.
+ */
+function GroupedTable({
+  groups,
+  canWrite,
+  onReviewed,
+}: {
+  groups: GroupedRow[];
+  canWrite: boolean;
+  onReviewed: () => void;
+}) {
+  const [pending, setPending] = useState<GroupedRow | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const clearGroup = async () => {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      const r = await api.post('/system/errors/review-group', { fingerprint: pending.fingerprint });
+      const n = r.data?.reviewed ?? 0;
+      toast.success(`Marked ${n} ${n === 1 ? 'error' : 'errors'} reviewed`);
+      setPending(null);
+      onReviewed();
+    } catch (e) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Could not clear that group');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (groups.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
-        <p className="text-lg text-gray-500">Nothing is failing</p>
-        <p className="mt-1 text-sm text-gray-400">No errors recorded in this window.</p>
-      </div>
+      <TableEmpty
+        icon={<StatusLamp level="good" size="lg" label="Good" />}
+        title="Nothing is failing"
+        body="No errors recorded in this window."
+      />
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <caption className="sr-only">Recurring errors grouped by fingerprint</caption>
-          <thead className="sticky top-0 bg-gray-50">
-            <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">
-              <th scope="col" className="px-6 py-3">Count</th>
-              <th scope="col" className="px-6 py-3">Severity</th>
-              <th scope="col" className="px-6 py-3">Error</th>
-              <th scope="col" className="px-6 py-3">Route</th>
-              <th scope="col" className="px-6 py-3">Clients</th>
-              <th scope="col" className="px-6 py-3">Last seen</th>
-              <th scope="col" className="px-6 py-3">Ticket</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
+    <>
+      <TableShell>
+        <Table caption="Recurring errors grouped by fingerprint">
+          <THead sticky>
+            <TH>
+              <HintedHeading term="this count" hint={FINGERPRINT_HINT}>Count</HintedHeading>
+            </TH>
+            <TH>
+              <HintedHeading
+                term="severity"
+                hint={`${SEVERITY.fatal.hint} ${SEVERITY.error.hint} ${SEVERITY.warn.hint}`}
+              >
+                Severity
+              </HintedHeading>
+            </TH>
+            <TH>Error</TH>
+            <TH>Route</TH>
+            <TH>Clients</TH>
+            <TH>Last seen</TH>
+            <TH>Ticket</TH>
+            <TH align="right" srOnly>Actions</TH>
+          </THead>
+          <TBody>
             {groups.map((g) => (
-              <tr key={g.fingerprint} className="text-sm">
-                <td className="px-6 py-4 font-semibold text-gray-900">{g.count}</td>
-                <td className="px-6 py-4"><SeverityPill severity={g.severity} /></td>
-                <td className="max-w-md px-6 py-4">
-                  <p className="font-medium text-gray-900">{g.errorName}</p>
-                  <p className="truncate text-gray-500" title={g.message}>{g.message}</p>
-                </td>
-                <td className="px-6 py-4 font-mono text-xs text-gray-600">{g.route ?? '—'}</td>
-                <td className="px-6 py-4 text-gray-600">{g.clientIds.length || '—'}</td>
-                <td className="px-6 py-4 text-gray-600">{timeAgo(g.lastSeen)}</td>
-                <td className="px-6 py-4">
+              <TR key={g.fingerprint}>
+                <TD numeric className="font-heading text-base font-semibold text-ink-900">
+                  {g.count}
+                </TD>
+                <TD><SeverityLamp severity={g.severity} /></TD>
+                <TD className="max-w-md">
+                  <p className="font-medium text-ink-900">{g.errorName}</p>
+                  <p className="truncate text-panel-500" title={g.message}>{g.message}</p>
+                </TD>
+                <TD mono>{g.route ?? '—'}</TD>
+                <TD className="text-panel-600">{g.clientIds.length || '—'}</TD>
+                <TD className="whitespace-nowrap text-panel-600">{timeAgo(g.lastSeen)}</TD>
+                <TD>
                   {g.ticketId ? (
                     <Link
                       href={`/dashboard/support/${g.ticketId}`}
-                      className="inline-flex items-center gap-1 text-primary-600 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="inline-flex items-center gap-1 text-signal-700 underline decoration-signal-300 underline-offset-2 transition-colors hover:text-signal-800 hover:decoration-signal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       Open <ExternalLink className="h-3 w-3" aria-hidden />
                     </Link>
                   ) : (
-                    <span className="text-gray-400">—</span>
+                    <span className="text-panel-400">&mdash;</span>
                   )}
-                </td>
-              </tr>
+                </TD>
+                <TD align="right">
+                  {canWrite && (
+                    <button
+                      type="button"
+                      onClick={() => setPending(g)}
+                      className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-2xs font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" aria-hidden />
+                      Clear group
+                    </button>
+                  )}
+                </TD>
+              </TR>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TBody>
+        </Table>
+      </TableShell>
+
+      <ConfirmDialog
+        open={!!pending}
+        title="Clear this error group?"
+        body={
+          pending
+            ? `This marks all ${pending.count} unreviewed ${pending.count === 1 ? 'occurrence' : 'occurrences'} of ${pending.errorName} as reviewed, under your name. It does not fix the underlying error, and it cannot be undone.`
+            : ''
+        }
+        confirmLabel="Mark group reviewed"
+        busy={busy}
+        onConfirm={clearGroup}
+        onCancel={() => setPending(null)}
+      />
+    </>
   );
 }
 
@@ -314,49 +370,55 @@ function ActivityTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
-        <p className="text-lg text-gray-500">No activity</p>
-        <p className="mt-1 text-sm text-gray-400">Nothing matched these filters.</p>
-      </div>
+      <TableEmpty
+        icon={<StatusLamp level="off" size="lg" label="No signal" />}
+        title="No activity"
+        body="Nothing matched these filters. Widen the range or clear them."
+      />
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <caption className="sr-only">{count} system activity records</caption>
-          <thead className="sticky top-0 bg-gray-50">
-            <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">
-              <th scope="col" className="px-6 py-3">When</th>
-              <th scope="col" className="px-6 py-3">Type</th>
-              <th scope="col" className="px-6 py-3">Severity</th>
-              <th scope="col" className="px-6 py-3">What</th>
-              <th scope="col" className="px-6 py-3">Status</th>
-              <th scope="col" className="px-6 py-3"><span className="sr-only">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {rows.map((row) => (
-              <tr key={`${row.kind}-${row.ref_id}`} className="text-sm transition-colors hover:bg-gray-50">
-                <td className="whitespace-nowrap px-6 py-4 text-gray-600">{timeAgo(row.occurred_at)}</td>
-                <td className="px-6 py-4 text-gray-600">{KIND_LABELS[row.kind] ?? row.kind}</td>
-                <td className="px-6 py-4"><SeverityPill severity={row.severity} /></td>
-                <td className="max-w-md px-6 py-4">
-                  <p className="font-medium text-gray-900">{row.title}</p>
-                  <p className="truncate text-gray-500" title={row.detail}>{row.detail}</p>
-                </td>
-                <td className="px-6 py-4">
-                  {row.reviewed_at
-                    ? <StatusPill tone="success" label="Reviewed" />
-                    : <StatusPill tone="warning" label="Needs attention" />}
-                </td>
-                <td className="whitespace-nowrap px-6 py-4 text-right">
+    <TableShell>
+      <Table caption={`${count} system activity records`}>
+        <THead sticky>
+          <TH>When</TH>
+          <TH>Type</TH>
+          <TH>
+            <HintedHeading
+              term="severity"
+              hint={`${SEVERITY.fatal.hint} ${SEVERITY.error.hint} ${SEVERITY.warn.hint}`}
+            >
+              Severity
+            </HintedHeading>
+          </TH>
+          <TH>What</TH>
+          <TH>
+            <HintedHeading term="reviewed" hint={REVIEW_STATE.reviewed.hint ?? ''}>
+              Status
+            </HintedHeading>
+          </TH>
+          <TH align="right" srOnly>Actions</TH>
+        </THead>
+        <TBody>
+          {rows.map((row) => (
+            <TR key={`${row.kind}-${row.ref_id}`}>
+              <TD className="whitespace-nowrap text-panel-600">{timeAgo(row.occurred_at)}</TD>
+              <TD className="text-panel-600">{kindTerm(row.kind).label}</TD>
+              <TD><SeverityLamp severity={row.severity} /></TD>
+              <TD className="max-w-md">
+                <p className="font-medium text-ink-900">{row.title}</p>
+                <p className="truncate text-panel-500" title={row.detail}>{row.detail}</p>
+              </TD>
+              <TD>
+                <ReviewLamp reviewedAt={row.reviewed_at} />
+              </TD>
+              <TD align="right" className="whitespace-nowrap">
                   {row.kind === 'system_error' && (
                     <button
                       type="button"
                       onClick={() => onOpen(row)}
-                      className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 hover:text-signal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       Details
                     </button>
@@ -366,18 +428,17 @@ function ActivityTable({
                       type="button"
                       onClick={() => onRetry(row.ref_id)}
                       aria-label={`Retry ${row.title}`}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 hover:text-signal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Retry
                     </button>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              </TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </TableShell>
   );
 }
 
@@ -403,8 +464,18 @@ function ErrorDetailBody({ detail }: { detail: ErrorDetail }) {
           <dd className="mt-1 text-gray-700">{new Date(detail.occurred_at).toLocaleString()}</dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Fingerprint</dt>
-          <dd className="mt-1 font-mono text-xs text-gray-700">{detail.fingerprint}</dd>
+          <dt className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
+            Fingerprint
+            <Hint term="a fingerprint">{FINGERPRINT_HINT}</Hint>
+          </dt>
+          {/* Truncated for reading; the full value stays selectable via title
+              and is what a copy of the element yields. */}
+          <dd
+            className="mt-1 font-mono text-xs text-panel-700"
+            title={detail.fingerprint ?? undefined}
+          >
+            {shortFingerprint(detail.fingerprint)}
+          </dd>
         </div>
       </dl>
 

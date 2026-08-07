@@ -12,7 +12,8 @@ interface SessionContextValue {
   isPlatform: boolean;
 }
 
-const SessionContext = createContext<SessionContextValue>({
+/** Exported so tests and visual harnesses can supply a session without a backend. */
+export const SessionContext = createContext<SessionContextValue>({
   auth: null,
   loading: true,
   can: () => false,

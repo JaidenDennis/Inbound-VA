@@ -191,7 +191,7 @@ export function InlineEditTable<T extends { id: string }>({
                           type="button"
                           onClick={() => remove(row.id)}
                           aria-label="Remove row"
-                          className="ml-1 cursor-pointer rounded p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          className="ml-1 cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden />
                         </button>

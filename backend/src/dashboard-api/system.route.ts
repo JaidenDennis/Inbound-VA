@@ -19,6 +19,10 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const reviewGroupSchema = z.object({
+  fingerprint: z.string().min(1),
+});
+
 /**
  * Every queue, keyed by name, derived from the single registry in queues/.
  *
@@ -159,6 +163,44 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         ipAddress: request.ip,
       });
       reply.send({ ok: true });
+    },
+  });
+
+  /**
+   * Clear a whole fingerprint group in one decision.
+   *
+   * One audit entry is written for the group, recording how many rows changed,
+   * rather than one entry per row — the operator made a single judgement and the
+   * trail should read that way.
+   */
+  app.post<{ Body: { fingerprint: string } }>('/system/errors/review-group', {
+    preHandler: requirePlatform('system:write'),
+    handler: async (request, reply) => {
+      const parsed = reviewGroupSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'A fingerprint is required' });
+      }
+
+      const actor = request.user as JwtPayload;
+      const reviewed = await systemErrorService.markFingerprintReviewed(
+        parsed.data.fingerprint,
+        actor.sub
+      );
+
+      if (reviewed === 0) {
+        return reply.code(409).send({ error: 'Every error in this group was already reviewed' });
+      }
+
+      await writeAuditLog({
+        userId: actor.sub,
+        action: 'system.error.group_reviewed',
+        entityType: 'system_error_group',
+        entityId: parsed.data.fingerprint,
+        newValue: { reviewed_count: reviewed },
+        ipAddress: request.ip,
+      });
+
+      reply.send({ ok: true, reviewed });
     },
   });
 

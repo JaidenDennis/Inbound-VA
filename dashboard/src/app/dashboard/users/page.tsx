@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { Plus, UserPlus } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Table, TableEmpty, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
 import { useSession } from '@/lib/SessionProvider';
 import { PLATFORM_ROLES, CLIENT_ROLES, roleLabel, type UserRole } from '@/lib/session';
 
@@ -27,6 +30,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
+  const [pendingDisable, setPendingDisable] = useState<AppUser | null>(null);
+  const [toggling, setToggling] = useState(false);
 
   // new user form
   const [email, setEmail] = useState('');
@@ -61,9 +66,30 @@ export default function UsersPage() {
     }
   };
 
-  const toggleActive = async (u: AppUser) => {
-    await api.patch(`/users/${u.id}`, { is_active: !u.is_active });
-    load();
+  /**
+   * Disabling revokes a person's access, so it asks first. Enabling restores it
+   * and is harmless, so it does not. The previous version did neither, and also
+   * swallowed failures: a rejected patch left the row unchanged with no message,
+   * so an admin could believe they had revoked access that was still live.
+   */
+  const applyToggle = async (u: AppUser) => {
+    setToggling(true);
+    try {
+      await api.patch(`/users/${u.id}`, { is_active: !u.is_active });
+      toast.success(u.is_active ? `${u.name || u.email} disabled` : `${u.name || u.email} enabled`);
+      setPendingDisable(null);
+      load();
+    } catch (e) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Could not change that user');
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const toggleActive = (u: AppUser) => {
+    if (u.is_active) setPendingDisable(u);
+    else void applyToggle(u);
   };
 
   const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
@@ -106,44 +132,74 @@ export default function UsersPage() {
       )}
 
       {loading ? (
-        <div className="text-gray-400 animate-pulse">Loading users...</div>
+        <TableShell>
+          <div aria-hidden className="divide-y divide-panel-100">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="px-5 py-4">
+                <div className="h-3.5 w-1/2 animate-pulse rounded bg-panel-200" />
+              </div>
+            ))}
+          </div>
+          <span className="sr-only" role="status">Loading users</span>
+        </TableShell>
+      ) : users.length === 0 ? (
+        <TableEmpty
+          title="No users yet"
+          body="Invite someone with the button above to give them console access."
+        />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
+        <TableShell>
+          <Table caption={`${users.length} users`}>
+            <THead>
+              <TH>Name</TH>
+              <TH>Email</TH>
+              <TH>Role</TH>
+              <TH>Status</TH>
+              <TH align="right" srOnly>Actions</TH>
+            </THead>
+            <TBody>
               {users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-800">{u.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3"><span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs">{roleLabel(u.role as UserRole)}</span></td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-                      {u.is_active ? 'active' : 'disabled'}
+                <TR key={u.id}>
+                  <TD className="font-medium text-ink-900">{u.name}</TD>
+                  <TD className="text-panel-600">{u.email}</TD>
+                  <TD>
+                    <span className="rounded-full border border-panel-200 bg-panel-100 px-2.5 py-1 text-2xs font-medium text-panel-700">
+                      {roleLabel(u.role as UserRole)}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => toggleActive(u)} className="text-xs text-brand-600 hover:underline">
+                  </TD>
+                  <TD>
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${u.is_active ? 'border-lamp-good-rim bg-lamp-good-wash text-lamp-good-ink' : 'border-panel-200 bg-panel-100 text-panel-700'}`}>
+                      {u.is_active ? 'Active' : 'Disabled'}
+                    </span>
+                  </TD>
+                  <TD align="right">
+                    <button
+                      onClick={() => toggleActive(u)}
+                      className="cursor-pointer whitespace-nowrap rounded px-1.5 py-1 text-xs font-medium text-ink-800 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-900 hover:decoration-panel-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                    >
                       {u.is_active ? 'Disable' : 'Enable'}
                     </button>
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-              {users.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No users</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            </TBody>
+          </Table>
+        </TableShell>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDisable}
+        title="Disable this user?"
+        body={
+          pendingDisable
+            ? `${pendingDisable.name || pendingDisable.email} will lose access to the console immediately. Any session they have open stops working on their next request. You can re-enable them later.`
+            : ''
+        }
+        confirmLabel="Disable user"
+        busy={toggling}
+        onConfirm={() => pendingDisable && void applyToggle(pendingDisable)}
+        onCancel={() => setPendingDisable(null)}
+      />
     </div>
   );
 }

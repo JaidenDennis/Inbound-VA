@@ -7,20 +7,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Nav is 13 items for staff; keyboard users need a way past it. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-700 focus:shadow-lg focus:ring-2 focus:ring-primary-500"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink-800 focus:shadow-lg focus:ring-2 focus:ring-signal-600"
       >
         Skip to main content
       </a>
-      <div className="flex min-h-screen bg-navy-50">
+
+      <div className="flex min-h-screen bg-panel-50">
         <Sidebar />
-        <main id="main-content" className="relative flex-1 overflow-auto">
-          {/* Subtle top-edge gradient for depth */}
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white to-transparent"
-            aria-hidden
-          />
-          <div className="relative min-h-screen p-6 sm:p-8 lg:p-10">
-            <div className="mx-auto max-w-7xl animate-fade-in">{children}</div>
+        {/* The rail's own flex placeholder reserves its 16rem on desktop, so
+            main only needs to clear the fixed mobile bar's height. */}
+        <main
+          id="main-content"
+          className="min-w-0 flex-1 pt-14 lg:pt-0"
+        >
+          <div className="px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+            <div className="mx-auto max-w-[1400px]">{children}</div>
           </div>
         </main>
       </div>

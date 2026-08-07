@@ -56,14 +56,18 @@ export function FilterBar({ filters }: { filters: FilterSpec[] }) {
   const activeCount = filters.filter((f) => get(f.key)).length;
 
   const inputCls =
-    'rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 ' +
-    'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+    'rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 ' +
+    'placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 ' +
+    'focus:outline-none focus:border-signal-600 focus:ring-2 focus:ring-signal-600/25';
 
   return (
-    <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
+    <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-panel-200 bg-white p-4">
       {filters.map((filter) => (
-        <div key={filter.key} className="flex flex-col gap-1">
-          <label htmlFor={filter.key} className="text-xs font-medium text-gray-500">
+        <div key={filter.key} className="flex flex-col gap-1.5">
+          <label
+            htmlFor={filter.key}
+            className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500"
+          >
             {filter.label}
           </label>
           {filter.type === 'select' ? (
@@ -97,7 +101,7 @@ export function FilterBar({ filters }: { filters: FilterSpec[] }) {
         <button
           type="button"
           onClick={clear}
-          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="flex cursor-pointer items-center gap-1.5 rounded-md border border-transparent px-3 py-2 text-sm font-medium text-panel-600 transition-colors duration-150 hover:border-panel-200 hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
         >
           <X className="h-4 w-4" aria-hidden />
           Clear {activeCount} filter{activeCount > 1 ? 's' : ''}

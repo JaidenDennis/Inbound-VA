@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { Table, TableEmpty, TableShell, TBody, TD, TH, THead, TR } from './Table';
 
 interface Column<T> {
   key: keyof T;
@@ -17,8 +18,16 @@ interface DataTableProps<T extends Record<string, any>> {
   emptyState?: ReactNode;
   rowKey?: keyof T;
   onRowClick?: (row: T) => void;
+  /** Announced to screen readers; the visible caption stays hidden. */
+  caption?: string;
 }
 
+/**
+ * The column-driven table. A thin wrapper over the primitives in Table.tsx, so
+ * its chrome, heading treatment, row affordances, and keyboard behaviour are
+ * literally the same code a bespoke table uses. Reach for the primitives
+ * directly when cells need more than a `render` function.
+ */
 export function DataTable<T extends Record<string, any>>({
   columns,
   data,
@@ -26,90 +35,79 @@ export function DataTable<T extends Record<string, any>>({
   emptyState,
   rowKey,
   onRowClick,
+  caption,
 }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
+      <TableShell>
+        <Table caption="Loading results">
+          <THead>
+            {columns.map((col) => (
+              <TH key={String(col.key)} width={col.width}>
+                {col.label}
+              </TH>
+            ))}
+          </THead>
+          <tbody aria-hidden className="divide-y divide-panel-100">
+            {[...Array(5)].map((_, i) => (
+              <tr key={i}>
                 {columns.map((col) => (
-                  <th
-                    key={String(col.key)}
-                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide"
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[...Array(5)].map((_, i) => (
-                <tr key={i} className="border-b border-gray-100">
-                  {columns.map((col) => (
-                    <td key={String(col.key)} className="px-6 py-4">
-                      <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: '60%' }} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-        {emptyState || (
-          <>
-            <p className="text-gray-500 text-lg">No data available</p>
-            <p className="text-gray-400 text-sm mt-1">Try adjusting your filters or check back soon</p>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              {columns.map((col) => (
-                <th
-                  key={String(col.key)}
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide"
-                  style={{ width: col.width }}
-                >
-                  {col.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {data.map((row, idx) => (
-              <tr
-                key={rowKey ? String(row[rowKey]) : idx}
-                onClick={() => onRowClick?.(row)}
-                className={`transition-colors duration-150 ${
-                  onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''
-                }`}
-              >
-                {columns.map((col) => (
-                  <td key={String(col.key)} className="px-6 py-4 text-sm text-gray-900">
-                    {col.render ? col.render(row[col.key], row) : row[col.key]}
+                  <td key={String(col.key)} className="px-5 py-4">
+                    <div className="h-3.5 animate-pulse rounded bg-panel-200" style={{ width: '62%' }} />
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
-    </div>
+        </Table>
+        <span className="sr-only" role="status">
+          Loading results
+        </span>
+      </TableShell>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    if (emptyState) {
+      return (
+        <div className="rounded-xl border border-panel-200 bg-white px-6 py-14 text-center">
+          {emptyState}
+        </div>
+      );
+    }
+    return (
+      <TableEmpty
+        title="No results"
+        body="Nothing matched these filters. Widen the range or clear them."
+      />
+    );
+  }
+
+  return (
+    <TableShell>
+      <Table caption={caption}>
+        <THead>
+          {columns.map((col) => (
+            <TH key={String(col.key)} width={col.width}>
+              {col.label}
+            </TH>
+          ))}
+        </THead>
+        <TBody>
+          {data.map((row, idx) => (
+            <TR
+              key={rowKey ? String(row[rowKey]) : idx}
+              onActivate={onRowClick ? () => onRowClick(row) : undefined}
+            >
+              {columns.map((col) => (
+                <TD key={String(col.key)}>
+                  {col.render ? col.render(row[col.key], row) : row[col.key]}
+                </TD>
+              ))}
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </TableShell>
   );
 }

@@ -115,6 +115,27 @@ export class SystemErrorService {
       .eq('id', id);
   }
 
+  /**
+   * Mark every unreviewed row sharing a fingerprint as reviewed.
+   *
+   * The console groups errors by fingerprint, so the unit an operator actually
+   * decides about is the group, not the row. Clearing a 96-occurrence group one
+   * row at a time is 96 round trips and 96 audit entries for one human decision.
+   *
+   * Already-reviewed rows are left alone so an operator does not silently
+   * reassign someone else's review, and the returned count is what actually
+   * changed rather than the size of the group.
+   */
+  async markFingerprintReviewed(fingerprint: string, userId: string): Promise<number> {
+    const { data } = await supabase
+      .from('system_errors')
+      .update({ reviewed_at: new Date().toISOString(), reviewed_by: userId })
+      .eq('fingerprint', fingerprint)
+      .is('reviewed_at', null)
+      .select('id');
+    return data?.length ?? 0;
+  }
+
   /** Attach every row sharing a fingerprint to a ticket. */
   async linkToTicket(fingerprint: string, ticketId: string): Promise<void> {
     await supabase.from('system_errors').update({ ticket_id: ticketId }).eq('fingerprint', fingerprint);

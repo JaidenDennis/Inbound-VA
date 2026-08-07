@@ -36,19 +36,28 @@ export default function AnalyticsPage() {
       <p className="text-sm text-gray-400 mb-6">
         {new Date(data.period.from).toLocaleDateString()} – {new Date(data.period.to).toLocaleDateString()}
       </p>
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-xl border p-4 text-center">
-          <p className="text-3xl font-bold text-blue-600">{data.totalCalls}</p>
-          <p className="text-sm text-gray-500 mt-1">Total Calls</p>
-        </div>
-        <div className="bg-white rounded-xl border p-4 text-center">
-          <p className="text-3xl font-bold text-green-600">{data.leadsCapured}</p>
-          <p className="text-sm text-gray-500 mt-1">Leads Captured</p>
-        </div>
-        <div className="bg-white rounded-xl border p-4 text-center">
-          <p className="text-3xl font-bold text-purple-600">{data.conversionRate}%</p>
-          <p className="text-sm text-gray-500 mt-1">Conversion Rate</p>
-        </div>
+      {/* These three figures were blue / green / purple, which read as a
+          traffic light over metrics that carry no health meaning at all — and
+          purple is not in the token system, so it rendered as stock Tailwind.
+          Figures are ink; chroma stays with real status. */}
+      <div className="mb-8 grid grid-cols-1 overflow-hidden rounded-xl border border-panel-200 bg-white sm:grid-cols-3">
+        {[
+          { label: 'Total calls', value: data.totalCalls },
+          { label: 'Leads captured', value: data.leadsCapured },
+          { label: 'Conversion rate', value: `${data.conversionRate}%` },
+        ].map((m, i) => (
+          <div
+            key={m.label}
+            className={`px-5 py-4 ${i > 0 ? 'border-t border-panel-200 sm:border-l sm:border-t-0' : ''}`}
+          >
+            <p className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
+              {m.label}
+            </p>
+            <p data-numeric className="mt-2 font-heading text-3xl font-semibold tracking-[-0.022em] text-ink-900">
+              {m.value}
+            </p>
+          </div>
+        ))}
       </div>
       <div className="bg-white rounded-xl border p-6">
         <h2 className="font-semibold text-gray-700 mb-4">Performance Overview</h2>

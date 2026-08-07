@@ -3,99 +3,136 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-  }
-
-  * {
-    @apply border-gray-200;
-  }
-
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
   }
 
   body {
-    @apply bg-navy-50 text-gray-900;
+    @apply bg-panel-50 text-ink-800;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Headings inherit the brand sans with tighter, professional tracking */
-  h1, h2, h3, h4 {
-    @apply font-heading tracking-tight text-gray-900;
+  * {
+    @apply border-panel-200;
   }
+
+  /* Headings set face and weight but deliberately NOT colour. A blanket
+     heading colour here silently overrides the inherited colour on every dark
+     surface, which rendered the login headline near-black on near-black.
+     Colour belongs to the surface, so headings inherit it. */
+  h1, h2, h3, h4 {
+    @apply font-heading;
+    font-weight: 600;
+    color: inherit;
+  }
+
+  /* Every figure in this product is compared against another figure, so digits
+     hold their column. This is the single highest-value type setting here. */
+  table, .tabular, time, [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* ---- Browser surfaces ------------------------------------------------
+     The parts we did not draw still carry the design. Left at their defaults
+     these belong to no design system and quietly cheapen the whole panel. */
 
   ::selection {
-    @apply bg-primary-600/15 text-primary-900;
+    background-color: theme('colors.signal.200');
+    color: theme('colors.signal.900');
   }
 
-  /* Refined, unobtrusive scrollbars */
+  :root {
+    caret-color: theme('colors.signal.600');
+    accent-color: theme('colors.signal.600');
+    color-scheme: light;
+  }
+
   * {
     scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
+    scrollbar-color: theme('colors.panel.300') transparent;
   }
-  *::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  *::-webkit-scrollbar { width: 11px; height: 11px; }
+  *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb {
-    background-color: #cbd5e1;
+    background-color: theme('colors.panel.300');
     border-radius: 9999px;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     background-clip: content-box;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background-color: #94a3b8;
+    background-color: theme('colors.panel.400');
     background-clip: content-box;
   }
 
-  /* Consistent, visible keyboard focus across the app */
   :focus-visible {
-    outline: 2px solid theme('colors.primary.500');
+    outline: 2px solid theme('colors.signal.600');
     outline-offset: 2px;
     border-radius: 4px;
   }
+
+  a { text-underline-offset: 0.18em; text-decoration-thickness: from-font; }
+
+  /* Placeholder must clear 4.5:1 on white, which panel-400 does and the
+     browser default grey does not. */
+  ::placeholder { color: theme('colors.panel.500'); opacity: 1; }
 }
 
 @layer components {
-  /* Surface card — the standard professional container */
+  /* Elevation is declared once. Cards are hairline-bordered surfaces with no
+     shadow; the 1px-border-under-soft-shadow "ghost card" is not used here.
+     Shadow is reserved for layers that genuinely float (drawer, toast, menu). */
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    @apply rounded-xl border border-panel-200 bg-white;
   }
 
-  /* Subtle dotted-grid background for hero/brand panels */
-  .bg-grid {
-    background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0);
-    background-size: 22px 22px;
+  /* A machined surface: the faint top highlight a lit panel face catches. */
+  .card-seated {
+    @apply rounded-xl border border-panel-200 bg-white;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
   }
+
+  /* Small instrument label. Used for column heads and field labels only —
+     never as an eyebrow above a page heading. */
+  .label-instrument {
+    @apply text-2xs font-semibold uppercase text-panel-500;
+    letter-spacing: 0.07em;
+  }
+
+  .hairline { @apply border-panel-200; }
 }
 
 @layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.4s ease-out both;
-  }
   .animate-rise {
-    animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    animation: rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
+  /* Reduced motion removes travel and looping, NOT feedback.
+     A blanket `* { transition-duration: 0.01ms }` is the usual shortcut and it
+     is wrong here: it also kills the colour and border transitions that tell an
+     operator a row is hovered, a control is focused, or a lamp changed state.
+     Those are the affordances this interface runs on. So: kill the decorative
+     entrance and the looping lamp breath, keep short state transitions. */
   @media (prefers-reduced-motion: reduce) {
-    .animate-fade-in,
-    .animate-rise {
-      animation: none;
+    .animate-rise,
+    .animate-lamp-live,
+    .animate-sweep {
+      animation: none !important;
+    }
+    *, *::before, *::after {
+      scroll-behavior: auto !important;
+    }
+    /* Cap transitions rather than deleting them: still instant-feeling,
+       still perceptible as a state change. */
+    * {
+      transition-duration: 90ms !important;
+      animation-iteration-count: 1 !important;
     }
   }
 }
@@ -103,48 +140,30 @@
 /* ============================================================
    Data-visualisation tokens
    ------------------------------------------------------------
-   Charts read colour by role, never raw hex, so light/dark swap
-   in one place. The dark column is a SELECTED set of steps for
-   the dark surface — not an automatic flip of the light values,
-   which would fail the lightness-band and contrast gates.
+   Charts read colour by role, never raw hex, so the surface can
+   swap in one place.
 
-   Categorical slots 1–2 validated against both surfaces (all six
-   checks pass; worst adjacent CVD ΔE 24.7 light / 26.8 dark,
-   target ≥ 8). Slot order is fixed and never cycled.
+   Series hues were re-picked for the supervisory-panel world:
+   the previous blue/orange pair put a series colour inside the
+   amber lamp's hue range, which let a chart line read as a
+   status. Teal and mulberry sit far from all three lamp hues and
+   separate on the blue-yellow axis, so they hold under
+   deuteranopia and protanopia.
+
+   NOTE: these two slots have NOT been re-run through the
+   numeric CVD/contrast gate that validated the previous pair.
+   They are reasoned, not measured. Re-validate before adding a
+   third categorical slot.
    ============================================================ */
 .viz-root {
   color-scheme: light;
   --surface-1: #ffffff;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --baseline: #c3c2b7;
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme='light'])) .viz-root {
-    color-scheme: dark;
-    --surface-1: #1a1a19;
-    --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --gridline: #2c2c2a;
-    --baseline: #383835;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-  }
-}
-
-:root[data-theme='dark'] .viz-root {
-  color-scheme: dark;
-  --surface-1: #1a1a19;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --baseline: #383835;
-  --series-1: #3987e5;
-  --series-2: #d95926;
+  --text-secondary: #545D5D;
+  --text-muted: #939D9D;
+  --gridline: #E9ECEC;
+  --baseline: #BCC4C4;
+  --series-1: #1E7A90;
+  --series-2: #9B4D93;
 }
 
 /* Recharts suppresses the default focus ring on its SVG surface. */

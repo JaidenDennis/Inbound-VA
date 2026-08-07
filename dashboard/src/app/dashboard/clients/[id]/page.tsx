@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 import { stageLabel, ONBOARDING_STATUSES, type Milestone } from '@/lib/onboarding';
 import { type ActionItem } from '@/lib/actionItems';
+import { clientStatusTerm } from '@/lib/vocabulary';
 
 interface ClientSettings {
   agent_prompt: string;
@@ -150,8 +151,8 @@ export default function ClientEditPage() {
       </Link>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">{client.name}</h1>
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-          {status}
+        <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'active' ? 'border-lamp-good-rim bg-lamp-good-wash text-lamp-good-ink' : 'border-panel-200 bg-panel-100 text-panel-700'}`}>
+          {clientStatusTerm(status).label}
         </span>
       </div>
 
@@ -179,7 +180,7 @@ export default function ClientEditPage() {
             <option value="inactive">inactive</option>
             <option value="suspended">suspended</option>
           </select>
-          {status !== 'active' && <p className="text-xs text-orange-600 mt-1">A non-active client will not be matched to inbound calls.</p>}
+          {status !== 'active' && <p className="mt-1.5 text-xs text-lamp-fair-ink">A non-active client will not be matched to inbound calls.</p>}
         </div>
         <button onClick={saveClient} disabled={savingClient}
           className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">

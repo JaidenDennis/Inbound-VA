@@ -17,19 +17,27 @@ export const STATUS_LABEL: Record<TicketStatus, string> = {
   closed: 'Closed',
 };
 
+/**
+ * Chroma is reserved for state (see DESIGN.md). A ticket's *status* is mostly a
+ * category, not a health reading, so only the two statuses that genuinely mean
+ * "someone is blocked" light a lamp; the rest stay achromatic. Purple and slate
+ * were removed outright — neither exists in the token system, so they rendered
+ * as stock Tailwind and broke the palette.
+ */
 export const STATUS_COLOR: Record<TicketStatus, string> = {
-  investigating: 'bg-blue-100 text-blue-700',
-  waiting_on_client: 'bg-amber-100 text-amber-700',
-  waiting_on_third_party: 'bg-purple-100 text-purple-700',
-  resolved: 'bg-green-100 text-green-700',
-  closed: 'bg-gray-100 text-gray-600',
+  investigating: 'bg-signal-50 text-signal-800 border border-signal-200',
+  waiting_on_client: 'bg-lamp-fair-wash text-lamp-fair-ink border border-lamp-fair-rim',
+  waiting_on_third_party: 'bg-panel-100 text-panel-700 border border-panel-200',
+  resolved: 'bg-lamp-good-wash text-lamp-good-ink border border-lamp-good-rim',
+  closed: 'bg-panel-100 text-panel-600 border border-panel-200',
 };
 
+/** Priority IS a severity judgement, so it maps straight onto the lamps. */
 export const PRIORITY_COLOR: Record<TicketPriority, string> = {
-  low: 'bg-gray-100 text-gray-600',
-  normal: 'bg-slate-100 text-slate-700',
-  high: 'bg-orange-100 text-orange-700',
-  urgent: 'bg-red-100 text-red-700',
+  low: 'bg-panel-100 text-panel-600 border border-panel-200',
+  normal: 'bg-panel-100 text-panel-700 border border-panel-200',
+  high: 'bg-lamp-fair-wash text-lamp-fair-ink border border-lamp-fair-rim',
+  urgent: 'bg-lamp-bad-wash text-lamp-bad-ink border border-lamp-bad-rim',
 };
 
 export const TICKET_STATUSES: TicketStatus[] = [
@@ -46,8 +54,8 @@ export function statusLabel(s: string): string {
   return STATUS_LABEL[s as TicketStatus] ?? s;
 }
 export function statusColor(s: string): string {
-  return STATUS_COLOR[s as TicketStatus] ?? 'bg-gray-100 text-gray-500';
+  return STATUS_COLOR[s as TicketStatus] ?? 'bg-panel-100 text-panel-600 border border-panel-200';
 }
 export function priorityColor(p: string): string {
-  return PRIORITY_COLOR[p as TicketPriority] ?? 'bg-gray-100 text-gray-500';
+  return PRIORITY_COLOR[p as TicketPriority] ?? 'bg-panel-100 text-panel-600 border border-panel-200';
 }

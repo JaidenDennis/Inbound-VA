@@ -21,3 +21,6 @@ supabase/.env
 # Local agent skill installs (caveman etc.) — not part of the repo
 .agents/
 skills-lock.json
+
+# Design-tool critique output — local scratch, not part of the repo
+.impeccable/

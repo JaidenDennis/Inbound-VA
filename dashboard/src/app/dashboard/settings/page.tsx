@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { AlertTriangle } from 'lucide-react';
+import { jobStatusTerm, JOB_STATUS } from '@/lib/vocabulary';
+import { HintedHeading } from '@/components/Hint';
+import { PageHeader } from '@/components/PageHeader';
+import { StatusLamp } from '@/components/StatusLamp';
+import { Table, TableEmpty, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
 
 interface FailedJob {
   id: string;
@@ -34,50 +39,73 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <PageHeader
+        title="Settings"
+        description="Jobs that exhausted their retries and are waiting on a human decision."
+      />
 
-      <div className="bg-white rounded-xl border overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-          <AlertTriangle className="w-4 h-4 text-orange-500" />
-          <h2 className="font-semibold text-gray-700">Failed Jobs ({failedJobs.length})</h2>
-        </div>
-        {failedJobs.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">No failed jobs</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Queue</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Error</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Attempts</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
+      <div className="mb-3 flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-lamp-fair-ink" aria-hidden />
+        <h2 className="font-heading text-sm font-semibold text-ink-900">
+          Failed jobs
+        </h2>
+        <span
+          data-numeric
+          className="rounded-full border border-panel-200 bg-panel-100 px-2 py-0.5 text-2xs font-semibold text-panel-700"
+        >
+          {failedJobs.length}
+        </span>
+      </div>
+
+      {failedJobs.length === 0 ? (
+        <TableEmpty
+          icon={<StatusLamp level="good" size="lg" label="Good" />}
+          title="No failed jobs"
+          body="Every queued job has completed or is still retrying."
+        />
+      ) : (
+        <TableShell>
+          <Table caption={`${failedJobs.length} failed jobs`}>
+            <THead>
+              <TH>Queue</TH>
+              <TH>Error</TH>
+              <TH>Attempts</TH>
+              <TH>
+                <HintedHeading term="Awaiting review" hint={JOB_STATUS.pending.hint ?? ''}>
+                  Status
+                </HintedHeading>
+              </TH>
+              <TH align="right" srOnly>Actions</TH>
+            </THead>
+            <TBody>
               {failedJobs.map((job) => (
-                <tr key={job.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{job.queue_name}</td>
-                  <td className="px-4 py-3 text-red-500 text-xs max-w-xs truncate">{job.error_message}</td>
-                  <td className="px-4 py-3 text-gray-500">{job.attempts}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">{job.status}</span>
-                  </td>
-                  <td className="px-4 py-3">
+                <TR key={job.id}>
+                  <TD mono>{job.queue_name}</TD>
+                  <TD className="max-w-xs truncate text-xs text-lamp-bad-ink" >
+                    {job.error_message}
+                  </TD>
+                  <TD numeric className="text-panel-600">{job.attempts}</TD>
+                  <TD>
+                    <span className="whitespace-nowrap rounded-full border border-lamp-fair-rim bg-lamp-fair-wash px-2.5 py-1 text-xs font-medium text-lamp-fair-ink">
+                      {jobStatusTerm(job.status).label}
+                    </span>
+                  </TD>
+                  <TD align="right">
                     <button
                       onClick={() => retryJob(job)}
                       disabled={retrying === job.id}
-                      className="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                      aria-label={`Retry ${job.queue_name} job`}
+                      className="cursor-pointer whitespace-nowrap rounded px-1.5 py-1 text-xs font-medium text-signal-700 underline decoration-signal-300 underline-offset-2 transition-colors hover:text-signal-800 hover:decoration-signal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {retrying === job.id ? 'Retrying...' : 'Retry'}
+                      {retrying === job.id ? 'Retrying…' : 'Retry'}
                     </button>
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+            </TBody>
+          </Table>
+        </TableShell>
+      )}
     </div>
   );
 }
