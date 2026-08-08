@@ -28,10 +28,14 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
       const clientId = user.clientId ?? request.query.clientId;
-      if (!clientId) return reply.code(400).send({ error: 'clientId is required' });
+      // Staff with no client named see every client's items rather than a 400.
+      if (!clientId) {
+        if (!isPlatformUser(user)) return reply.code(403).send({ error: 'Forbidden' });
+        return reply.send({ scope: 'platform', data: await actionItemService.listAllForPlatform() });
+      }
       if (!assertClientAccess(user, clientId)) return reply.code(403).send({ error: 'Forbidden' });
       const items = await actionItemService.listForClient(clientId);
-      reply.send({ data: items });
+      reply.send({ scope: 'client', data: items });
     },
   });
 

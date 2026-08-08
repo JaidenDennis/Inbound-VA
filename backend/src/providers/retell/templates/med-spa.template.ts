@@ -13,6 +13,7 @@ import type {
   FAQ,
   WorkingHours,
 } from '../../../types/index.js';
+import { applyGreeting } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Everything is sourced from client_settings; nothing about a specific client is
@@ -220,8 +221,9 @@ Use your functions rather than guessing: lookup_existing_client (only after iden
 
 /** First spoken line — introduce only (identification happens next, per the flow). */
 function buildBeginMessage(ctx: TemplateContext): string {
-  const { business, agentName } = identity(ctx);
-  return `Thank you for calling ${business}, this is ${agentName}.`;
+  const names = identity(ctx);
+  const { business, agentName } = names;
+  return applyGreeting(ctx, names, `Thank you for calling ${business}, this is ${agentName}.`);
 }
 
 function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolSpec[] {

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { supabase } from '../db/index.js';
 import { allQueues } from '../queues/index.js';
-import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
+import { requirePermission, assertClientAccess, isPlatformUser, resolveClientScope } from '../middleware/index.js';
 import { callService } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
@@ -49,13 +49,17 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     preHandler: requirePermission('calls:read'),
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
-      // Client-scoped users are locked to their own tenant.
-      const clientId = user.clientId ?? request.query.clientId;
-      if (!clientId) return reply.code(400).send({ error: 'clientId required' });
-      if (!assertClientAccess(user, clientId)) {
+      // Client-scoped users are locked to their own tenant. Platform staff get
+      // every tenant unless they name one — this page is their whole-estate
+      // view, and demanding a clientId here is what made it render empty.
+      const clientId = resolveClientScope(user, request.query.clientId);
+      if (clientId && !assertClientAccess(user, clientId)) {
         return reply.code(403).send({ error: 'Forbidden' });
       }
-      const result = await callService.list(clientId, Number(request.query.page ?? 1));
+      if (!clientId && !isPlatformUser(user)) {
+        return reply.code(403).send({ error: 'Forbidden' });
+      }
+      const result = await callService.list(clientId, Number(request.query.page ?? 1), 20, request.query.q);
       reply.send(result);
     },
   });

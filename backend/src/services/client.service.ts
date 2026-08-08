@@ -38,11 +38,21 @@ export class ClientService {
     return data as ClientSettings | null;
   }
 
-  async list(page = 1, limit = 20): Promise<{ data: Client[]; count: number }> {
+  /**
+   * Archived (status 'inactive') clients are hidden unless asked for. Archiving
+   * is the console's delete, so an archived tenant disappearing from the list is
+   * what makes the action feel like it did something — while the row, and every
+   * call and audit entry hanging off it, stays recoverable.
+   */
+  async list(
+    page = 1,
+    limit = 20,
+    opts: { includeArchived?: boolean } = {}
+  ): Promise<{ data: Client[]; count: number }> {
     const from = (page - 1) * limit;
-    const { data, count } = await supabase
-      .from('clients')
-      .select('*', { count: 'exact' })
+    let query = supabase.from('clients').select('*', { count: 'exact' });
+    if (!opts.includeArchived) query = query.neq('status', 'inactive');
+    const { data, count } = await query
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
     return { data: (data ?? []) as Client[], count: count ?? 0 };

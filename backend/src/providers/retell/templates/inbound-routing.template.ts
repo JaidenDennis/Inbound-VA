@@ -6,6 +6,7 @@ import type {
   RetellToolSpec,
 } from './template.types.js';
 import type { ClientSettings, FAQ, PricingItem, Service, WorkingHours } from '../../../types/index.js';
+import { applyGreeting, voiceTuning } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Inbound ROUTING agent template (vertical-neutral). Unlike the single-prompt
@@ -142,10 +143,19 @@ Use your tools rather than guessing. route_intent (classify/switch topic), updat
 }
 
 function buildBeginMessage(ctx: TemplateContext): string {
-  const { business, agentName } = identity(ctx);
+  const names = identity(ctx);
+  const { business, agentName } = names;
   // Introduce, invite, and disclose recording — all spoken in the first turn
   // before the caller replies, so the recording disclosure is always heard.
-  return `Thank you for calling ${business}, this is ${agentName}. How can I help you today? And just so you know, this call is being recorded.`;
+  //
+  // A client-authored greeting replaces this wholesale. That includes the
+  // recording disclosure, which is why the editor warns about it: two-party
+  // consent states require it, and we cannot enforce it inside free text.
+  return applyGreeting(
+    ctx,
+    names,
+    `Thank you for calling ${business}, this is ${agentName}. How can I help you today? And just so you know, this call is being recorded.`
+  );
 }
 
 function buildTools(ctx: TemplateContext, settings: ClientSettings): RetellToolSpec[] {
@@ -509,16 +519,19 @@ export const inboundRoutingTemplate: AgentTemplate = {
       voice_id: ctx.client.retell_voice_id ?? ctx.defaultVoiceId,
       language: 'en-US',
       pronunciation_dictionary: ctx.settings.agent_config?.pronunciation_dictionary,
-      // Same pacing/hangup posture as the med-spa template (see its comments).
-      responsiveness: 0.85,
-      interruption_sensitivity: 0.95,
       enable_backchannel: true,
       begin_message_delay_ms: 600,
       end_call_after_silence_ms: 10000,
       reminder_trigger_ms: 5000,
       reminder_max_count: 1,
-      // Hold a steady, even tone across the call (default 1 ranges too far).
-      voice_temperature: 0.6,
+      // Same pacing/hangup posture as the med-spa template (see its comments),
+      // unless the client has tuned it. voice_temperature 0.6 holds a steady,
+      // even tone across the call (Retell's default of 1 ranges too far).
+      ...voiceTuning(ctx, {
+        responsiveness: 0.85,
+        interruption_sensitivity: 0.95,
+        voice_temperature: 0.6,
+      }),
     };
     return { responseEngine, agent };
   },

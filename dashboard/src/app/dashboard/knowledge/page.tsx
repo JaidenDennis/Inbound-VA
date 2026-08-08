@@ -6,17 +6,33 @@ import { PageHeader } from '@/components/PageHeader';
 import { Tabs, useActiveTab, type TabSpec } from '@/components/Tabs';
 import { InlineEditTable, type FieldSpec } from '@/components/InlineEditTable';
 import { SyncBadge } from '@/components/StatusPill';
+import { ClientPicker, ChooseClientPrompt, useClientScope } from '@/components/ClientPicker';
 import { useSession } from '@/lib/SessionProvider';
 import { Info } from 'lucide-react';
+import { CopilotFaqs } from '@/components/CopilotFaqs';
+import { PoliciesEditor } from './components/PoliciesEditor';
+import { HoursEditor } from './components/HoursEditor';
+
+/**
+ * Everything the agent knows.
+ *
+ * This page was previously reachable only by client users and always read the
+ * caller's own tenant, so platform staff had no way to edit any client's
+ * knowledge at all. It now scopes through ClientPicker: a client sees their own
+ * data with no picker, staff choose whose knowledge they are editing.
+ */
 
 const TABS: TabSpec[] = [
   { key: 'faqs', label: 'FAQs' },
   { key: 'services', label: 'Services' },
   { key: 'pricing', label: 'Pricing' },
   { key: 'promotions', label: 'Promotions' },
+  { key: 'policies', label: 'Policies' },
+  { key: 'hours', label: 'Hours' },
 ];
 
-const FIELDS: Record<string, FieldSpec[]> = {
+/** Tabs backed by the relational knowledge tables and the generic CRUD table. */
+const TABLE_FIELDS: Record<string, FieldSpec[]> = {
   faqs: [
     { key: 'question', label: 'Question', required: true, width: '35%' },
     { key: 'answer', label: 'Answer', type: 'textarea', required: true },
@@ -55,55 +71,53 @@ function cleanPayload(values: Record<string, string>, fields: FieldSpec[]): Reco
 
 interface Row { id: string; [key: string]: unknown }
 
-function KnowledgePageInner() {
-  const tab = useActiveTab(TABS);
-  const { can } = useSession();
-  const canWrite = can('knowledge:write');
-
+function KnowledgeTable({
+  tab,
+  clientId,
+  canWrite,
+  onChanged,
+}: {
+  tab: string;
+  clientId: string;
+  canWrite: boolean;
+  onChanged: () => void;
+}) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [syncState, setSyncState] = useState<string | null>(null);
-
-  const fields = FIELDS[tab] ?? FIELDS.faqs;
+  const fields = TABLE_FIELDS[tab];
 
   const load = useCallback(() => {
     setLoading(true);
     setError('');
     api
-      .get(`/knowledge/${tab}`)
+      .get(`/knowledge/${tab}`, { params: { clientId } })
       .then((r) => setRows(r.data.data ?? []))
       .catch((e) => setError(e?.response?.data?.error ?? 'Could not load this section'))
       .finally(() => setLoading(false));
-  }, [tab]);
+  }, [tab, clientId]);
 
   useEffect(load, [load]);
 
-  // After a write the agent is stale until the queued provision runs, so the
-  // header says so rather than implying the change is already live on calls.
-  const markPending = () => setSyncState('pending');
-
   return (
-    <div>
-      <PageHeader
-        title="Knowledge"
-        description="What your AI agent tells callers. Changes go live on calls within about a minute."
-        action={syncState ? <SyncBadge state={syncState} /> : undefined}
-      />
-
-      {!canWrite && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          <Info className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
-          <p>You have read-only access. Ask an account owner to make changes.</p>
+    <>
+      {error && (
+        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+          {error}
         </div>
       )}
 
-      <Tabs tabs={TABS} />
-
-      {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
+      {/* Suggestions only make sense where the model has something to ground a
+          draft in — the FAQ set is the one section with that context. */}
+      {tab === 'faqs' && canWrite && (
+        <CopilotFaqs
+          clientId={clientId}
+          onAdd={async (draft) => {
+            await api.post('/knowledge/faqs', draft, { params: { clientId } });
+            onChanged();
+            load();
+          }}
+        />
       )}
 
       <InlineEditTable
@@ -113,28 +127,88 @@ function KnowledgePageInner() {
         readOnly={!canWrite}
         emptyMessage={`No ${tab} yet. Add the first one so your agent can answer about it.`}
         onCreate={async (values) => {
-          await api.post(`/knowledge/${tab}`, cleanPayload(values, fields));
-          markPending();
+          await api.post(`/knowledge/${tab}`, cleanPayload(values, fields), { params: { clientId } });
+          onChanged();
           load();
         }}
         onUpdate={async (id, values) => {
           await api.patch(`/knowledge/${tab}/${id}`, cleanPayload(values, fields));
-          markPending();
+          onChanged();
           load();
         }}
         onDelete={async (id) => {
           await api.delete(`/knowledge/${tab}/${id}`);
-          markPending();
+          onChanged();
           load();
         }}
       />
+    </>
+  );
+}
+
+function KnowledgePageInner() {
+  const tab = useActiveTab(TABS);
+  const { can } = useSession();
+  const canWrite = can('knowledge:write');
+  const { clientId, needsChoice, ready } = useClientScope();
+
+  const [syncState, setSyncState] = useState<string | null>(null);
+  const [timezone, setTimezone] = useState('UTC');
+
+  // The hours editor needs a timezone to seed a first-time schedule with.
+  useEffect(() => {
+    if (!clientId) return;
+    api
+      .get(`/clients/${clientId}`)
+      .then((r) => setTimezone(r.data?.timezone ?? 'UTC'))
+      .catch(() => setTimezone('UTC'));
+  }, [clientId]);
+
+  // After a write the agent is stale until the queued provision runs, so the
+  // header says so rather than implying the change is already live on calls.
+  const markPending = () => setSyncState('pending');
+
+  return (
+    <div>
+      <PageHeader
+        title="Knowledge"
+        description="What the agent tells callers. Changes go live on calls within about a minute."
+        action={syncState ? <SyncBadge state={syncState} /> : undefined}
+      />
+
+      <ClientPicker label="Editing knowledge for" />
+
+      {!canWrite && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-panel-200 bg-panel-50 px-4 py-3 text-sm text-panel-700">
+          <Info className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
+          <p>You have read-only access. Ask an account owner to make changes.</p>
+        </div>
+      )}
+
+      {!ready ? (
+        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+      ) : needsChoice || !clientId ? (
+        <ChooseClientPrompt what="Knowledge" />
+      ) : (
+        <>
+          <Tabs tabs={TABS} />
+
+          {TABLE_FIELDS[tab] ? (
+            <KnowledgeTable tab={tab} clientId={clientId} canWrite={canWrite} onChanged={markPending} />
+          ) : tab === 'policies' ? (
+            <PoliciesEditor clientId={clientId} readOnly={!canWrite} />
+          ) : (
+            <HoursEditor clientId={clientId} readOnly={!canWrite} timezone={timezone} />
+          )}
+        </>
+      )}
     </div>
   );
 }
 
 export default function KnowledgePage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-gray-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
       <KnowledgePageInner />
     </Suspense>
   );

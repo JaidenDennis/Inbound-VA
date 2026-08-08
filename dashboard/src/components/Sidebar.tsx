@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Building2, Phone, Calendar,
   BarChart2, Settings, Database, Users, LifeBuoy, ListChecks, LogOut,
-  Activity, Bot, BookOpen, ScrollText, Menu, X,
+  Activity, Bot, BookOpen, ScrollText, Menu, X, Plug, Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
@@ -33,6 +33,7 @@ const staffNav: NavGroup[] = [
     label: 'Operate',
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+      { href: '/dashboard/assistant', label: 'Assistant', icon: Sparkles },
       { href: '/dashboard/calls', label: 'Calls', icon: Phone, permission: 'calls:read' },
       { href: '/dashboard/bookings', label: 'Bookings', icon: Calendar, permission: 'bookings:read' },
       { href: '/dashboard/support', label: 'Support', icon: LifeBuoy, permission: 'tickets:read' },
@@ -43,8 +44,10 @@ const staffNav: NavGroup[] = [
     items: [
       { href: '/dashboard/clients', label: 'Clients', icon: Building2, permission: 'clients:read' },
       { href: '/dashboard/agents', label: 'Agents', icon: Bot, permission: 'agents:read' },
+      { href: '/dashboard/knowledge', label: 'Knowledge', icon: BookOpen, permission: 'knowledge:read' },
       { href: '/dashboard/onboarding', label: 'Onboarding', icon: ListChecks, permission: 'clients:read' },
-      { href: '/dashboard/crm', label: 'CRM', icon: Database, permission: 'crm:read' },
+      { href: '/dashboard/connections', label: 'Connections', icon: Plug, permission: 'crm:read' },
+      { href: '/dashboard/crm', label: 'CRM Sync', icon: Database, permission: 'crm:read' },
       { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2, permission: 'analytics:read' },
     ],
   },
@@ -64,8 +67,11 @@ const clientNav: NavGroup[] = [
     label: null,
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+      { href: '/dashboard/assistant', label: 'Assistant', icon: Sparkles },
       { href: '/dashboard/reports', label: 'Reports', icon: BarChart2, permission: 'analytics:read' },
+      { href: '/dashboard/agent', label: 'My Agent', icon: Bot, permission: 'knowledge:read' },
       { href: '/dashboard/knowledge', label: 'Knowledge', icon: BookOpen, permission: 'knowledge:read' },
+      { href: '/dashboard/connections', label: 'Connections', icon: Plug, permission: 'crm:read' },
       { href: '/dashboard/support', label: 'Support', icon: LifeBuoy, permission: 'tickets:read' },
       { href: '/dashboard/onboarding', label: 'Onboarding', icon: ListChecks, permission: 'clients:read' },
       { href: '/dashboard/team', label: 'Team', icon: Users, permission: 'users:write' },

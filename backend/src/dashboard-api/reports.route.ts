@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
-import { requirePermission, assertClientAccess } from '../middleware/index.js';
+import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
 import { callRecordService } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
@@ -38,22 +38,34 @@ function defaultRange(from?: string, to?: string) {
 }
 
 export async function reportRoutes(app: FastifyInstance): Promise<void> {
-  /** Tenant for this request, or null when the caller may not have one. */
-  function scopeFor(user: JwtPayload, requested?: string): string | null {
+  /**
+   * Tenant for this request.
+   *
+   * Three outcomes, kept distinct: a named tenant the caller may see, the
+   * platform-wide view (`clientId: null`, staff only), or a refusal. The old
+   * version returned null for both "estate view" and "forbidden", which is why
+   * staff pages got a 400 instead of data.
+   */
+  function scopeFor(
+    user: JwtPayload,
+    requested?: string
+  ): { ok: true; clientId: string | null } | { ok: false } {
     const clientId = user.clientId ?? requested ?? null;
-    if (!clientId) return null;
-    return assertClientAccess(user, clientId) ? clientId : null;
+    if (!clientId) {
+      return isPlatformUser(user) ? { ok: true, clientId: null } : { ok: false };
+    }
+    return assertClientAccess(user, clientId) ? { ok: true, clientId } : { ok: false };
   }
 
   app.get('/reports/kpis', {
     preHandler: requirePermission('analytics:read'),
     handler: async (request, reply) => {
       const q = rangeSchema.parse(request.query);
-      const clientId = scopeFor(request.user as JwtPayload, q.clientId);
-      if (!clientId) return reply.code(400).send({ error: 'clientId is required' });
+      const scope = scopeFor(request.user as JwtPayload, q.clientId);
+      if (!scope.ok) return reply.code(403).send({ error: 'Forbidden' });
 
       const { from, to } = defaultRange(q.from, q.to);
-      const stats = await callRecordService.getStats(clientId, from, to);
+      const stats = await callRecordService.getStats(scope.clientId, from, to);
       reply.send({ period: { from, to }, ...stats });
     },
   });
@@ -62,8 +74,8 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
     preHandler: requirePermission('analytics:read'),
     handler: async (request, reply) => {
       const q = rangeSchema.parse(request.query);
-      const clientId = scopeFor(request.user as JwtPayload, q.clientId);
-      if (!clientId) return reply.code(400).send({ error: 'clientId is required' });
+      const scope = scopeFor(request.user as JwtPayload, q.clientId);
+      if (!scope.ok) return reply.code(403).send({ error: 'Forbidden' });
 
       const { from, to } = defaultRange(q.from, q.to);
       // Daily buckets stop being readable past about a month of bars, so a
@@ -71,7 +83,7 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
       const span = new Date(to).getTime() - new Date(from).getTime();
       const bucket = q.bucket ?? (span > THIRTY_ONE_DAYS_MS ? 'week' : 'day');
 
-      const data = await callRecordService.getVolume(clientId, from, to, bucket);
+      const data = await callRecordService.getVolume(scope.clientId, from, to, bucket);
       reply.send({ period: { from, to }, bucket, data });
     },
   });
@@ -80,11 +92,11 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
     preHandler: requirePermission('analytics:read'),
     handler: async (request, reply) => {
       const q = rangeSchema.parse(request.query);
-      const clientId = scopeFor(request.user as JwtPayload, q.clientId);
-      if (!clientId) return reply.code(400).send({ error: 'clientId is required' });
+      const scope = scopeFor(request.user as JwtPayload, q.clientId);
+      if (!scope.ok) return reply.code(403).send({ error: 'Forbidden' });
 
       const { from, to } = defaultRange(q.from, q.to);
-      const data = await callRecordService.getOutcomes(clientId, from, to);
+      const data = await callRecordService.getOutcomes(scope.clientId, from, to);
       reply.send({ period: { from, to }, data });
     },
   });
@@ -97,20 +109,22 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
     preHandler: requirePermission('calls:read'),
     handler: async (request, reply) => {
       const q = logSchema.parse(request.query);
-      const clientId = scopeFor(request.user as JwtPayload, q.clientId);
-      if (!clientId) return reply.code(400).send({ error: 'clientId is required' });
+      const scope = scopeFor(request.user as JwtPayload, q.clientId);
+      if (!scope.ok) return reply.code(403).send({ error: 'Forbidden' });
 
       const { from, to } = defaultRange(q.from, q.to);
 
       let query = supabase
         .from('client_call_log')
         .select('*')
-        .eq('client_id', clientId)
         .gte('started_at', from)
         .lte('started_at', to)
         .order('started_at', { ascending: false })
         .limit(q.limit + 1); // one extra row tells us whether more exist
 
+      // Applied after the range so the estate view (clientId null) simply omits
+      // the tenant predicate rather than filtering on a null.
+      if (scope.clientId) query = query.eq('client_id', scope.clientId);
       if (q.cursor) query = query.lt('started_at', q.cursor);
       if (q.outcome) query = query.eq('outcome', q.outcome);
       if (q.q) query = query.ilike('from_number', `%${q.q}%`);

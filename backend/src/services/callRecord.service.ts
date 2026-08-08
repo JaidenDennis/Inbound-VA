@@ -103,7 +103,8 @@ export class CallRecordService {
    * under-reported past PostgREST's 1000-row response cap — so any client with
    * more than 1000 calls in the period was shown wrong numbers, with no error.
    */
-  async getStats(clientId: string, from: string, to: string): Promise<CallStats> {
+  /** `clientId: null` aggregates every tenant — the platform-wide view. */
+  async getStats(clientId: string | null, from: string, to: string): Promise<CallStats> {
     const { data, error } = await supabase.rpc('report_kpis', {
       p_client_id: clientId,
       p_from: from,
@@ -136,7 +137,7 @@ export class CallRecordService {
 
   /** Calls per day or week, split answered vs voicemail, in the client's timezone. */
   async getVolume(
-    clientId: string,
+    clientId: string | null,
     from: string,
     to: string,
     bucket: 'day' | 'week'
@@ -161,7 +162,7 @@ export class CallRecordService {
 
   /** Where calls ended up. See call_outcome() in migration 020 for precedence. */
   async getOutcomes(
-    clientId: string,
+    clientId: string | null,
     from: string,
     to: string
   ): Promise<Array<{ outcome: string; count: number }>> {
