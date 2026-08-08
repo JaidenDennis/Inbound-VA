@@ -35,10 +35,20 @@ INSERT INTO users (email, name, password_hash, role, is_active) VALUES
 ON CONFLICT (email) DO NOTHING;
 
 -- Sample Clients
+--
+-- phone_numbers is deliberately EMPTY. These rows previously carried reserved
+-- fiction numbers (+1212555xxxx). Two of these slugs are also used by the real
+-- vertical demo seeds in supabase/data/, whose ON CONFLICT clause does not touch
+-- phone_numbers — so the fake numbers survived onto live demo clients and the
+-- dashboard displayed them as though a number were assigned. Nothing in Retell
+-- ever mapped to them, which made the console disagree with the provider.
+--
+-- A number belongs here only once it exists in Retell. Migration 021 clears the
+-- historical values from any database that already ran this file.
 INSERT INTO clients (id, name, slug, industry, timezone, phone_numbers, status, retell_agent_id) VALUES
-  ('a1b2c3d4-0000-0000-0000-000000000001', 'Bright Smile Dental', 'bright-smile-dental', 'dental', 'America/New_York', ARRAY['+12125550100'], 'active', NULL),
-  ('a1b2c3d4-0000-0000-0000-000000000002', 'Serenity Med Spa', 'serenity-med-spa', 'medical', 'America/Los_Angeles', ARRAY['+13105550200'], 'active', NULL),
-  ('a1b2c3d4-0000-0000-0000-000000000003', 'Parker & Associates Law', 'parker-law', 'legal', 'America/Chicago', ARRAY['+13125550300'], 'active', NULL)
+  ('a1b2c3d4-0000-0000-0000-000000000001', 'Bright Smile Dental', 'bright-smile-dental', 'dental', 'America/New_York', '{}', 'active', NULL),
+  ('a1b2c3d4-0000-0000-0000-000000000002', 'Serenity Med Spa', 'serenity-med-spa', 'medical', 'America/Los_Angeles', '{}', 'active', NULL),
+  ('a1b2c3d4-0000-0000-0000-000000000003', 'Parker & Associates Law', 'parker-law', 'legal', 'America/Chicago', '{}', 'active', NULL)
 ON CONFLICT DO NOTHING;
 
 -- Sample Client Settings

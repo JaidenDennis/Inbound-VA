@@ -71,7 +71,39 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         )
         .order('name');
       if (error) return reply.code(500).send({ error: error.message });
-      reply.send({ data: data ?? [], verticals: listVerticals() });
+
+      // `clients.phone_numbers` is only what someone typed into the console.
+      // `retell_phone_numbers` is written after Retell confirms the mapping, so
+      // the difference between the two is exactly the case that misled us
+      // before: a number shown as assigned that no provider ever routed.
+      // Mapping failures are logged and swallowed during provisioning, so
+      // without this the console cannot tell the two apart.
+      const { data: mapped } = await supabase
+        .from('retell_phone_numbers')
+        .select('client_id, phone_number');
+
+      const confirmedByClient = new Map<string, Set<string>>();
+      for (const row of (mapped ?? []) as Array<{ client_id: string; phone_number: string }>) {
+        const set = confirmedByClient.get(row.client_id) ?? new Set<string>();
+        set.add(row.phone_number);
+        confirmedByClient.set(row.client_id, set);
+      }
+
+      const clients = (data ?? []) as unknown as Array<Record<string, unknown>>;
+      const rows = clients.map((client) => {
+        const confirmed = confirmedByClient.get(client.id as string) ?? new Set<string>();
+        const numbers = (client.phone_numbers as string[] | null) ?? [];
+        return {
+          ...client,
+          phone_numbers: numbers,
+          /** Numbers Retell has actually accepted an inbound mapping for. */
+          confirmed_numbers: numbers.filter((n) => confirmed.has(n)),
+          /** Configured here but never confirmed by Retell — these do not ring. */
+          unconfirmed_numbers: numbers.filter((n) => !confirmed.has(n)),
+        };
+      });
+
+      reply.send({ data: rows, verticals: listVerticals() });
     },
   });
 

@@ -50,9 +50,12 @@ export async function clientRoutes(app: FastifyInstance): Promise<void> {
         const client = user.clientId ? await clientService.findById(user.clientId) : null;
         return reply.send({ data: client ? [client] : [], count: client ? 1 : 0 });
       }
-      const page = Number((request.query as Record<string, string>).page ?? 1);
-      const limit = Number((request.query as Record<string, string>).limit ?? 20);
-      const result = await clientService.list(page, limit);
+      const query = request.query as Record<string, string>;
+      const page = Number(query.page ?? 1);
+      const limit = Number(query.limit ?? 20);
+      const result = await clientService.list(page, limit, {
+        includeArchived: query.includeArchived === 'true',
+      });
       reply.send(result);
     },
   });
@@ -112,6 +115,50 @@ export async function clientRoutes(app: FastifyInstance): Promise<void> {
         newValue: updated,
         ipAddress: request.ip,
       });
+      reply.send(updated);
+    },
+  });
+
+  /**
+   * Archive a client.
+   *
+   * Deliberately not a row delete. A client owns calls, transcripts, contacts,
+   * appointments and audit rows; destroying it would either cascade away the
+   * operating history the audit log exists to preserve, or fail on a foreign
+   * key halfway through and leave the tenant half-removed.
+   *
+   * Archiving sets status to 'inactive', which already excludes the client from
+   * routing and the default dashboard list, and is reversible with a PATCH.
+   */
+  app.delete<{ Params: { id: string } }>('/clients/:id', {
+    preHandler: requirePermission('clients:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      // Only platform staff may archive a tenant — a client admin archiving
+      // their own account would lock themselves out with no way back.
+      if (!isPlatformUser(user)) return reply.code(403).send({ error: 'Forbidden' });
+
+      const existing = await clientService.findById(request.params.id);
+      if (!existing) return reply.code(404).send({ error: 'Not found' });
+      if (existing.status === 'inactive') {
+        return reply.send({ ...existing, alreadyArchived: true });
+      }
+
+      const updated = await clientService.update(request.params.id, {
+        status: 'inactive',
+      } as Partial<Client>);
+
+      await writeAuditLog({
+        userId: user.sub,
+        clientId: request.params.id,
+        action: 'client.archived',
+        entityType: 'client',
+        entityId: request.params.id,
+        oldValue: { status: existing.status },
+        newValue: { status: 'inactive' },
+        ipAddress: request.ip,
+      });
+
       reply.send(updated);
     },
   });
