@@ -174,3 +174,10 @@ envVarGroups:
       # ---- Optional: error reporting. Unset disables Sentry entirely. ----
       - key: SENTRY_DSN
         sync: false
+      # ---- Optional: AI. Unset disables the assistant, the config copilot,
+      # call intelligence, and AI ticket drafting — each answers 503 with an
+      # explanation rather than failing boot. ----
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-5

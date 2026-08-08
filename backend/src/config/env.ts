@@ -107,6 +107,14 @@ const envSchema = z.object({
   RUN_WORKERS_IN_API: z.preprocess((v) => v === 'true' || v === '1', z.boolean()),
 
   SENTRY_DSN: z.string().optional(),
+
+  // Claude powers the dashboard assistant, the agent-config copilot, and
+  // per-call intelligence. Optional: unset disables every AI surface with a
+  // clear message rather than failing boot, so the console still runs without
+  // it. Model is overridable so a cost-sensitive deployment can drop a tier
+  // without a code change.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().default('claude-opus-5'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { FilterBar, type FilterSpec } from '@/components/FilterBar';
 import { SlaCountdown } from '@/components/SlaCountdown';
 import { StatusPill } from '@/components/StatusPill';
+import { TicketComposer } from '@/components/TicketComposer';
 import { useSession } from '@/lib/SessionProvider';
 import { statusColor, statusLabel, priorityColor, TICKET_PRIORITIES } from '@/lib/tickets';
 import { Bot } from 'lucide-react';
@@ -153,6 +154,16 @@ function SupportPageInner() {
         <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {breached} ticket{breached > 1 ? 's have' : ' has'} passed the first-response target without a reply.
         </div>
+      )}
+
+      {showForm && !isPlatform && (
+        <TicketComposer
+          onDraft={(draft) => {
+            setSubject(draft.subject);
+            setDescription(draft.description);
+            setPriority(draft.priority);
+          }}
+        />
       )}
 
       {showForm && !isPlatform && (
