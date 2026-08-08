@@ -50,7 +50,7 @@ export function InlineEditTable<T extends { id: string }>({
   const [saving, setSaving] = useState(false);
 
   const inputCls =
-    'w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+    'w-full rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25';
 
   const startEdit = (row: T) => {
     setCreating(false);
@@ -126,9 +126,9 @@ export function InlineEditTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-panel-200 bg-white">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-14 animate-pulse border-b border-gray-100 bg-gray-50 last:border-0" />
+          <div key={i} className="h-14 animate-pulse border-b border-panel-100 bg-panel-50 last:border-0" />
         ))}
       </div>
     );
@@ -136,11 +136,11 @@ export function InlineEditTable<T extends { id: string }>({
 
   return (
     <div>
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-panel-200 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">
+            <thead className="bg-panel-50">
+              <tr className="border-b border-panel-200 text-left text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
                 {fields.map((f) => (
                   <th key={f.key} scope="col" className="px-4 py-3" style={{ width: f.width }}>
                     {f.label}
@@ -153,7 +153,7 @@ export function InlineEditTable<T extends { id: string }>({
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-panel-100">
               {rows.map((row) =>
                 editingId === row.id ? (
                   <tr key={row.id} className="bg-primary-50/40">
@@ -168,12 +168,12 @@ export function InlineEditTable<T extends { id: string }>({
                     </td>
                   </tr>
                 ) : (
-                  <tr key={row.id} className="text-sm transition-colors hover:bg-gray-50">
+                  <tr key={row.id} className="text-sm transition-colors duration-150 hover:bg-panel-25">
                     {fields.map((f) => {
                       const value = (row as Record<string, unknown>)[f.key];
                       return (
-                        <td key={f.key} className="px-4 py-3 text-gray-800">
-                          {f.render ? f.render(value) : (value as ReactNode) ?? <span className="text-gray-400">—</span>}
+                        <td key={f.key} className="px-5 py-3.5 text-ink-800">
+                          {f.render ? f.render(value) : (value as ReactNode) ?? <span className="text-panel-400">—</span>}
                         </td>
                       );
                     })}
@@ -183,7 +183,7 @@ export function InlineEditTable<T extends { id: string }>({
                           type="button"
                           onClick={() => startEdit(row)}
                           aria-label="Edit row"
-                          className="cursor-pointer rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          className="cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                         >
                           <Pencil className="h-4 w-4" aria-hidden />
                         </button>
@@ -217,7 +217,7 @@ export function InlineEditTable<T extends { id: string }>({
 
               {rows.length === 0 && !creating && (
                 <tr>
-                  <td colSpan={fields.length + 1} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={fields.length + 1} className="px-5 py-10 text-center text-panel-500">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -231,7 +231,7 @@ export function InlineEditTable<T extends { id: string }>({
         <button
           type="button"
           onClick={startCreate}
-          className="mt-3 flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
         >
           <Plus className="h-4 w-4" aria-hidden /> Add
         </button>
@@ -257,7 +257,7 @@ function RowActions({ saving, onSave, onCancel }: { saving: boolean; onSave: () 
         onClick={onCancel}
         disabled={saving}
         aria-label="Cancel editing"
-        className="ml-1 cursor-pointer rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+        className="ml-1 cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
       >
         <X className="h-4 w-4" aria-hidden />
       </button>
