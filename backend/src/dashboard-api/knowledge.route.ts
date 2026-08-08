@@ -169,6 +169,134 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
     });
   }
 
+  /**
+   * Business policies — cancellation, deposits, insurance, parking, anything the
+   * agent must state verbatim rather than improvise.
+   *
+   * Unlike the four resources above these are not a table: they are a text array
+   * on client_settings that `renderPolicies()` reads straight into the prompt.
+   * They had no editor at all, so the only way to change what the agent said
+   * about a refund policy was a raw settings PATCH.
+   */
+  app.get<{ Querystring: { clientId?: string } }>('/knowledge/policies', {
+    preHandler: requirePermission('knowledge:read'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      const { data } = await supabase
+        .from('client_settings')
+        .select('business_policies')
+        .eq('client_id', clientId)
+        .maybeSingle();
+
+      reply.send({ data: (data as { business_policies: string[] | null } | null)?.business_policies ?? [] });
+    },
+  });
+
+  app.put<{ Querystring: { clientId?: string }; Body: unknown }>('/knowledge/policies', {
+    preHandler: requirePermission('knowledge:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      // Whole-list replace rather than per-item CRUD: policies are short, are
+      // reordered as often as they are edited, and have no stable id to patch.
+      const body = z
+        .object({ policies: z.array(z.string().min(1).max(1000)).max(50) })
+        .parse(request.body);
+
+      const { error } = await supabase
+        .from('client_settings')
+        .update({ business_policies: body.policies })
+        .eq('client_id', clientId);
+      if (error) return reply.code(400).send({ error: error.message });
+
+      await afterWrite(user, clientId, 'policies', 'updated', clientId, request.ip);
+      reply.send({ data: body.policies });
+    },
+  });
+
+  /**
+   * Opening hours.
+   *
+   * Stored inside `booking_rules.business_hours` because the booking service
+   * already reads availability from there — a second copy would let the hours
+   * the agent speaks drift from the hours it will actually book.
+   */
+  const hoursSchema = z.object({
+    tz: z.string().min(1),
+    weekly: z
+      .array(
+        z.object({
+          day: z.number().int().min(0).max(6),
+          open: z.string().regex(/^\d{2}:\d{2}$/),
+          close: z.string().regex(/^\d{2}:\d{2}$/),
+          closed: z.boolean().default(false),
+        })
+      )
+      .max(7),
+    exceptions: z
+      .array(
+        z.object({
+          date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          open: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+          close: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+          closed: z.boolean().default(false),
+        })
+      )
+      .default([]),
+  });
+
+  app.get<{ Querystring: { clientId?: string } }>('/knowledge/hours', {
+    preHandler: requirePermission('knowledge:read'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      const { data } = await supabase
+        .from('client_settings')
+        .select('booking_rules')
+        .eq('client_id', clientId)
+        .maybeSingle();
+
+      const rules = (data as { booking_rules: Record<string, unknown> | null } | null)?.booking_rules ?? {};
+      reply.send({ data: rules.business_hours ?? null });
+    },
+  });
+
+  app.put<{ Querystring: { clientId?: string }; Body: unknown }>('/knowledge/hours', {
+    preHandler: requirePermission('knowledge:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      const hours = hoursSchema.parse(request.body);
+
+      // Merge, never replace: booking_rules also carries buffers, lead times and
+      // qualification rules that this editor knows nothing about.
+      const { data: current } = await supabase
+        .from('client_settings')
+        .select('booking_rules')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      const existingRules = (current as { booking_rules: Record<string, unknown> | null } | null)?.booking_rules ?? {};
+
+      const { error } = await supabase
+        .from('client_settings')
+        .update({ booking_rules: { ...existingRules, business_hours: hours } })
+        .eq('client_id', clientId);
+      if (error) return reply.code(400).send({ error: error.message });
+
+      await afterWrite(user, clientId, 'hours', 'updated', clientId, request.ip);
+      reply.send({ data: hours });
+    },
+  });
+
   async function afterWrite(
     user: JwtPayload,
     clientId: string,

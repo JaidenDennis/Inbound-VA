@@ -154,3 +154,57 @@ export function extraInstructions(ctx: TemplateContext): string {
   const extra = ctx.settings.agent_prompt?.trim();
   return extra ? `\n\nADDITIONAL CLIENT INSTRUCTIONS:\n${extra}` : '';
 }
+
+/**
+ * The opening line, honouring a client's override.
+ *
+ * The greeting is the one piece of wording clients consistently want control of
+ * — it carries their brand and is the first thing every caller hears — while the
+ * body of the prompt stays ours. `{business}` and `{agent}` are substituted so
+ * an override survives a rename without being re-typed.
+ *
+ * With no override configured this returns the template's own line byte for
+ * byte, so an existing agent's greeting cannot shift under it.
+ */
+/**
+ * Client-tunable call feel, clamped to ranges that still produce a usable agent.
+ *
+ * These are the three knobs clients actually ask for after hearing their agent:
+ * how eagerly it replies, how readily it lets a caller cut in, and how much the
+ * voice varies. Left unset, each falls through to the template's own value, so
+ * this cannot change an agent nobody has tuned.
+ *
+ * Clamping is the point — Retell accepts 0..1 and the extremes are unusable
+ * (0 interruption sensitivity means the agent talks over everyone), so a client
+ * cannot configure their way into a broken call.
+ */
+export function voiceTuning(
+  ctx: TemplateContext,
+  defaults: { responsiveness: number; interruption_sensitivity: number; voice_temperature: number }
+): { responsiveness: number; interruption_sensitivity: number; voice_temperature: number } {
+  const cfg = ctx.settings.agent_config ?? {};
+  const clamp = (value: unknown, fallback: number, min: number, max: number): number => {
+    const n = typeof value === 'number' ? value : Number.NaN;
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  };
+
+  return {
+    responsiveness: clamp(cfg.responsiveness, defaults.responsiveness, 0.3, 1),
+    interruption_sensitivity: clamp(cfg.interruption_sensitivity, defaults.interruption_sensitivity, 0.3, 1),
+    voice_temperature: clamp(cfg.voice_temperature, defaults.voice_temperature, 0.2, 1.2),
+  };
+}
+
+export function applyGreeting(
+  ctx: TemplateContext,
+  names: { business: string; agentName: string },
+  fallback: string
+): string {
+  const raw = (ctx.settings.agent_config?.opening_message as string | undefined)?.trim();
+  if (!raw) return fallback;
+
+  return raw
+    .replace(/\{business\}/gi, names.business)
+    .replace(/\{agent\}/gi, names.agentName);
+}
