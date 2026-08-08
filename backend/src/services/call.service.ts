@@ -77,14 +77,38 @@ export class CallService {
     return summary as CallSummary;
   }
 
-  async list(clientId: string, page = 1, limit = 20): Promise<{ data: Call[]; count: number }> {
+  /**
+   * List calls, newest first.
+   *
+   * `clientId: null` is the platform-wide view — staff looking at every tenant
+   * at once. Client-scoped callers are pinned to their own id upstream, so a
+   * null here can only come from a platform user.
+   *
+   * The client name is joined in rather than fetched per row, so the calls list
+   * can say *whose* call it was without N+1 lookups.
+   */
+  async list(
+    clientId: string | null,
+    page = 1,
+    limit = 20,
+    q?: string
+  ): Promise<{ data: Call[]; count: number }> {
     const from = (page - 1) * limit;
-    const { data, count } = await supabase
+    let query = supabase
       .from('calls')
-      .select('*', { count: 'exact' })
-      .eq('client_id', clientId)
-      .order('started_at', { ascending: false })
-      .range(from, from + limit - 1);
+      .select('*, clients(id, name)', { count: 'exact' })
+      .order('started_at', { ascending: false });
+
+    if (clientId) query = query.eq('client_id', clientId);
+
+    // Search server-side: the client list can run to thousands of rows, and
+    // filtering in the browser only ever searches the page already loaded.
+    if (q?.trim()) {
+      const term = `%${q.trim()}%`;
+      query = query.or(`from_number.ilike.${term},to_number.ilike.${term},status.ilike.${term}`);
+    }
+
+    const { data, count } = await query.range(from, from + limit - 1);
     return { data: (data ?? []) as Call[], count: count ?? 0 };
   }
 

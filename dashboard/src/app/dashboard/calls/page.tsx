@@ -1,132 +1,212 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Phone, Search, Download } from 'lucide-react';
+import { Phone, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
-import { Badge } from '@/components/Badge';
+import { StatusPill, type Tone } from '@/components/StatusPill';
+import { Table, TableEmpty, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
+
+/**
+ * The staff call log — every tenant at once.
+ *
+ * This page rendered empty for staff for a long time: `/admin/calls` demanded a
+ * clientId, staff have none, so the request 400'd and the table drew an empty
+ * state that read as "no calls happened". The endpoint now treats an unnamed
+ * client as the estate view, and this page shows *whose* call each row was.
+ */
 
 interface Call {
   id: string;
-  from_number: string;
-  to_number: string;
+  from_number: string | null;
+  to_number: string | null;
   status: string;
   duration_seconds: number | null;
-  started_at: string;
+  started_at: string | null;
   client_id: string;
+  /** Joined by the API so the estate view can name the tenant. */
+  clients?: { id: string; name: string } | null;
 }
 
-export default function CallsPage() {
+const STATUS_TONES: Record<string, Tone> = {
+  completed: 'success',
+  in_progress: 'pending',
+  failed: 'error',
+  transferred: 'warning',
+  no_answer: 'warning',
+};
+
+/** Numbers arrive E.164 and are unreadable as one run of digits at a glance. */
+function formatNumber(raw: string | null): string {
+  if (!raw) return '—';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return raw;
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds == null) return '—';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function CallsPageInner() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
 
-  useEffect(() => {
+  const load = useCallback((q: string) => {
+    setError('');
     api
-      .get('/admin/calls')
+      .get('/admin/calls', { params: q.trim() ? { q: q.trim() } : {} })
       .then((r) => {
         setCalls(r.data.data ?? []);
         setTotal(r.data.count ?? 0);
       })
+      .catch((e) => setError(e?.response?.data?.error ?? 'Could not load calls'))
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredCalls = calls.filter(
-    (call) =>
-      call.from_number.includes(searchQuery) ||
-      call.to_number.includes(searchQuery) ||
-      call.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Search runs on the server, so it covers every call rather than the page
+  // already in memory. Debounced so typing does not fire a request per key.
+  useEffect(() => {
+    const t = setTimeout(() => load(query), query ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [query, load]);
 
-  const statusVariantMap: Record<string, 'success' | 'primary' | 'warning' | 'error' | 'gray'> = {
-    completed: 'success',
-    in_progress: 'primary',
-    failed: 'error',
-    transferred: 'warning',
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <div className="h-12 bg-gray-200 rounded-lg w-1/3 animate-pulse" />
-        <div className="h-64 bg-gray-200 rounded-lg animate-pulse" />
-      </div>
-    );
-  }
+  const searching = query.trim().length > 0;
 
   return (
     <div>
       <PageHeader
         title="Calls"
-        description="View and manage all inbound voice calls"
+        description="Every inbound call across all clients, newest first."
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Calls' }]}
-        action={
-          <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2 cursor-pointer">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-        }
       />
 
-      {/* Search */}
-      <div className="mb-6 relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search by phone number or status..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-        />
+      <div className="mb-4 rounded-xl border border-panel-200 bg-white p-4">
+        <label htmlFor="call-search" className="mb-1.5 block text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
+          Search
+        </label>
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-panel-400" aria-hidden />
+          <input
+            id="call-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Phone number or status"
+            className="w-full rounded-md border border-panel-300 bg-white py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+          />
+        </div>
       </div>
 
-      {/* Data Table */}
-      <div className="overflow-hidden rounded-xl border border-panel-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">From</th>
-                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">To</th>
-                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Status</th>
-                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Duration</th>
-                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Started</th>
-                <th className="text-left px-6 py-4 font-semibold text-gray-700 uppercase tracking-wide text-xs">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredCalls.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors duration-150">
-                  <td className="px-6 py-4 font-mono text-gray-900">{c.from_number}</td>
-                  <td className="px-6 py-4 font-mono text-gray-900">{c.to_number}</td>
-                  <td className="px-6 py-4">
-                    <Badge label={c.status} variant={statusVariantMap[c.status] ?? 'gray'} size="md" />
-                  </td>
-                  <td className="px-6 py-4 text-gray-700">
-                    {c.duration_seconds != null ? `${Math.floor(c.duration_seconds / 60)}m ${c.duration_seconds % 60}s` : '—'}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">{new Date(c.started_at).toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <Link href={`/dashboard/calls/${c.id}`} className="text-primary-600 hover:text-primary-700 font-medium transition-colors cursor-pointer">
-                      View
-                    </Link>
-                  </td>
+      {error && (
+        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <TableShell>
+          <Table caption="Loading calls">
+            <THead>
+              <TH>Client</TH><TH>From</TH><TH>To</TH><TH>Status</TH><TH>Duration</TH><TH>Started</TH>
+            </THead>
+            <tbody aria-hidden className="divide-y divide-panel-100">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <td key={j} className="px-5 py-4">
+                      <div className="h-3.5 w-3/5 animate-pulse rounded bg-panel-200" />
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
-      </div>
+          </Table>
+        </TableShell>
+      ) : calls.length === 0 ? (
+        <TableEmpty
+          icon={<Phone className="h-8 w-8 text-panel-300" aria-hidden />}
+          title={searching ? 'Nothing matched that search' : 'No calls recorded yet'}
+          body={
+            searching
+              ? 'Try a partial number, or clear the search to see every call.'
+              : 'Calls appear here once a caller reaches an agent with a phone number mapped to it.'
+          }
+        />
+      ) : (
+        <>
+          <TableShell>
+            <Table caption="Inbound calls across all clients">
+              <THead sticky>
+                <TH>Client</TH>
+                <TH>From</TH>
+                <TH>To</TH>
+                <TH>Status</TH>
+                <TH align="right">Duration</TH>
+                <TH>Started</TH>
+                <TH srOnly>Actions</TH>
+              </THead>
+              <TBody>
+                {calls.map((c) => (
+                  <TR key={c.id}>
+                    <TD>
+                      {c.clients?.name ? (
+                        <Link
+                          href={`/dashboard/clients/${c.client_id}`}
+                          className="font-medium text-signal-700 underline decoration-signal-200 underline-offset-2 transition-colors hover:decoration-signal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                        >
+                          {c.clients.name}
+                        </Link>
+                      ) : (
+                        <span className="text-panel-400">Unknown</span>
+                      )}
+                    </TD>
+                    <TD mono>{formatNumber(c.from_number)}</TD>
+                    <TD mono>{formatNumber(c.to_number)}</TD>
+                    <TD>
+                      <StatusPill tone={STATUS_TONES[c.status] ?? 'neutral'} label={c.status.replace(/_/g, ' ')} />
+                    </TD>
+                    <TD align="right" numeric>{formatDuration(c.duration_seconds)}</TD>
+                    <TD className="whitespace-nowrap text-panel-600">
+                      {c.started_at ? new Date(c.started_at).toLocaleString() : '—'}
+                    </TD>
+                    <TD align="right">
+                      <Link
+                        href={`/dashboard/calls/${c.id}`}
+                        className="rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                      >
+                        View
+                      </Link>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
 
-      {filteredCalls.length === 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <Phone className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg">No calls found</p>
-          <p className="text-gray-400 text-sm mt-1">Try adjusting your search filters or check back soon</p>
-        </div>
+          <p className="mt-3 text-xs text-panel-500" role="status">
+            Showing {calls.length} of {total} call{total === 1 ? '' : 's'}
+            {searching && ' matching this search'}.
+          </p>
+        </>
       )}
     </div>
+  );
+}
+
+export default function CallsPage() {
+  return (
+    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+      <CallsPageInner />
+    </Suspense>
   );
 }

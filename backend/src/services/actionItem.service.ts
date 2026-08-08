@@ -24,6 +24,19 @@ export class ActionItemService {
     return (data ?? []) as ClientActionItem[];
   }
 
+  /**
+   * Every client's outstanding items — the staff view of "who owes us what".
+   * Client name is joined so the list is readable without a second lookup.
+   */
+  async listAllForPlatform(): Promise<ClientActionItem[]> {
+    const { data } = await supabase
+      .from('client_action_items')
+      .select('*, clients(id, name)')
+      .order('status', { ascending: true })
+      .order('created_at', { ascending: true });
+    return (data ?? []) as ClientActionItem[];
+  }
+
   async findById(id: string): Promise<ClientActionItem | null> {
     const { data } = await supabase.from('client_action_items').select('*').eq('id', id).maybeSingle();
     return data as ClientActionItem | null;

@@ -20,10 +20,16 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
       const clientId = user.clientId ?? request.query.clientId;
-      if (!clientId) return reply.code(400).send({ error: 'clientId is required' });
+      // Staff who named no client get the estate rollup instead of a 400 —
+      // there is no single tenant to scope them to, and the page has to draw
+      // something.
+      if (!clientId) {
+        if (!isPlatformUser(user)) return reply.code(403).send({ error: 'Forbidden' });
+        return reply.send({ scope: 'platform', data: await onboardingService.listAllForPlatform() });
+      }
       if (!assertClientAccess(user, clientId)) return reply.code(403).send({ error: 'Forbidden' });
       const milestones = await onboardingService.listForClient(clientId);
-      reply.send({ data: milestones });
+      reply.send({ scope: 'client', data: milestones });
     },
   });
 
