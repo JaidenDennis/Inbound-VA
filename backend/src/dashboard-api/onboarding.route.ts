@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { onboardingService, writeAuditLog } from '../services/index.js';
+import { onboardingService, withAudit } from '../services/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
 import { ONBOARDING_STAGES, ONBOARDING_STATUSES } from '../types/index.js';
 import type { JwtPayload, OnboardingStageKey, OnboardingStatus } from '../types/index.js';
@@ -43,20 +43,17 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'Unknown stage' });
       }
       const body = updateSchema.parse(request.body);
-      const milestone = await onboardingService.updateStage(
-        body.clientId,
-        request.params.stageKey as OnboardingStageKey,
-        body.status as OnboardingStatus
-      );
-      await writeAuditLog({
-        userId: user.sub,
-        clientId: body.clientId,
+      const stageKey = request.params.stageKey as OnboardingStageKey;
+
+      const milestone = await withAudit({
+        actor: { userId: user.sub, clientId: body.clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
         action: 'onboarding.stage.updated',
         entityType: 'onboarding_milestone',
-        entityId: milestone.id,
-        newValue: { stage_key: milestone.stage_key, status: milestone.status },
-        ipAddress: request.ip,
+        before: async () =>
+          (await onboardingService.listForClient(body.clientId)).find((m) => m.stage_key === stageKey) ?? null,
+        mutate: () => onboardingService.updateStage(body.clientId, stageKey, body.status as OnboardingStatus),
       });
+
       reply.send(milestone);
     },
   });

@@ -6,6 +6,7 @@ import { AlertTriangle, Calendar, Database, Link2, Lock, RefreshCw } from 'lucid
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusPill } from '@/components/StatusPill';
+import { LampStatus, type LampLevel } from '@/components/StatusLamp';
 import { ClientPicker, ChooseClientPrompt, useClientScope } from '@/components/ClientPicker';
 import { useSession } from '@/lib/SessionProvider';
 import { GhlSettingsPanel } from './GhlSettingsPanel';
@@ -166,12 +167,66 @@ function ConnectionCard({
   );
 }
 
+interface ChannelHealth {
+  id: string;
+  label: string;
+  status: 'ok' | 'failing' | 'stalled' | 'never';
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  note: string;
+}
+
+/**
+ * A stored credential is not evidence that anything works.
+ *
+ * `connected` says someone authenticated once, possibly in January. These lamps
+ * read the event stream instead, so a token that quietly stopped working shows
+ * as bad rather than as a green tick above a silent integration.
+ *
+ * `never` is deliberately an unlit lamp, not a red one: an integration nobody
+ * has used yet is not broken, and colouring it as a fault trains people to
+ * ignore the ones that are.
+ */
+const HEALTH_LEVEL: Record<ChannelHealth['status'], { level: LampLevel; live?: boolean }> = {
+  ok: { level: 'good' },
+  failing: { level: 'bad', live: true },
+  stalled: { level: 'fair' },
+  never: { level: 'off' },
+};
+
+function HealthStrip({ health }: { health: ChannelHealth[] }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
+        Is it working
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {health.map((c) => {
+          const { level, live } = HEALTH_LEVEL[c.status];
+          return (
+            <div key={c.id} className="rounded-xl border border-panel-200 bg-white p-4">
+              <LampStatus level={level} live={live} label={c.label} />
+              <p className="mt-1.5 text-xs leading-relaxed text-panel-600">{c.note}</p>
+              {c.lastSuccessAt && (
+                <p className="mt-1 text-2xs text-panel-500">
+                  Last succeeded {new Date(c.lastSuccessAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ConnectionsInner() {
   const { can } = useSession();
   const canWrite = can('crm:write');
   const { clientId, needsChoice, ready } = useClientScope();
 
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [health, setHealth] = useState<ChannelHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -181,7 +236,10 @@ function ConnectionsInner() {
     setError('');
     api
       .get('/connections', { params: { clientId } })
-      .then((r) => setConnections(r.data.data ?? []))
+      .then((r) => {
+        setConnections(r.data.data ?? []);
+        setHealth(r.data.health ?? []);
+      })
       .catch((e) => setError(e?.response?.data?.error ?? 'Could not load connections'))
       .finally(() => setLoading(false));
   }, [clientId]);
@@ -237,6 +295,8 @@ function ConnectionsInner() {
         </div>
       ) : (
         <div className="space-y-8">
+          {health.length > 0 && <HealthStrip health={health} />}
+
           <section>
             <h2 className="mb-3 text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
               CRM

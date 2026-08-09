@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePlatform } from '../middleware/index.js';
-import { clientService, agentSyncService, provisioningService, writeAuditLog } from '../services/index.js';
+import { clientService, agentSyncService, provisioningService, withAudit } from '../services/index.js';
 import { listVerticals } from '../providers/retell/templates/index.js';
 import type { JwtPayload } from '../types/index.js';
 
@@ -142,41 +142,45 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
 
       const client = await clientService.findById(request.params.id);
       if (!client) return reply.code(404).send({ error: 'Client not found' });
-      const before = await clientService.getSettings(request.params.id);
 
       // Split the payload: some fields live on `clients`, the rest on
       // `client_settings`. business_hours is folded into booking_rules rather
       // than getting its own column — the booking service already reads there.
       const { voice_id, phone_numbers, business_hours, booking_rules, ...settingsPatch } = body;
 
-      if (Object.keys(settingsPatch).length > 0 || business_hours || booking_rules) {
-        const mergedBookingRules = {
-          ...((before?.booking_rules as unknown as Record<string, unknown>) ?? {}),
-          ...(booking_rules ?? {}),
-          ...(business_hours ? { business_hours } : {}),
-        };
-        await clientService.updateSettings(request.params.id, {
-          ...settingsPatch,
-          ...(business_hours || booking_rules ? { booking_rules: mergedBookingRules } : {}),
-        } as Parameters<typeof clientService.updateSettings>[1]);
-      }
-
-      if (voice_id !== undefined || phone_numbers !== undefined) {
-        await clientService.update(request.params.id, {
-          ...(voice_id !== undefined ? { retell_voice_id: voice_id } : {}),
-          ...(phone_numbers !== undefined ? { phone_numbers } : {}),
-        });
-      }
-
-      await writeAuditLog({
-        userId: actor.sub,
-        clientId: request.params.id,
+      await withAudit({
+        actor: { userId: actor.sub, clientId: request.params.id, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
         action: 'agent.config.updated',
         entityType: 'client',
         entityId: request.params.id,
-        oldValue: before as unknown as Record<string, unknown>,
-        newValue: body,
-        ipAddress: request.ip,
+        before: () => clientService.getSettings(request.params.id),
+        mutate: async () => {
+          const before = await clientService.getSettings(request.params.id);
+
+          if (Object.keys(settingsPatch).length > 0 || business_hours || booking_rules) {
+            const mergedBookingRules = {
+              ...((before?.booking_rules as unknown as Record<string, unknown>) ?? {}),
+              ...(booking_rules ?? {}),
+              ...(business_hours ? { business_hours } : {}),
+            };
+            await clientService.updateSettings(request.params.id, {
+              ...settingsPatch,
+              ...(business_hours || booking_rules ? { booking_rules: mergedBookingRules } : {}),
+            } as Parameters<typeof clientService.updateSettings>[1]);
+          }
+
+          if (voice_id !== undefined || phone_numbers !== undefined) {
+            await clientService.update(request.params.id, {
+              ...(voice_id !== undefined ? { retell_voice_id: voice_id } : {}),
+              ...(phone_numbers !== undefined ? { phone_numbers } : {}),
+            });
+          }
+
+          // The resulting settings, not the patch that produced them. A patch
+          // records intent; the audit trail has to record state, or "what did
+          // this look like before Tuesday" stays unanswerable.
+          return clientService.getSettings(request.params.id);
+        },
       });
 
       await agentSyncService.requestSync(request.params.id, { userId: actor.sub });
@@ -250,19 +254,23 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       const { id: _id, client_id: _clientId, created_at: _createdAt, updated_at: _updatedAt, ...restorable } =
         row.settings_snapshot;
 
-      await clientService.updateSettings(
-        request.params.id,
-        restorable as Parameters<typeof clientService.updateSettings>[1]
-      );
-
-      await writeAuditLog({
-        userId: actor.sub,
-        clientId: request.params.id,
+      // The audit carries the full before and after, not just the version
+      // number. A restore is the most destructive configuration action in the
+      // product — it overwrites every field at once — and "restored to v7" does
+      // not tell anyone what v7 replaced.
+      await withAudit({
+        actor: { userId: actor.sub, clientId: request.params.id, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
         action: 'agent.config.restored',
         entityType: 'client',
         entityId: request.params.id,
-        newValue: { version: row.version },
-        ipAddress: request.ip,
+        before: () => clientService.getSettings(request.params.id),
+        mutate: async () => {
+          await clientService.updateSettings(
+            request.params.id,
+            restorable as Parameters<typeof clientService.updateSettings>[1]
+          );
+          return clientService.getSettings(request.params.id);
+        },
       });
 
       await agentSyncService.requestSync(request.params.id, { userId: actor.sub, immediate: true });

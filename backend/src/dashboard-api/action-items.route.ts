@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { actionItemService, writeAuditLog } from '../services/index.js';
+import { actionItemService, writeAuditLog, withAudit } from '../services/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
 import { ACTION_ITEM_STATUSES } from '../types/index.js';
 import type { JwtPayload, ActionItemStatus } from '../types/index.js';
@@ -46,21 +46,23 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
       const user = request.user as JwtPayload;
       if (!isPlatformUser(user)) return reply.code(403).send({ error: 'Forbidden' });
       const body = createSchema.parse(request.body);
-      const item = await actionItemService.create({
-        clientId: body.clientId,
-        title: body.title,
-        description: body.description,
-        createdBy: user.sub,
-      });
-      await writeAuditLog({
-        userId: user.sub,
-        clientId: body.clientId,
+
+      const item = await withAudit({
+        actor: { userId: user.sub, clientId: body.clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
         action: 'action_item.created',
         entityType: 'client_action_item',
-        entityId: item.id,
-        newValue: { title: item.title },
-        ipAddress: request.ip,
+        // Nothing existed before a create. Stated explicitly rather than left to
+        // the wrapper's default so the null is a decision, not an omission.
+        before: async () => null,
+        mutate: () =>
+          actionItemService.create({
+            clientId: body.clientId,
+            title: body.title,
+            description: body.description,
+            createdBy: user.sub,
+          }),
       });
+
       reply.code(201).send(item);
     },
   });

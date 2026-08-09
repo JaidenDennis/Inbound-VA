@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePermission, assertClientAccess } from '../middleware/index.js';
-import { agentSyncService, writeAuditLog } from '../services/index.js';
+import { agentSyncService, writeAuditLog, withAudit } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -98,15 +98,30 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
 
         const body = config.schema.parse(request.body);
-        const { data, error } = await supabase
-          .from(config.table)
-          .insert({ ...body, client_id: clientId })
-          .select()
-          .single();
-        if (error) return reply.code(400).send({ error: error.message });
 
-        await afterWrite(user, clientId, name, 'created', (data as { id: string }).id, request.ip);
-        reply.code(201).send(data);
+        let created: Record<string, unknown>;
+        try {
+          created = await withAudit<Record<string, unknown> | null>({
+            actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+            action: `knowledge.${name}.created`,
+            entityType: name,
+            before: async () => null,
+            mutate: async () => {
+              const { data, error } = await supabase
+                .from(config.table)
+                .insert({ ...body, client_id: clientId })
+                .select()
+                .single();
+              if (error) throw new Error(error.message);
+              return data as Record<string, unknown>;
+            },
+          }) as Record<string, unknown>;
+        } catch (err) {
+          return reply.code(400).send({ error: (err as Error).message });
+        }
+
+        await afterWrite(clientId, user.sub);
+        reply.code(201).send(created);
       },
     });
 
@@ -116,10 +131,12 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         const user = request.user as JwtPayload;
 
         // Read the row first: the tenant check has to be against the row's own
-        // client_id, not one supplied by the caller.
+        // client_id, not one supplied by the caller. The whole row rather than
+        // just client_id, because it is also the `before` the audit records —
+        // "someone changed a price" is not an answer without the old price.
         const { data: existing } = await supabase
           .from(config.table)
-          .select('client_id')
+          .select('*')
           .eq('id', request.params.id)
           .maybeSingle();
         if (!existing) return reply.code(404).send({ error: 'Not found' });
@@ -128,16 +145,32 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         if (!assertClientAccess(user, rowClientId)) return reply.code(403).send({ error: 'Forbidden' });
 
         const body = config.schema.partial().parse(request.body);
-        const { data, error } = await supabase
-          .from(config.table)
-          .update({ ...body, updated_at: new Date().toISOString() })
-          .eq('id', request.params.id)
-          .select()
-          .single();
-        if (error) return reply.code(400).send({ error: error.message });
 
-        await afterWrite(user, rowClientId, name, 'updated', request.params.id, request.ip);
-        reply.send(data);
+        let updated: Record<string, unknown>;
+        try {
+          updated = await withAudit<Record<string, unknown> | null>({
+            actor: { userId: user.sub, clientId: rowClientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+            action: `knowledge.${name}.updated`,
+            entityType: name,
+            entityId: request.params.id,
+            before: async () => existing as Record<string, unknown>,
+            mutate: async () => {
+              const { data, error } = await supabase
+                .from(config.table)
+                .update({ ...body, updated_at: new Date().toISOString() })
+                .eq('id', request.params.id)
+                .select()
+                .single();
+              if (error) throw new Error(error.message);
+              return data as Record<string, unknown>;
+            },
+          }) as Record<string, unknown>;
+        } catch (err) {
+          return reply.code(400).send({ error: (err as Error).message });
+        }
+
+        await afterWrite(rowClientId, user.sub);
+        reply.send(updated);
       },
     });
 
@@ -147,7 +180,7 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         const user = request.user as JwtPayload;
         const { data: existing } = await supabase
           .from(config.table)
-          .select('client_id')
+          .select('*')
           .eq('id', request.params.id)
           .maybeSingle();
         if (!existing) return reply.code(404).send({ error: 'Not found' });
@@ -155,15 +188,31 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         const rowClientId = (existing as { client_id: string }).client_id;
         if (!assertClientAccess(user, rowClientId)) return reply.code(403).send({ error: 'Forbidden' });
 
-        // Soft delete: the agent stops using it, but history and any prompt
-        // version that referenced it stay coherent.
-        const { error } = await supabase
-          .from(config.table)
-          .update({ active: false, updated_at: new Date().toISOString() })
-          .eq('id', request.params.id);
-        if (error) return reply.code(400).send({ error: error.message });
+        try {
+          await withAudit<Record<string, unknown> | null>({
+            actor: { userId: user.sub, clientId: rowClientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+            action: `knowledge.${name}.deactivated`,
+            entityType: name,
+            entityId: request.params.id,
+            // The full row, so a deactivated FAQ can be reconstructed from the
+            // audit trail alone if someone needs it back.
+            before: async () => existing as Record<string, unknown>,
+            mutate: async () => {
+              // Soft delete: the agent stops using it, but history and any prompt
+              // version that referenced it stay coherent.
+              const { error } = await supabase
+                .from(config.table)
+                .update({ active: false, updated_at: new Date().toISOString() })
+                .eq('id', request.params.id);
+              if (error) throw new Error(error.message);
+              return { ...(existing as Record<string, unknown>), active: false };
+            },
+          });
+        } catch (err) {
+          return reply.code(400).send({ error: (err as Error).message });
+        }
 
-        await afterWrite(user, rowClientId, name, 'deactivated', request.params.id, request.ip);
+        await afterWrite(rowClientId, user.sub);
         reply.send({ ok: true });
       },
     });
@@ -208,13 +257,34 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         .object({ policies: z.array(z.string().min(1).max(1000)).max(50) })
         .parse(request.body);
 
-      const { error } = await supabase
-        .from('client_settings')
-        .update({ business_policies: body.policies })
-        .eq('client_id', clientId);
-      if (error) return reply.code(400).send({ error: error.message });
+      try {
+        await withAudit<{ business_policies: string[] }>({
+          actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'knowledge.policies.updated',
+          entityType: 'client_settings',
+          entityId: clientId,
+          before: async () => {
+            const { data } = await supabase
+              .from('client_settings')
+              .select('business_policies')
+              .eq('client_id', clientId)
+              .maybeSingle();
+            return { business_policies: (data as { business_policies: string[] | null } | null)?.business_policies ?? [] };
+          },
+          mutate: async () => {
+            const { error } = await supabase
+              .from('client_settings')
+              .update({ business_policies: body.policies })
+              .eq('client_id', clientId);
+            if (error) throw new Error(error.message);
+            return { business_policies: body.policies };
+          },
+        });
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message });
+      }
 
-      await afterWrite(user, clientId, 'policies', 'updated', clientId, request.ip);
+      await afterWrite(clientId, user.sub);
       reply.send({ data: body.policies });
     },
   });
@@ -356,13 +426,31 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
       const existingRules = (current as { booking_rules: Record<string, unknown> | null } | null)?.booking_rules ?? {};
 
       const stored = toStored(hours);
-      const { error } = await supabase
-        .from('client_settings')
-        .update({ booking_rules: { ...existingRules, ...stored } })
-        .eq('client_id', clientId);
-      if (error) return reply.code(400).send({ error: error.message });
 
-      await afterWrite(user, clientId, 'hours', 'updated', clientId, request.ip);
+      try {
+        await withAudit<Record<string, unknown>>({
+          actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'knowledge.hours.updated',
+          entityType: 'client_settings',
+          entityId: clientId,
+          // Only the hours keys, not all of booking_rules: an audit row that
+          // repeats the buffers and qualification rules on every hours edit
+          // makes the change itself harder to find.
+          before: async () => ({ working_hours: existingRules.working_hours ?? null }),
+          mutate: async () => {
+            const { error } = await supabase
+              .from('client_settings')
+              .update({ booking_rules: { ...existingRules, ...stored } })
+              .eq('client_id', clientId);
+            if (error) throw new Error(error.message);
+            return stored as Record<string, unknown>;
+          },
+        });
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message });
+      }
+
+      await afterWrite(clientId, user.sub);
 
       // Report what was actually persisted, not what was posted. A partial-day
       // exception (open late on the 24th) has nowhere to live in the canonical
@@ -378,22 +466,17 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
-  async function afterWrite(
-    user: JwtPayload,
-    clientId: string,
-    resource: string,
-    action: string,
-    entityId: string,
-    ip: string
-  ): Promise<void> {
-    await writeAuditLog({
-      userId: user.sub,
-      clientId,
-      action: `knowledge.${resource}.${action}`,
-      entityType: resource,
-      entityId,
-      ipAddress: ip,
-    });
-    await agentSyncService.requestSync(clientId, { userId: user.sub });
+  /**
+   * Push a knowledge change to the live agent.
+   *
+   * The audit half of this used to live here too, which meant every knowledge
+   * write recorded a verb and an id and nothing else — enough to say a price
+   * changed, not enough to say what it changed from. The routes now go through
+   * `withAudit` with the real before/after row, and this is left with the one job
+   * it was always doing: without the re-provision the row changes and the agent
+   * keeps quoting the old answer.
+   */
+  async function afterWrite(clientId: string, userId: string): Promise<void> {
+    await agentSyncService.requestSync(clientId, { userId });
   }
 }

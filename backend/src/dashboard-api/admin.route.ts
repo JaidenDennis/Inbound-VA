@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { supabase } from '../db/index.js';
 import { allQueues } from '../queues/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser, resolveClientScope } from '../middleware/index.js';
-import { callService } from '../services/index.js';
+import { callService, auditTranscriptView } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
@@ -64,23 +64,60 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
-  // Call detail with transcript + summary — tenant-checked
+  /**
+   * Call detail — tenant-checked, and split on `transcripts:read`.
+   *
+   * The transcript and summary are withheld from a caller who only holds
+   * `calls:read`. This route used to return both on `calls:read` alone, which
+   * quietly handed every transcript to `client_viewer` — the one client role
+   * deliberately denied `transcripts:read` (migration 016), and the boundary
+   * `/reports/calls/:id/transcript` enforces two files away. Same data, two
+   * routes, two different answers; this one was wrong.
+   *
+   * The call metadata stays available to `calls:read`, so the read-only
+   * compliance role can still see that a call happened, its duration and its
+   * outcome — just not what was said, which is exactly the split the role exists
+   * to express.
+   */
   app.get<{ Params: { id: string } }>('/admin/calls/:id', {
     preHandler: requirePermission('calls:read'),
     handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
       const { data: call } = await supabase.from('calls').select('*').eq('id', request.params.id).maybeSingle();
       if (!call) return reply.code(404).send({ error: 'Not found' });
-      if (!assertClientAccess(request.user as JwtPayload, call.client_id)) {
+      if (!assertClientAccess(user, call.client_id)) {
         return reply.code(403).send({ error: 'Forbidden' });
       }
 
+      const mayReadTranscript = request.jwtPermissions?.has('transcripts:read') ?? false;
+
       const [transcript, summary, conversation] = await Promise.all([
-        callService.getTranscript(call.id),
-        callService.getSummary(call.id),
+        mayReadTranscript ? callService.getTranscript(call.id) : Promise.resolve(null),
+        mayReadTranscript ? callService.getSummary(call.id) : Promise.resolve(null),
         supabase.from('conversations').select('*').eq('call_id', call.id).maybeSingle().then(r => r.data),
       ]);
 
-      reply.send({ call, transcript, summary, conversation });
+      // One row per transcript actually opened — the access record §2.5 asks
+      // for. Not written when the transcript was withheld, because nothing was
+      // disclosed.
+      if (mayReadTranscript && transcript) {
+        await auditTranscriptView(
+          { userId: user.sub, clientId: call.client_id, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          (transcript as { id?: string }).id ?? call.id,
+          call.id
+        );
+      }
+
+      reply.send({
+        call,
+        transcript,
+        summary,
+        conversation,
+        // Stated rather than silently absent: a UI showing an empty transcript
+        // pane cannot otherwise tell "no transcript exists" from "you may not
+        // read it", and would render the wrong empty state for both.
+        ...(mayReadTranscript ? {} : { transcriptWithheld: 'Requires the transcripts:read permission.' }),
+      });
     },
   });
 

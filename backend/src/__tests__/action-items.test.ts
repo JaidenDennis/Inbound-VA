@@ -8,10 +8,20 @@ const svc = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   writeAuditLog: vi.fn(),
+  /**
+   * Stands in for the real `withAudit`, preserving the ordering the route
+   * depends on: read the prior state, mutate, then log. A stub that only called
+   * `mutate` would let a route drop its `before` and still pass.
+   */
+  withAudit: vi.fn(async (opts: { before: () => Promise<unknown>; mutate: () => Promise<unknown> }) => {
+    await opts.before();
+    return opts.mutate();
+  }),
 }));
 vi.mock('../services/index.js', () => ({
   actionItemService: { findById: svc.findById, create: svc.create, update: svc.update },
   writeAuditLog: svc.writeAuditLog,
+  withAudit: svc.withAudit,
 }));
 // requirePermission resolves grants from the database; serve them from the
 // migration instead so route tests stay offline.

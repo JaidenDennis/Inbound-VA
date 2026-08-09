@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
-import { writeAuditLog } from '../services/index.js';
+import { writeAuditLog, auditTranscriptView } from '../services/index.js';
 import { isAiConfigured } from '../ai/claude.client.js';
 import { askAssistant } from '../ai/assistant.service.js';
 import { draftFaqs, draftGreetings } from '../ai/copilot.service.js';
@@ -167,6 +167,21 @@ export async function aiRoutes(app: FastifyInstance): Promise<void> {
             .code(422)
             .send({ error: 'This call has no transcript yet, so there is nothing to analyse.' });
         }
+
+        // Analysing a transcript is still reading it — the content goes to a
+        // model and comes back as prose about what the caller said. The access
+        // record does not care which of those the user asked for.
+        await auditTranscriptView(
+          {
+            userId: user.sub,
+            clientId: (call as { client_id: string }).client_id,
+            ipAddress: request.ip,
+            userAgent: request.headers['user-agent'],
+          },
+          request.params.id,
+          request.params.id
+        );
+
         reply.send(analysis);
       } catch (err) {
         request.log.error({ err }, 'Call analysis failed');

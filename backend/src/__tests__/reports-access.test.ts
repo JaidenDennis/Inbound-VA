@@ -78,6 +78,10 @@ vi.mock('../services/index.js', () => ({
     getVolume: vi.fn().mockResolvedValue([]),
     getOutcomes: vi.fn().mockResolvedValue([]),
   },
+  // Every transcript read writes an access record (spec §2.5). Asserted below
+  // rather than merely stubbed — the audit row is the compliance answer, so a
+  // route that stopped writing it should fail here.
+  auditTranscriptView: vi.fn().mockResolvedValue(undefined),
 }));
 
 const { reportRoutes } = await import('../dashboard-api/reports.route.js');
@@ -118,6 +122,43 @@ describe('transcript access', () => {
       headers: { authorization: `Bearer ${token(app, 'client_manager', CLIENT)}` },
     });
     expect(res.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('records who read the transcript', async () => {
+    // The access record IS the deliverable here: for the medical tenants, "who
+    // has read this caller's transcript" is a question with a compliance answer,
+    // and it only has one if the row is written at read time.
+    const { auditTranscriptView } = await import('../services/index.js');
+    vi.mocked(auditTranscriptView).mockClear();
+
+    const app = await buildApp();
+    await app.inject({
+      method: 'GET',
+      url: '/reports/calls/call-log-1/transcript',
+      headers: { authorization: `Bearer ${token(app, 'client_owner', CLIENT)}` },
+    });
+
+    expect(auditTranscriptView).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(auditTranscriptView).mock.calls[0][0]).toMatchObject({
+      userId: 'u-client_owner',
+      clientId: CLIENT,
+    });
+    await app.close();
+  });
+
+  it('does not record an access when the transcript is refused', async () => {
+    const { auditTranscriptView } = await import('../services/index.js');
+    vi.mocked(auditTranscriptView).mockClear();
+
+    const app = await buildApp();
+    await app.inject({
+      method: 'GET',
+      url: '/reports/calls/call-log-1/transcript',
+      headers: { authorization: `Bearer ${token(app, 'client_viewer', CLIENT)}` },
+    });
+
+    expect(auditTranscriptView).not.toHaveBeenCalled();
     await app.close();
   });
 

@@ -1,8 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { supabase } from '../db/index.js';
 import { requirePermission, assertClientAccess } from '../middleware/index.js';
-import { clientService, agentSyncService, writeAuditLog } from '../services/index.js';
+import {
+  clientService,
+  agentSyncService,
+  withAudit,
+  agentDraftService,
+  assertWithinPromptBoundary,
+  describeBoundary,
+  DraftError,
+  PromptBoundaryError,
+} from '../services/index.js';
+import { toSettingsPatch } from '../services/agentDraft.service.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -102,28 +111,9 @@ const updateSchema = z.object({
   pronunciation_dictionary: z.array(pronunciationSchema).max(100).optional(),
 });
 
-/** Keys that live inside client_settings.agent_config rather than a column. */
-const AGENT_CONFIG_KEYS = [
-  'opening_message',
-  'responsiveness',
-  'interruption_sensitivity',
-  'voice_temperature',
-  'transfer_enabled',
-  'transfer_number',
-  'callback_enabled',
-  'waitlist_enabled',
-  'take_messages',
-  'pronunciation_dictionary',
-] as const;
-
-/** Keys that belong inside booking_rules. */
-const BOOKING_RULE_KEYS = [
-  'advance_booking_hours',
-  'max_advance_booking_days',
-  'buffer_minutes',
-  'cancellation_notice_hours',
-  'cancellation_policy',
-] as const;
+// The flat-editor → settings-shape mapping that used to live here now sits in
+// agentDraft.service.ts, so the immediate path and the reviewed path place a
+// field in the same column. See `toSettingsPatch`.
 
 export async function myAgentRoutes(app: FastifyInstance): Promise<void> {
   /** The tenant this request acts on. Staff must name one; clients cannot. */
@@ -203,53 +193,30 @@ export async function myAgentRoutes(app: FastifyInstance): Promise<void> {
       const existing = await clientService.getSettings(clientId);
       if (!existing) return reply.code(404).send({ error: 'Settings not found' });
 
-      // Merge into the existing JSONB rather than replacing it: agent_config and
-      // booking_rules both carry keys this editor knows nothing about (vertical
-      // offering flags, qualification fields), and a replace would delete them.
-      const nextConfig: Record<string, unknown> = {
-        ...((existing.agent_config as unknown as Record<string, unknown>) ?? {}),
-      };
-      for (const key of AGENT_CONFIG_KEYS) {
-        if (body[key] !== undefined) nextConfig[key] = body[key];
+      const patch = toSettingsPatch(body as Record<string, unknown>);
+
+      try {
+        // Belt and braces. `updateSchema` has no prompt fields, so this cannot
+        // fire today — it fires the day someone adds one without thinking about
+        // who can reach this route.
+        assertWithinPromptBoundary(user.role, patch);
+
+        await withAudit({
+          actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'agent.customised',
+          entityType: 'client_settings',
+          entityId: clientId,
+          before: () => agentDraftService.readConfig(clientId),
+          mutate: async () => {
+            await agentDraftService.applyConfigPatch(clientId, patch, existing);
+            return agentDraftService.readConfig(clientId);
+          },
+        });
+      } catch (err) {
+        const failure = draftFailure(err);
+        if (failure) return reply.code(failure.code).send(failure.body);
+        throw err;
       }
-
-      const nextBooking: Record<string, unknown> = {
-        ...((existing.booking_rules as unknown as Record<string, unknown>) ?? {}),
-      };
-      for (const key of BOOKING_RULE_KEYS) {
-        if (body[key] !== undefined) nextBooking[key] = body[key];
-      }
-
-      const settingsPatch: Record<string, unknown> = { agent_config: nextConfig, booking_rules: nextBooking };
-      if (body.business_name !== undefined) settingsPatch.business_name = body.business_name;
-      if (body.agent_name !== undefined) settingsPatch.agent_name = body.agent_name;
-      if (body.agent_personality !== undefined) settingsPatch.agent_personality = body.agent_personality;
-      if (body.agent_tone !== undefined) settingsPatch.agent_tone = body.agent_tone;
-      if (body.agent_response_style !== undefined) settingsPatch.agent_response_style = body.agent_response_style;
-      if (body.booking_enabled !== undefined) settingsPatch.booking_enabled = body.booking_enabled;
-      if (body.notification_emails !== undefined) settingsPatch.notification_emails = body.notification_emails;
-      if (body.escalation_rules !== undefined) settingsPatch.escalation_rules = body.escalation_rules;
-
-      const { error } = await supabase
-        .from('client_settings')
-        .update(settingsPatch)
-        .eq('client_id', clientId);
-      if (error) return reply.code(400).send({ error: error.message });
-
-      // Voice lives on `clients`, not `client_settings`.
-      if (body.voice_id !== undefined) {
-        await clientService.update(clientId, { retell_voice_id: body.voice_id } as never);
-      }
-
-      await writeAuditLog({
-        userId: user.sub,
-        clientId,
-        action: 'agent.customised',
-        entityType: 'client_settings',
-        entityId: clientId,
-        newValue: body as Record<string, unknown>,
-        ipAddress: request.ip,
-      });
 
       await agentSyncService.requestSync(clientId, { userId: user.sub });
       reply.send({ ok: true, syncState: 'pending' });
@@ -291,6 +258,188 @@ export async function myAgentRoutes(app: FastifyInstance): Promise<void> {
         // requirement the default greeting was carrying.
         mentionsRecording: /record/i.test(rendered),
       });
+    },
+  });
+
+  // ────────────────────────────────────────────────────────────────
+  // Review before publish
+  //
+  // The routes above save and re-provision in one step, which is right for a
+  // one-field change. These add the reviewed path: compose the edit, read what
+  // it changes, then publish it deliberately.
+  //
+  // Gated on `agents:write` rather than `knowledge:write` — migration 022 made
+  // that grant client-reachable precisely for agent configuration, and it is
+  // held by client_owner and client_admin only. The prompt stays out of reach on
+  // both paths regardless of grants; that boundary is in the service.
+  // ────────────────────────────────────────────────────────────────
+
+  /** Translate service-layer refusals into the right status code, once. */
+  function draftFailure(err: unknown): { code: number; body: Record<string, unknown> } | null {
+    if (err instanceof PromptBoundaryError) {
+      return { code: 403, body: { error: err.message, fields: err.fields, boundary: describeBoundary() } };
+    }
+    if (err instanceof DraftError) {
+      // 409 for staleness: the request was valid and the state moved. A 400
+      // would tell the UI to fix the payload, which is not the problem.
+      return { code: err.code === 'stale' ? 409 : err.code === 'not-found' ? 404 : 400, body: { error: err.message, code: err.code } };
+    }
+    return null;
+  }
+
+  /**
+   * What is yours to change and what is ours, with the reason attached.
+   *
+   * Served rather than hardcoded in the dashboard so the explanation cannot
+   * drift from what the service actually enforces.
+   */
+  app.get('/my-agent/boundary', {
+    preHandler: requirePermission('knowledge:read'),
+    handler: async (_request, reply) => reply.send(describeBoundary()),
+  });
+
+  app.get<{ Querystring: { clientId?: string } }>('/my-agent/draft', {
+    preHandler: requirePermission('agents:read'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      reply.send(await agentDraftService.getDraft(clientId));
+    },
+  });
+
+  /** Save the pending edit. Replaces any draft already in flight for this tenant. */
+  app.put<{ Querystring: { clientId?: string } }>('/my-agent/draft', {
+    preHandler: requirePermission('agents:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      // The body is the same editor shape the PATCH takes, so the UI holds one
+      // form model whether it saves directly or stages a review.
+      const patch = toSettingsPatch(updateSchema.parse(request.body) as Record<string, unknown>);
+
+      let state: Awaited<ReturnType<typeof agentDraftService.saveDraft>> | undefined;
+
+      try {
+        // The audit records the draft rows, before and after — the patch itself
+        // is not yet a change to the agent, and logging it as one would put
+        // unpublished edits in the same trail as live ones.
+        await withAudit<Record<string, unknown> | null>({
+          actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'agent.draft.saved',
+          entityType: 'agent_config_drafts',
+          entityId: clientId,
+          before: async () =>
+            ((await agentDraftService.getDraft(clientId)).draft as unknown as Record<string, unknown> | null),
+          mutate: async () => {
+            state = await agentDraftService.saveDraft({
+              clientId,
+              patch,
+              actorId: user.sub,
+              actorRole: user.role,
+            });
+            return state.draft as unknown as Record<string, unknown> | null;
+          },
+        });
+        reply.send(state);
+      } catch (err) {
+        const failure = draftFailure(err);
+        if (failure) return reply.code(failure.code).send(failure.body);
+        throw err;
+      }
+    },
+  });
+
+  app.delete<{ Querystring: { clientId?: string } }>('/my-agent/draft', {
+    preHandler: requirePermission('agents:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      await withAudit({
+        actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+        action: 'agent.draft.discarded',
+        entityType: 'agent_config_drafts',
+        entityId: clientId,
+        before: async () => (await agentDraftService.getDraft(clientId)).draft,
+        mutate: async () => {
+          await agentDraftService.discardDraft(clientId);
+          return null;
+        },
+      });
+
+      reply.send({ ok: true });
+    },
+  });
+
+  /**
+   * What an unsaved edit would change, without staging it.
+   *
+   * The live-feedback call: the UI asks on every meaningful edit so the
+   * consequence appears beside the field, not after the fact on a review screen.
+   */
+  app.post<{ Querystring: { clientId?: string } }>('/my-agent/draft/preview', {
+    preHandler: requirePermission('agents:read'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      const patch = toSettingsPatch(updateSchema.parse(request.body) as Record<string, unknown>);
+      try {
+        reply.send(await agentDraftService.previewDiff(clientId, patch));
+      } catch (err) {
+        const failure = draftFailure(err);
+        if (failure) return reply.code(failure.code).send(failure.body);
+        throw err;
+      }
+    },
+  });
+
+  /**
+   * Apply the pending edit and queue the re-provision.
+   *
+   * Refuses a draft composed against settings that have since moved — see
+   * `publishDraft`. The audit row carries the full before/after configuration
+   * rather than the patch, because a patch on its own does not record what it
+   * replaced.
+   */
+  app.post<{ Querystring: { clientId?: string } }>('/my-agent/draft/publish', {
+    preHandler: requirePermission('agents:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      let result: Awaited<ReturnType<typeof agentDraftService.publishDraft>> | undefined;
+
+      try {
+        await withAudit({
+          actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'agent.draft.published',
+          entityType: 'client_settings',
+          entityId: clientId,
+          before: () => agentDraftService.readConfig(clientId),
+          mutate: async () => {
+            result = await agentDraftService.publishDraft({
+              clientId,
+              actorId: user.sub,
+              actorRole: user.role,
+            });
+            return result.after;
+          },
+        });
+      } catch (err) {
+        const failure = draftFailure(err);
+        if (failure) return reply.code(failure.code).send(failure.body);
+        throw err;
+      }
+
+      reply.send({ ok: true, syncState: 'pending', applied: result?.applied });
     },
   });
 }

@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { AlertTriangle, Info, Save, Volume2 } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Info, Save, Volume2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Tabs, useActiveTab, type TabSpec } from '@/components/Tabs';
@@ -10,6 +10,7 @@ import { SyncBadge } from '@/components/StatusPill';
 import { ClientPicker, ChooseClientPrompt, useClientScope } from '@/components/ClientPicker';
 import { useSession } from '@/lib/SessionProvider';
 import { GreetingSuggestions } from './GreetingSuggestions';
+import { ReviewChanges, ManagedByGravvia } from './ReviewChanges';
 
 /**
  * "My Agent" — everything a client may change about how their agent sounds and
@@ -143,7 +144,12 @@ function AgentCustomiserInner() {
   const tab = useActiveTab(TABS);
   const { can } = useSession();
   const canWrite = can('knowledge:write');
+  // The reviewed path is gated on `agents:write` — the grant migration 022 made
+  // client-reachable for agent configuration. Held by owners and admins, not by
+  // managers, who can edit knowledge but do not configure the agent.
+  const canReview = can('agents:write');
   const { clientId, needsChoice, ready } = useClientScope();
+  const [reviewing, setReviewing] = useState(false);
 
   const [agent, setAgent] = useState<AgentState | null>(null);
   const [options, setOptions] = useState<Options | null>(null);
@@ -187,40 +193,49 @@ function AgentCustomiserInner() {
     setDirty(true);
   };
 
+  /**
+   * The editor's state as the API wants it.
+   *
+   * One builder for both paths — saving directly and staging a review — because
+   * two would eventually disagree about which fields get sent, and the review
+   * screen would then describe a change that is not the one published.
+   */
+  const payload = useCallback((): Record<string, unknown> | null => {
+    if (!agent) return null;
+    const emails = emailsRaw.split(',').map((e) => e.trim()).filter(Boolean);
+    return {
+      business_name: agent.business_name || undefined,
+      agent_name: agent.agent_name || undefined,
+      opening_message: agent.opening_message?.trim() ? agent.opening_message.trim() : null,
+      agent_personality: agent.agent_personality || undefined,
+      agent_tone: agent.agent_tone || undefined,
+      agent_response_style: agent.agent_response_style || undefined,
+      voice_id: agent.voice_id || undefined,
+      ...(agent.responsiveness != null ? { responsiveness: agent.responsiveness } : {}),
+      ...(agent.interruption_sensitivity != null ? { interruption_sensitivity: agent.interruption_sensitivity } : {}),
+      ...(agent.voice_temperature != null ? { voice_temperature: agent.voice_temperature } : {}),
+      booking_enabled: agent.booking_enabled,
+      transfer_enabled: agent.transfer_enabled,
+      transfer_number: agent.transfer_number?.trim() || null,
+      callback_enabled: agent.callback_enabled,
+      waitlist_enabled: agent.waitlist_enabled,
+      take_messages: agent.take_messages,
+      ...(agent.advance_booking_hours != null ? { advance_booking_hours: agent.advance_booking_hours } : {}),
+      ...(agent.max_advance_booking_days != null ? { max_advance_booking_days: agent.max_advance_booking_days } : {}),
+      ...(agent.buffer_minutes != null ? { buffer_minutes: agent.buffer_minutes } : {}),
+      ...(agent.cancellation_notice_hours != null ? { cancellation_notice_hours: agent.cancellation_notice_hours } : {}),
+      cancellation_policy: agent.cancellation_policy?.trim() || null,
+      notification_emails: emails,
+      pronunciation_dictionary: agent.pronunciation_dictionary.filter((p) => p.word && p.phoneme),
+    };
+  }, [agent, emailsRaw]);
+
   const save = async () => {
-    if (!agent || !clientId) return;
+    const body = payload();
+    if (!body || !clientId) return;
     setSaving(true);
     try {
-      const emails = emailsRaw.split(',').map((e) => e.trim()).filter(Boolean);
-      await api.patch(
-        '/my-agent',
-        {
-          business_name: agent.business_name || undefined,
-          agent_name: agent.agent_name || undefined,
-          opening_message: agent.opening_message?.trim() ? agent.opening_message.trim() : null,
-          agent_personality: agent.agent_personality || undefined,
-          agent_tone: agent.agent_tone || undefined,
-          agent_response_style: agent.agent_response_style || undefined,
-          voice_id: agent.voice_id || undefined,
-          ...(agent.responsiveness != null ? { responsiveness: agent.responsiveness } : {}),
-          ...(agent.interruption_sensitivity != null ? { interruption_sensitivity: agent.interruption_sensitivity } : {}),
-          ...(agent.voice_temperature != null ? { voice_temperature: agent.voice_temperature } : {}),
-          booking_enabled: agent.booking_enabled,
-          transfer_enabled: agent.transfer_enabled,
-          transfer_number: agent.transfer_number?.trim() || null,
-          callback_enabled: agent.callback_enabled,
-          waitlist_enabled: agent.waitlist_enabled,
-          take_messages: agent.take_messages,
-          ...(agent.advance_booking_hours != null ? { advance_booking_hours: agent.advance_booking_hours } : {}),
-          ...(agent.max_advance_booking_days != null ? { max_advance_booking_days: agent.max_advance_booking_days } : {}),
-          ...(agent.buffer_minutes != null ? { buffer_minutes: agent.buffer_minutes } : {}),
-          ...(agent.cancellation_notice_hours != null ? { cancellation_notice_hours: agent.cancellation_notice_hours } : {}),
-          cancellation_policy: agent.cancellation_policy?.trim() || null,
-          notification_emails: emails,
-          pronunciation_dictionary: agent.pronunciation_dictionary.filter((p) => p.word && p.phoneme),
-        },
-        { params: { clientId } }
-      );
+      await api.patch('/my-agent', body, { params: { clientId } });
       setSyncState('pending');
       setDirty(false);
       toast.success('Saved — your agent updates on new calls within about a minute');
@@ -493,18 +508,52 @@ function AgentCustomiserInner() {
 
             {canWrite && (
               <div className="flex flex-wrap items-center gap-3 border-t border-panel-200 pt-5">
+                {/* Review leads. Publishing straight from the form is still one
+                    click away for the rename-the-agent case, but the default
+                    action is the one that shows you what you are about to do. */}
+                {canReview && (
+                  <button
+                    type="button"
+                    onClick={() => setReviewing(true)}
+                    disabled={saving || !dirty}
+                    className="flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ClipboardCheck className="h-4 w-4" aria-hidden /> Review changes
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={save}
                   disabled={saving || !dirty}
-                  className="flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                  className={
+                    canReview
+                      ? 'flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-4 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40'
+                      : 'flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40'
+                  }
                 >
-                  <Save className="h-4 w-4" aria-hidden /> {saving ? 'Saving…' : 'Save changes'}
+                  <Save className="h-4 w-4" aria-hidden /> {saving ? 'Saving…' : canReview ? 'Save without reviewing' : 'Save changes'}
                 </button>
                 {dirty && <span className="text-xs text-lamp-fair-ink">Unsaved changes</span>}
               </div>
             )}
           </div>
+
+          <ManagedByGravvia />
+
+          {reviewing && clientId && payload() && (
+            <ReviewChanges
+              clientId={clientId}
+              payload={payload() as Record<string, unknown>}
+              onClose={() => setReviewing(false)}
+              onPublished={() => {
+                setReviewing(false);
+                setSyncState('pending');
+                setDirty(false);
+                load();
+                if (tab === 'greeting') loadPreview();
+              }}
+            />
+          )}
         </>
       )}
     </div>

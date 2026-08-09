@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
-import { callRecordService } from '../services/index.js';
+import { callRecordService, auditTranscriptView } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -191,10 +191,19 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
       const { data } = await supabase
         .from('call_transcripts')
-        .select('transcript, word_count, created_at')
+        .select('id, transcript, word_count, created_at')
         .eq('call_id', row.call_id)
         .maybeSingle();
       if (!data) return reply.code(404).send({ error: 'No transcript for this call' });
+
+      // The access record §2.5 asks for: one row per transcript opened, written
+      // before the content leaves the building. Individual reads only — the call
+      // log itself is not audited, or the trail would be all noise.
+      await auditTranscriptView(
+        { userId: user.sub, clientId: row.client_id, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+        (data as { id: string }).id,
+        row.call_id
+      );
 
       reply.send(data);
     },

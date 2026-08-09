@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePermission, assertClientAccess } from '../middleware/index.js';
-import { clientService, writeAuditLog } from '../services/index.js';
+import { clientService, withAudit, integrationHealth } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -138,7 +138,11 @@ export async function connectionRoutes(app: FastifyInstance): Promise<void> {
         };
       });
 
-      reply.send({ data: connections, activeCrm });
+      // Per-channel health alongside the catalogue, not as a separate route:
+      // "what am I connected to" and "is it working" are the same question asked
+      // twice, and answering them on two screens is how a stalled integration
+      // survives a review.
+      reply.send({ data: connections, activeCrm, health: await integrationHealth(clientId) });
     },
   });
 
@@ -172,21 +176,25 @@ export async function connectionRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'Only a CRM can be the active sync target.' });
       }
 
-      const { error } = await supabase
-        .from('client_settings')
-        .update({ crm_type: body.provider })
-        .eq('client_id', clientId);
-      if (error) return reply.code(400).send({ error: error.message });
-
-      await writeAuditLog({
-        userId: user.sub,
-        clientId,
-        action: 'crm.active.changed',
-        entityType: 'client_settings',
-        entityId: clientId,
-        newValue: { crm_type: body.provider },
-        ipAddress: request.ip,
-      });
+      try {
+        await withAudit<{ crm_type: string | null }>({
+          actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'crm.active.changed',
+          entityType: 'client_settings',
+          entityId: clientId,
+          before: async () => ({ crm_type: (await clientService.getSettings(clientId))?.crm_type ?? null }),
+          mutate: async () => {
+            const { error } = await supabase
+              .from('client_settings')
+              .update({ crm_type: body.provider })
+              .eq('client_id', clientId);
+            if (error) throw new Error(error.message);
+            return { crm_type: body.provider };
+          },
+        });
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message });
+      }
 
       reply.send({ ok: true, activeCrm: body.provider });
     },

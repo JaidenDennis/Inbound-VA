@@ -33,3 +33,17 @@ export {
 export type { OverrideRow } from './clientPermission.service.js';
 export { knowledgeService, KnowledgeService } from './knowledge.service.js';
 export type { ClientKnowledge, KnowledgeSearchResult } from './knowledge.service.js';
+export {
+  assertWithinPromptBoundary,
+  isWithinPromptBoundary,
+  describeBoundary,
+  PromptBoundaryError,
+  GRAVVIA_MANAGED_FIELDS,
+} from './promptBoundary.service.js';
+export type { BoundaryDescription, GravviaManagedField } from './promptBoundary.service.js';
+export { diffConfig, IMPACT_AREAS } from './configDiff.service.js';
+export type { ConfigDiff, DiffEntry, DiffKind, ImpactArea } from './configDiff.service.js';
+export { integrationHealth, integrationHealthService } from './integrationHealth.service.js';
+export type { ChannelHealth, HealthStatus } from './integrationHealth.service.js';
+export { agentDraftService, DraftError, fingerprintSettings } from './agentDraft.service.js';
+export type { DraftRow, DraftState, PublishResult } from './agentDraft.service.js';
