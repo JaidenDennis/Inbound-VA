@@ -1,7 +1,8 @@
 import { Worker, type Job } from 'bullmq';
 import { redis } from '../queues/index.js';
 import { supabase } from '../db/index.js';
-import { crmSyncQueue } from '../queues/index.js';
+import { crmSyncQueue, callAnalysisQueue } from '../queues/index.js';
+import { isAiConfigured } from '../ai/claude.client.js';
 import { buildIdempotencyKey } from '../utils/index.js';
 import { logger } from '../utils/index.js';
 import type { TranscriptProcessingJobData } from '../types/index.js';
@@ -19,6 +20,20 @@ async function processTranscript(job: Job<TranscriptProcessingJobData>): Promise
     transcript,
     word_count: wordCount,
   }, { onConflict: 'call_id' });
+
+  // Quality scoring and knowledge-gap extraction (migration 023).
+  //
+  // Enqueued HERE rather than from call-ended because the pass reads the
+  // transcript, and the transcript is what this worker just wrote. jobId is the
+  // callId, so a replayed webhook collapses into the same job instead of paying
+  // for a second model call.
+  if (isAiConfigured()) {
+    await callAnalysisQueue.add(
+      'analyze-call',
+      { callId, clientId },
+      { jobId: buildIdempotencyKey('call-analysis', callId) }
+    );
+  }
 
   // Get conversation contact
   const { data: conversation } = await supabase

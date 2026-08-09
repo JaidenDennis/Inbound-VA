@@ -8,11 +8,52 @@ const CAD_APPOINTMENT_BOOKED = 'appointment_booked';
 const CAD_LEAD_RECAPTURED = 'lead_recaptured';
 const CAD_MISSED_CALL_RECOVERED = 'missed_call_recovered';
 
+/**
+ * Demand-intelligence keys, added by migration 023.
+ *
+ * These are configured on the Retell agent by the provisioning template
+ * (see RETELL_ANALYSIS_FIELDS in provisioning). An agent that has not been
+ * re-provisioned simply omits them, and the columns stay NULL — which is the
+ * honest answer, and distinguishable from a captured negative.
+ */
+const CAD_CALL_REASON = 'call_reason';
+const CAD_REFERRAL_SOURCE = 'referral_source';
+const CAD_REQUESTED_SERVICE = 'requested_service';
+const CAD_SERVICE_AVAILABLE = 'service_available';
+const CAD_ESCALATION_REASON = 'escalation_reason';
+
 function asBool(v: unknown): boolean {
   return v === true || v === 'true' || v === 1;
 }
 function asNum(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Tri-state read: true / false / not-present.
+ *
+ * Deliberately NOT `asBool`. The five booleans that predate migration 023 default
+ * a missing field to `false`, which is right for them — "no appointment was
+ * booked" is true of a call where the field was never configured. It is wrong
+ * for `service_available`: defaulting that to false would report every call at
+ * an un-provisioned agent as demand the business could not serve, and that
+ * number feeds a dollar figure on the owner's dashboard.
+ */
+function asNullableBool(v: unknown): boolean | null {
+  if (v === true || v === 'true' || v === 1) return true;
+  if (v === false || v === 'false' || v === 0) return false;
+  return null;
+}
+
+/** Trimmed non-empty string, or null. Blank extractions are absences, not values. */
+function asText(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (!t) return null;
+  // Models asked for an extraction that is not present sometimes answer with a
+  // word rather than omitting the field. Those are absences too.
+  if (/^(n\/?a|none|unknown|not (specified|mentioned|provided|stated))$/i.test(t)) return null;
+  return t.slice(0, 500);
 }
 
 // The call_analyzed payload carries more than our trimmed RetellSummaryPayload
@@ -88,6 +129,12 @@ export class CallRecordService {
       appointment_booked: asBool(cad[CAD_APPOINTMENT_BOOKED]),
       lead_recaptured: asBool(cad[CAD_LEAD_RECAPTURED]),
       missed_call_recovered: asBool(cad[CAD_MISSED_CALL_RECOVERED]),
+      // Migration 023 signals. Null where the agent did not report them.
+      call_reason: asText(cad[CAD_CALL_REASON]),
+      referral_source: asText(cad[CAD_REFERRAL_SOURCE]),
+      requested_service: asText(cad[CAD_REQUESTED_SERVICE]),
+      service_available: asNullableBool(cad[CAD_SERVICE_AVAILABLE]),
+      escalation_reason: asText(cad[CAD_ESCALATION_REASON]),
       raw_analysis: cad as Record<string, unknown>,
     };
 

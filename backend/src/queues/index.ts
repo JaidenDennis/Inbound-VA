@@ -7,6 +7,7 @@ export {
   transcriptProcessingQueue,
   analyticsQueue,
   agentProvisioningQueue,
+  callAnalysisQueue,
   maintenanceQueue,
   allQueues,
 } from './queues.js';

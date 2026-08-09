@@ -67,6 +67,29 @@ export const agentProvisioningQueue = new Queue<{ clientId: string; userId?: str
   }
 );
 
+/**
+ * Post-call quality scoring and knowledge-gap extraction (migration 023).
+ *
+ * Runs one model call per completed call, so it is the first genuinely per-call
+ * recurring cost in the system. Three consequences shaped this config:
+ *
+ *   - jobId is the callId, so the provider's webhook retries collapse into one
+ *     job rather than one model call each.
+ *   - attempts is 2. A failure here is usually a missing transcript or an AI
+ *     outage; neither is fixed by a third attempt, and every attempt costs.
+ *   - concurrency is capped low in the worker, so a backlog drains steadily
+ *     rather than opening fifty concurrent model calls after an incident.
+ */
+export const callAnalysisQueue = new Queue<{ callId: string; clientId: string }>('call-analysis', {
+  connection: redis,
+  defaultJobOptions: {
+    ...defaultJobOptions,
+    attempts: 2,
+    backoff: { type: 'exponential' as const, delay: 30_000 },
+    removeOnComplete: { count: 500 },
+  },
+});
+
 // Internal housekeeping (daily retention purge). No payload; not tenant-scoped.
 export const maintenanceQueue = new Queue<Record<string, never>>('maintenance', {
   connection: redis,
@@ -81,6 +104,7 @@ export const allQueues = [
   transcriptProcessingQueue,
   analyticsQueue,
   agentProvisioningQueue,
+  callAnalysisQueue,
   maintenanceQueue,
 ];
 

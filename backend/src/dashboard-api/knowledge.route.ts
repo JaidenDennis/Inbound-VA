@@ -222,10 +222,79 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
   /**
    * Opening hours.
    *
-   * Stored inside `booking_rules.business_hours` because the booking service
-   * already reads availability from there — a second copy would let the hours
-   * the agent speaks drift from the hours it will actually book.
+   * Stored as `booking_rules.working_hours`, keyed by lowercase weekday name,
+   * with a closed day represented by the key being ABSENT:
+   *
+   *     { "monday": { "open": "09:00", "close": "17:00" }, ... }
+   *
+   * That is the canonical shape: `booking.service.ts` resolves availability from
+   * it, all seven agent templates render it, and it is what every configured
+   * tenant stores.
+   *
+   * This route previously read and wrote `booking_rules.business_hours` in a
+   * different `{tz, weekly[], exceptions[]}` shape, with a comment claiming it
+   * stored there so the hours the agent speaks could not drift from the hours it
+   * books. The opposite was true: nothing read `business_hours`, so the editor
+   * showed empty for every tenant and saving changed neither booking nor the
+   * agent. Confirmed against production — 7 of 8 tenants had `working_hours`
+   * and none had `business_hours`.
+   *
+   * The API shape is preserved so the dashboard editor is unchanged; the
+   * translation happens here.
    */
+  const WEEKDAYS = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+  ] as const;
+
+  type ApiHours = z.infer<typeof hoursSchema>;
+  type StoredDay = { open: string; close: string };
+
+  /** API shape → canonical storage. Closed days are omitted, not flagged. */
+  function toStored(hours: ApiHours): {
+    working_hours: Record<string, StoredDay>;
+    blackout_dates: string[];
+  } {
+    const working: Record<string, StoredDay> = {};
+    for (const d of hours.weekly) {
+      if (d.closed) continue;
+      working[WEEKDAYS[d.day]] = { open: d.open, close: d.close };
+    }
+    return {
+      working_hours: working,
+      // Only full-day closures survive the round trip: `blackout_dates` is a
+      // date array, with nowhere to put per-date open/close overrides. Partial
+      // exceptions are dropped rather than silently stored where the booking
+      // service cannot see them — see the note in the PUT handler.
+      blackout_dates: hours.exceptions.filter((e) => e.closed).map((e) => e.date),
+    };
+  }
+
+  /** Canonical storage → API shape, for the editor to render. */
+  function fromStored(rules: Record<string, unknown>, tz: string): ApiHours | null {
+    const working = rules.working_hours as Record<string, StoredDay> | undefined;
+    if (!working || Object.keys(working).length === 0) return null;
+
+    const weekly = WEEKDAYS.map((name, day) => {
+      const d = working[name];
+      return d
+        ? { day, open: d.open, close: d.close, closed: false }
+        : { day, open: '09:00', close: '17:00', closed: true };
+    });
+
+    const blackouts = Array.isArray(rules.blackout_dates) ? (rules.blackout_dates as string[]) : [];
+    return {
+      tz,
+      weekly,
+      exceptions: blackouts.map((date) => ({ date, closed: true })),
+    };
+  }
+
   const hoursSchema = z.object({
     tz: z.string().min(1),
     weekly: z
@@ -257,14 +326,14 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
       const clientId = scopeFor(user, request.query.clientId);
       if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
 
-      const { data } = await supabase
-        .from('client_settings')
-        .select('booking_rules')
-        .eq('client_id', clientId)
-        .maybeSingle();
+      const [{ data }, { data: client }] = await Promise.all([
+        supabase.from('client_settings').select('booking_rules').eq('client_id', clientId).maybeSingle(),
+        supabase.from('clients').select('timezone').eq('id', clientId).maybeSingle(),
+      ]);
 
       const rules = (data as { booking_rules: Record<string, unknown> | null } | null)?.booking_rules ?? {};
-      reply.send({ data: rules.business_hours ?? null });
+      const tz = (client as { timezone?: string } | null)?.timezone ?? 'UTC';
+      reply.send({ data: fromStored(rules, tz) });
     },
   });
 
@@ -286,14 +355,26 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         .maybeSingle();
       const existingRules = (current as { booking_rules: Record<string, unknown> | null } | null)?.booking_rules ?? {};
 
+      const stored = toStored(hours);
       const { error } = await supabase
         .from('client_settings')
-        .update({ booking_rules: { ...existingRules, business_hours: hours } })
+        .update({ booking_rules: { ...existingRules, ...stored } })
         .eq('client_id', clientId);
       if (error) return reply.code(400).send({ error: error.message });
 
       await afterWrite(user, clientId, 'hours', 'updated', clientId, request.ip);
-      reply.send({ data: hours });
+
+      // Report what was actually persisted, not what was posted. A partial-day
+      // exception (open late on the 24th) has nowhere to live in the canonical
+      // shape, so it is dropped — and the caller is told, rather than being
+      // handed its own input back as confirmation of a save that did not happen.
+      const droppedExceptions = hours.exceptions.filter((e) => !e.closed).map((e) => e.date);
+      reply.send({
+        data: fromStored({ ...existingRules, ...stored }, hours.tz),
+        ...(droppedExceptions.length > 0 && {
+          warning: `Partial-day exceptions are not supported and were not saved: ${droppedExceptions.join(', ')}. Only full-day closures are stored.`,
+        }),
+      });
     },
   });
 

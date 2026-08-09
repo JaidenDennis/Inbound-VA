@@ -6,8 +6,10 @@ import { startTranscriptProcessingWorker } from './transcript-processing.worker.
 import { startAnalyticsWorker } from './analytics.worker.js';
 import { startBookingWorker } from './booking.worker.js';
 import { startAgentProvisioningWorker } from './agent-provisioning.worker.js';
+import { startCallAnalysisWorker } from './call-analysis.worker.js';
 import { startMaintenanceWorker, scheduleMaintenance } from './maintenance.worker.js';
 import { onFinalFailure } from './failure-alerts.js';
+import { isAiConfigured } from '../ai/claude.client.js';
 import { logger } from '../utils/index.js';
 
 /**
@@ -30,6 +32,15 @@ export function startWorkers(): Worker[] {
     startAgentProvisioningWorker(),
     startMaintenanceWorker(),
   ];
+
+  // The call-analysis worker is registered only when AI is configured. A
+  // deployment with no ANTHROPIC_API_KEY should leave the quality columns NULL
+  // ("not measured") rather than accumulate a queue of jobs that can only fail.
+  if (isAiConfigured()) {
+    workers.push(startCallAnalysisWorker());
+  } else {
+    logger.warn('ANTHROPIC_API_KEY not set — call-analysis worker not started, quality scores will be null');
+  }
 
   // Centralized terminal-failure handling for EVERY queue (`w.name` = queue name).
   for (const w of workers) {

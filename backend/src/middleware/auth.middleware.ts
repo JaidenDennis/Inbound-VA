@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtPayload, Permission } from '../types/index.js';
-import { getRolePermissions } from '../services/permission.service.js';
+import { getEffectivePermissions } from '../services/permission.service.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -21,12 +21,16 @@ export function requireAuth() {
 }
 
 /**
- * Verify the token, then check the caller's role carries `permission`.
+ * Verify the token, then check the caller carries `permission`.
  *
  * Grants are read from the database (via a cached lookup), not from the token
  * and not from a map in source. Before migration 016 this consulted a hardcoded
  * ROLE_PERMISSIONS table that had silently drifted from the `permissions` rows
  * it was meant to mirror.
+ *
+ * Since migration 022 the lookup is EFFECTIVE rather than base: a client user's
+ * grants are their role's grants plus their tenant's overlay. Platform users
+ * have no overlay and resolve to base grants unchanged.
  */
 export function requirePermission(permission: Permission) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -39,7 +43,7 @@ export function requirePermission(permission: Permission) {
       return;
     }
 
-    const permissions = await getRolePermissions(user.role);
+    const permissions = await getEffectivePermissions(user.role, user.clientId);
     if (!permissions.has(permission)) {
       reply.code(403).send({ error: 'Forbidden' });
       return;

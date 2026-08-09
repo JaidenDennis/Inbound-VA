@@ -31,6 +31,7 @@ import { authRoutes } from './dashboard-api/auth.route.js';
 import { analyticsRoutes } from './dashboard-api/analytics.route.js';
 import { adminRoutes } from './dashboard-api/admin.route.js';
 import { userRoutes } from './dashboard-api/users.route.js';
+import { roleRoutes } from './dashboard-api/roles.route.js';
 import { ticketRoutes } from './dashboard-api/tickets.route.js';
 import { onboardingRoutes } from './dashboard-api/onboarding.route.js';
 import { actionItemRoutes } from './dashboard-api/action-items.route.js';
@@ -42,6 +43,7 @@ import { myAgentRoutes } from './dashboard-api/my-agent.route.js';
 import { connectionRoutes } from './dashboard-api/connections.route.js';
 import { aiRoutes } from './dashboard-api/ai.route.js';
 import { reportRoutes } from './dashboard-api/reports.route.js';
+import { ownerReportRoutes } from './dashboard-api/owner-reports.route.js';
 
 /**
  * Record a 5xx in `system_errors`, tagged with the tenant when the request
@@ -204,6 +206,7 @@ export async function buildApp() {
   await app.register(analyticsRoutes);
   await app.register(adminRoutes);
   await app.register(userRoutes);
+  await app.register(roleRoutes);
   await app.register(ticketRoutes);
   await app.register(onboardingRoutes);
   await app.register(actionItemRoutes);
@@ -215,6 +218,7 @@ export async function buildApp() {
   await app.register(connectionRoutes);
   await app.register(aiRoutes);
   await app.register(reportRoutes);
+  await app.register(ownerReportRoutes);
 
   return app;
 }

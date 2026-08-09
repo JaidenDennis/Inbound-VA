@@ -1,4 +1,5 @@
 import { retell } from './retell.client.js';
+import { buildPostCallAnalysisSchema } from './retell.analysis-fields.js';
 import type { ResponseEngineSpec, AgentSpec } from './templates/template.types.js';
 
 type RetellCustomTool = {
@@ -93,6 +94,11 @@ export async function createOrUpdateAgent(input: {
     voice_speed: input.spec.voice_speed,
     // TTS-layer pronunciation overrides (omitted when undefined).
     pronunciation_dictionary: input.spec.pronunciation_dictionary,
+    // Post-call extractions that back the demand-intelligence surfaces
+    // (migration 023). Sent on both create and update, so an existing agent
+    // picks the fields up on its next provision — which is the only way older
+    // agents start reporting them, since no backfill of past calls is possible.
+    post_call_analysis_data: buildPostCallAnalysisSchema(),
   };
   if (input.existingAgentId) {
     const res = await retell.agent.update(input.existingAgentId, body);

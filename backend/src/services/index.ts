@@ -10,7 +10,8 @@ export { provisioningService, ProvisioningService } from './provisioning.service
 export type { ProvisionOptions, ProvisionResult, RenderedAgent } from './provisioning.service.js';
 export { agentSyncService, AgentSyncService, SYNC_DEBOUNCE_MS } from './agentSync.service.js';
 export type { AgentSyncState } from './agentSync.service.js';
-export { writeAuditLog } from './audit.service.js';
+export { writeAuditLog, withAudit, auditTranscriptView } from './audit.service.js';
+export type { AuditActor } from './audit.service.js';
 export { clayLeadService, ClayLeadService, ClayIngestError, clayLeadSchema } from './clay-lead.service.js';
 export type { ClayLeadInput, ClayLeadResult } from './clay-lead.service.js';
 export { systemErrorService, SystemErrorService, fingerprintFor, normalizeMessage } from './systemError.service.js';
@@ -18,9 +19,17 @@ export type { ErrorSource, ErrorSeverity, RecordErrorInput } from './systemError
 export { systemAlertService, SystemAlertService, ALERT_OCCURRENCE_THRESHOLD, ALERT_WINDOW_MS } from './systemAlert.service.js';
 export {
   getRolePermissions,
+  getEffectivePermissions,
   roleHasPermission,
   listRolePermissions,
   invalidatePermissionCache,
 } from './permission.service.js';
+export {
+  listOverrides,
+  setOverride,
+  clearOverride,
+  PermissionOverlayError,
+} from './clientPermission.service.js';
+export type { OverrideRow } from './clientPermission.service.js';
 export { knowledgeService, KnowledgeService } from './knowledge.service.js';
 export type { ClientKnowledge, KnowledgeSearchResult } from './knowledge.service.js';

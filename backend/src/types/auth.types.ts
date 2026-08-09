@@ -7,7 +7,12 @@
 export type RoleScope = 'platform' | 'client';
 
 export const PLATFORM_ROLES = ['super_admin', 'support_agent', 'analyst'] as const;
-export const CLIENT_ROLES = ['client_owner', 'client_manager', 'client_viewer'] as const;
+export const CLIENT_ROLES = [
+  'client_owner',
+  'client_admin',
+  'client_manager',
+  'client_viewer',
+] as const;
 
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 export type ClientRole = (typeof CLIENT_ROLES)[number];
@@ -49,9 +54,65 @@ export const ALL_PERMISSIONS = [
   'agents:write',
   'system:read',
   'system:write',
+  // Added by migration 022 (enterprise dashboard).
+  'flags:read',
+  'flags:write',
+  'callbacks:read',
+  'callbacks:write',
+  'exports:read',
+  'configure:roles',
+  'configure:alerts',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
+
+/**
+ * Grants a tenant is allowed to hold, and therefore the only ones that may
+ * appear in `client_permission_overrides`.
+ *
+ * This is defence 2 of 2 for the overlay's escalation boundary — the other is
+ * the CHECK constraint in migration 022. Both exist because a single guard on a
+ * privilege boundary is one edit away from being no guard: a later migration
+ * that relaxes the CHECK still cannot open the hole while this list holds.
+ *
+ * Absences are deliberate. `recordings:read` (call audio is staff-only),
+ * `system:*` (the cross-tenant console), `clients:write`, `users:*`,
+ * `settings:write`, and `tickets:triage` are all platform territory, and a
+ * tenant handing one to itself is exactly the failure being prevented.
+ *
+ * Keep in step with the `cpo_permission_is_client_safe` constraint;
+ * `client-permission-overlay.test.ts` asserts the two match.
+ */
+export const CLIENT_SAFE_PERMISSIONS = [
+  'clients:read',
+  'calls:read',
+  'bookings:read',
+  'bookings:write',
+  'analytics:read',
+  'settings:read',
+  'tickets:read',
+  'tickets:write',
+  'transcripts:read',
+  'knowledge:read',
+  'knowledge:write',
+  'agents:read',
+  'agents:write',
+  'crm:read',
+  'crm:write',
+  'flags:read',
+  'flags:write',
+  'callbacks:read',
+  'callbacks:write',
+  'exports:read',
+  'configure:roles',
+  'configure:alerts',
+] as const satisfies readonly Permission[];
+
+export type ClientSafePermission = (typeof CLIENT_SAFE_PERMISSIONS)[number];
+
+export function isClientSafePermission(p: string): p is ClientSafePermission {
+  return (CLIENT_SAFE_PERMISSIONS as readonly string[]).includes(p);
+}
 
 export interface User {
   id: string;

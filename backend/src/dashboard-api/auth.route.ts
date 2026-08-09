@@ -77,7 +77,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .single();
       if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
-      const permissions = await listRolePermissions(user.role as UserRole);
+      // Effective, not base: a client user's grants include their tenant's
+      // overlay, so the nav must be filtered on what they actually hold.
+      const permissions = await listRolePermissions(user.role as UserRole, user.client_id);
       reply.send({ ...user, scope: roleScope(user.role as UserRole), permissions });
     },
   });
