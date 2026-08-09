@@ -841,6 +841,47 @@ Added by this spec, with reasons:
 - **PDF export** (§7.3). CSV ships; PDF needs a rendering stack.
 - **Custom domains** (§7.4). Render and DNS per tenant, not a dashboard feature.
 - **Slack and SMS alert channels** (§7.2). Email ships first.
+- **Semantic transcript search** (§7.5). Deferred on 2026-08-09 after checking
+  the live database. `pgvector` is *available* on the project but not installed,
+  which was the anticipated blocker — and the decisive one turned out to be
+  different: **there are zero rows in `call_transcripts`**, across 21 calls and
+  41 `call_records`. There is nothing to embed, nothing to backfill, and no way
+  to verify a search returns the right thing.
+
+  The spec's stated fallback — "search remains keyword-based against
+  `call_transcripts.content`, which works today" — does not hold either, for the
+  same reason. Both halves of §7.5 rest on a transcript corpus that does not
+  exist.
+
+  **Root cause is upstream and is its own defect** (see §11.1). Semantic search
+  should be reconsidered once transcripts are actually being stored, at which
+  point the pgvector install is the only remaining obstacle and a small one.
+
+### 11.1 Transcripts are never stored — open defect
+
+Found while assessing §7.5. Live counts on 2026-08-09:
+
+| Table | Rows |
+|---|---|
+| `calls` | 21 |
+| `call_records` | 41 |
+| `call_transcripts` | **0** |
+| `call_summaries` | **0** |
+| `call_records` with `analyzed_at` | **0** |
+
+The only writer of both transcripts and summaries is the `call_analyzed` branch
+of `retell-dispatcher.route.ts` (`upsertSummary`, then enqueue to
+`transcriptProcessingQueue`). Agents subscribe to `call_analyzed` —
+`retell.agent.ts:81` sets `webhook_events: ['call_started', 'call_ended',
+'call_analyzed']` — and the `events` table holds 21 `call.started` and 21
+`call.ended` rows with **no** analyzed events at all. So `call_analyzed` is
+either not being delivered or is failing before the write.
+
+Consequences, all currently invisible because every affected surface renders an
+honest empty state: no transcript is viewable, no call has been AI-analysed, the
+call-quality and knowledge-gap passes (migration 023) have never run, and the
+`transcripts:read` permission boundary has never been exercised against real
+data. Worth investigating before any further work depends on transcripts.
 
 ---
 

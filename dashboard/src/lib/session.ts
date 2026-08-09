@@ -9,7 +9,10 @@
 export type RoleScope = 'platform' | 'client';
 
 export const PLATFORM_ROLES = ['super_admin', 'support_agent', 'analyst'] as const;
-export const CLIENT_ROLES = ['client_owner', 'client_manager', 'client_viewer'] as const;
+// client_admin arrived with migration 022 and was never added here, so the
+// console typed it as an unknown role. Owner and Admin differ on exactly one
+// grant: configure:roles.
+export const CLIENT_ROLES = ['client_owner', 'client_admin', 'client_manager', 'client_viewer'] as const;
 
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 export type ClientRole = (typeof CLIENT_ROLES)[number];
@@ -39,7 +42,16 @@ export type Permission =
   | 'agents:read'
   | 'agents:write'
   | 'system:read'
-  | 'system:write';
+  | 'system:write'
+  // Added by migration 022 for the enterprise dashboard: the manager work queue,
+  // exports, and the two configure-axis grants.
+  | 'flags:read'
+  | 'flags:write'
+  | 'callbacks:read'
+  | 'callbacks:write'
+  | 'exports:read'
+  | 'configure:roles'
+  | 'configure:alerts';
 
 export interface Session {
   sub: string;
@@ -60,6 +72,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   support_agent: 'Support',
   analyst: 'Analyst',
   client_owner: 'Owner',
+  client_admin: 'Admin',
   client_manager: 'Manager',
   client_viewer: 'Viewer',
 };

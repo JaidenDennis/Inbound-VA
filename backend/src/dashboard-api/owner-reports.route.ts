@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePermission, assertClientAccess, resolveClientScope } from '../middleware/index.js';
 import { logger } from '../utils/index.js';
+import { buildExport, EXPORT_KINDS, type ExportKind } from '../services/export.service.js';
+import { periodInsights } from '../ai/insights.service.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -372,6 +374,61 @@ export async function ownerReportRoutes(app: FastifyInstance): Promise<void> {
           showToOwner: liveFor === null || liveFor < 30 * 86_400_000,
         },
       });
+    },
+  });
+
+  /**
+   * What changed, with the calls that prove it.
+   *
+   * Every insight carries the ids of calls that evidence it, and the service
+   * drops any it cannot trace to a real call in the period — see
+   * insights.service.ts. The UI renders no insight without a working
+   * click-through, so an untraceable claim never reaches a screen.
+   */
+  app.get('/reports/insights', {
+    preHandler: requirePermission('analytics:read'),
+    handler: async (request, reply) => {
+      const range = resolveRange(request, reply);
+      if (!range) return;
+
+      reply.send(await periodInsights(range.clientId, range.from, range.to));
+    },
+  });
+
+  /**
+   * CSV of one cluster, generated here rather than in the browser.
+   *
+   * `exports:read` rather than `analytics:read`: a file that leaves the building
+   * is a different act from looking at a chart, and `client_viewer` holds the
+   * export grant precisely so a compliance reader can take the numbers away
+   * without being able to open a transcript.
+   */
+  app.get<{ Params: { kind: string } }>('/reports/export/:kind', {
+    preHandler: requirePermission('exports:read'),
+    handler: async (request, reply) => {
+      const range = resolveRange(request, reply);
+      if (!range) return;
+
+      const kind = request.params.kind as ExportKind;
+      if (!EXPORT_KINDS.includes(kind)) {
+        return reply.code(400).send({ error: `Unknown export: ${request.params.kind}` });
+      }
+
+      try {
+        const result = await buildExport(kind, range);
+        const stamp = range.to.slice(0, 10);
+
+        reply
+          .header('content-type', 'text/csv; charset=utf-8')
+          .header('content-disposition', `attachment; filename="gravvia-${result.filename}-${stamp}.csv"`)
+          // Surfaced so a client can tell an empty export from a failed one
+          // without opening the file.
+          .header('x-row-count', String(result.rowCount))
+          .send(result.csv);
+      } catch (err) {
+        logger.error({ err, kind }, 'export failed');
+        reply.code(500).send({ error: 'Could not build that export' });
+      }
     },
   });
 }

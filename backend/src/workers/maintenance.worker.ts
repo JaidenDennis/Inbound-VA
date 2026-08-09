@@ -6,9 +6,12 @@ import { logger, sendMail } from '../utils/index.js';
 import { systemErrorService } from '../services/systemError.service.js';
 import { systemAlertService } from '../services/systemAlert.service.js';
 import { ticketService } from '../services/ticket.service.js';
+import { alertService } from '../services/alert.service.js';
+import { digestService } from '../services/digest.service.js';
 
 const PURGE_JOB = 'purge';
 const SLA_JOB = 'sla-sweep';
+const DIGEST_JOB = 'weekly-digest';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Fixed 90 days — not tied to AUDIT_RETENTION_DAYS. See processMaintenance. */
 const SYSTEM_ERROR_RETENTION_DAYS = 90;
@@ -34,7 +37,19 @@ export async function scheduleMaintenance(): Promise<void> {
     { name: SLA_JOB }
   );
 
-  logger.info({ retentionDays: env.AUDIT_RETENTION_DAYS }, 'Scheduled retention purge (03:00) and SLA sweep (5m)');
+  // Monday morning, before the week starts. A digest that lands on Friday
+  // evening reports a week nobody can act on until Monday anyway, by which time
+  // it is three days stale and unread.
+  await maintenanceQueue.upsertJobScheduler(
+    'weekly-digest',
+    { pattern: '0 7 * * 1' },
+    { name: DIGEST_JOB }
+  );
+
+  logger.info(
+    { retentionDays: env.AUDIT_RETENTION_DAYS },
+    'Scheduled retention purge (03:00), SLA + alert sweep (5m) and weekly digest (Mon 07:00)'
+  );
 }
 
 /**
@@ -43,6 +58,18 @@ export async function scheduleMaintenance(): Promise<void> {
  * the case that needs escalating.
  */
 async function processSlaSweep(): Promise<void> {
+  // Threshold alerts ride the same five-minute cadence rather than getting a
+  // scheduler of their own. Both are "check whether something has quietly gone
+  // wrong", the cost is one indexed read per enabled rule, and a second
+  // scheduler is a second thing to notice has stopped.
+  try {
+    const result = await alertService.evaluateAlerts();
+    if (result.fired > 0) logger.warn(result, 'Client alert rules fired');
+  } catch (err) {
+    // Never let alerting failure swallow the SLA sweep below it.
+    logger.error({ err }, 'Alert evaluation failed');
+  }
+
   const breached = await ticketService.sweepBreaches();
   if (breached.length === 0) return;
 
@@ -135,6 +162,13 @@ export function startMaintenanceWorker(): Worker {
     'maintenance',
     async (job) => {
       if (job.name === SLA_JOB) return processSlaSweep();
+      if (job.name === DIGEST_JOB) {
+        const result = await digestService.sendWeeklyDigests();
+        // `skipped` is the interesting half: a client skipped every week is one
+        // whose agent took no calls, which is a conversation, not a statistic.
+        logger.info(result, 'Weekly digests sent');
+        return;
+      }
       return processMaintenance();
     },
     { connection: redis, concurrency: 1 }

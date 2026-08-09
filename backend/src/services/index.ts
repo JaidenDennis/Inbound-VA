@@ -44,6 +44,22 @@ export type { BoundaryDescription, GravviaManagedField } from './promptBoundary.
 export { diffConfig, IMPACT_AREAS } from './configDiff.service.js';
 export type { ConfigDiff, DiffEntry, DiffKind, ImpactArea } from './configDiff.service.js';
 export { integrationHealth, integrationHealthService } from './integrationHealth.service.js';
+export { buildExport, toCsv, exportService, EXPORT_KINDS } from './export.service.js';
+export type { ExportKind } from './export.service.js';
+export { alertService, evaluateAlerts, observe, breaches, ALERT_METRICS, metricLabel } from './alert.service.js';
+export type { AlertMetric, AlertRule } from './alert.service.js';
+export { digestService, buildDigest, sendWeeklyDigests } from './digest.service.js';
+export {
+  brandingService,
+  readBranding,
+  writeBranding,
+  validateBranding,
+  assertAccentAllowed,
+  hexToHsl,
+  BrandingError,
+  EMPTY_BRANDING,
+} from './branding.service.js';
+export type { Branding } from './branding.service.js';
 export type { ChannelHealth, HealthStatus } from './integrationHealth.service.js';
 export { agentDraftService, DraftError, fingerprintSettings } from './agentDraft.service.js';
 export type { DraftRow, DraftState, PublishResult } from './agentDraft.service.js';

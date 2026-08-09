@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { StatusPill } from '@/components/StatusPill';
 import { useSession } from '@/lib/SessionProvider';
 import { clientStatusTerm } from '@/lib/vocabulary';
+import { BrandingPanel } from './BrandingPanel';
 
 /**
  * The client record: who this tenant is and how calls reach them.
@@ -299,6 +300,12 @@ export default function ClientDetailPage() {
           )}
         </div>
       </section>
+
+      {canWrite && (
+        <div className="mt-6">
+          <BrandingPanel clientId={id} />
+        </div>
+      )}
     </div>
   );
 }

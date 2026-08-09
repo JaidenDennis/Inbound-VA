@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Building2, Phone, Calendar,
   BarChart2, Settings, Database, Users, LifeBuoy, ListChecks, LogOut,
   Activity, Bot, BookOpen, ScrollText, Menu, X, Plug, Sparkles,
+  Inbox, TrendingUp, BellRing,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
@@ -34,6 +35,9 @@ const staffNav: NavGroup[] = [
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
       { href: '/dashboard/assistant', label: 'Assistant', icon: Sparkles },
+      // Above Calls deliberately: this is the list with things waiting on a
+      // person, and it should be the second thing an operator looks at.
+      { href: '/dashboard/queue', label: 'Work Queue', icon: Inbox, permission: 'flags:read' },
       { href: '/dashboard/calls', label: 'Calls', icon: Phone, permission: 'calls:read' },
       { href: '/dashboard/bookings', label: 'Bookings', icon: Calendar, permission: 'bookings:read' },
       { href: '/dashboard/support', label: 'Support', icon: LifeBuoy, permission: 'tickets:read' },
@@ -49,12 +53,16 @@ const staffNav: NavGroup[] = [
       { href: '/dashboard/connections', label: 'Connections', icon: Plug, permission: 'crm:read' },
       { href: '/dashboard/crm', label: 'CRM Sync', icon: Database, permission: 'crm:read' },
       { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2, permission: 'analytics:read' },
+      // Per-tenant by design — staff reach it through the client picker. It is
+      // the view the client sees, which is exactly why staff need it too.
+      { href: '/dashboard/business', label: 'Business', icon: TrendingUp, permission: 'analytics:read' },
     ],
   },
   {
     label: 'System',
     items: [
       { href: '/dashboard/system', label: 'System Health', icon: Activity, permission: 'system:read' },
+      { href: '/dashboard/alerts', label: 'Alerts', icon: BellRing, permission: 'analytics:read' },
       { href: '/dashboard/users', label: 'Users', icon: Users, permission: 'users:read' },
       { href: '/dashboard/audit', label: 'Audit Log', icon: ScrollText, permission: 'system:read' },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings, permission: 'settings:read' },
@@ -68,12 +76,17 @@ const clientNav: NavGroup[] = [
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
       { href: '/dashboard/assistant', label: 'Assistant', icon: Sparkles },
+      // Business before Reports: the owner cares what it is worth before what it
+      // did. Reports stays as the call-by-call detail behind these figures.
+      { href: '/dashboard/business', label: 'Business', icon: TrendingUp, permission: 'analytics:read' },
+      { href: '/dashboard/queue', label: 'Work Queue', icon: Inbox, permission: 'flags:read' },
       { href: '/dashboard/reports', label: 'Reports', icon: BarChart2, permission: 'analytics:read' },
       { href: '/dashboard/agent', label: 'My Agent', icon: Bot, permission: 'knowledge:read' },
       { href: '/dashboard/knowledge', label: 'Knowledge', icon: BookOpen, permission: 'knowledge:read' },
       { href: '/dashboard/connections', label: 'Connections', icon: Plug, permission: 'crm:read' },
       { href: '/dashboard/support', label: 'Support', icon: LifeBuoy, permission: 'tickets:read' },
       { href: '/dashboard/onboarding', label: 'Onboarding', icon: ListChecks, permission: 'clients:read' },
+      { href: '/dashboard/alerts', label: 'Alerts', icon: BellRing, permission: 'analytics:read' },
       { href: '/dashboard/team', label: 'Team', icon: Users, permission: 'users:write' },
     ],
   },
