@@ -44,6 +44,7 @@ import { connectionRoutes } from './dashboard-api/connections.route.js';
 import { aiRoutes } from './dashboard-api/ai.route.js';
 import { reportRoutes } from './dashboard-api/reports.route.js';
 import { ownerReportRoutes } from './dashboard-api/owner-reports.route.js';
+import { queueRoutes } from './dashboard-api/queue.route.js';
 
 /**
  * Record a 5xx in `system_errors`, tagged with the tenant when the request
@@ -219,6 +220,7 @@ export async function buildApp() {
   await app.register(aiRoutes);
   await app.register(reportRoutes);
   await app.register(ownerReportRoutes);
+  await app.register(queueRoutes);
 
   return app;
 }
