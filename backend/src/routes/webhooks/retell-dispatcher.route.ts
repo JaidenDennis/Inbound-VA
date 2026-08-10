@@ -107,16 +107,82 @@ async function onCallEnded(body: RetellCallEndedPayload, req: FastifyRequest, re
   return reply.code(200).send({ ok: true });
 }
 
+/**
+ * Rebuild the `calls` row for a call whose `call_started` never landed.
+ *
+ * Returns null only when the tenant cannot be resolved at all.
+ *
+ * call_started is the one webhook with no second chance: miss it (cold start,
+ * deploy, a transient throw in the handler) and every later stage keyed on the
+ * calls row is lost with it. That was 24 of 41 analyzed calls in production —
+ * real inbound calls on the same numbers as the ones that worked, so this is
+ * intermittent delivery, not misconfiguration, and it will happen again.
+ *
+ * The call_analyzed payload carries everything the row needs, so a miss is
+ * recoverable rather than terminal. recordFromAnalyzed already self-heals the
+ * tenant from agent_id, and route_intent already self-heals a missing workflow
+ * session; this closes the same gap for the call itself.
+ */
+async function ensureCallRow(analyzed: RetellAnalyzedCall, req: FastifyRequest) {
+  const retellCallId = analyzed.call_id!;
+  const existing = await callService.findByRetellId(retellCallId);
+  if (existing) return existing;
+
+  const toNumber = typeof analyzed.to_number === 'string' ? analyzed.to_number : '';
+  const fromNumber = typeof analyzed.from_number === 'string' ? analyzed.from_number : '';
+  const client =
+    (toNumber ? await clientService.findByPhoneNumber(toNumber) : null) ??
+    (analyzed.agent_id ? await clientService.findByAgentId(analyzed.agent_id) : null);
+  if (!client) {
+    req.log.warn(
+      { retellCallId, agentId: analyzed.agent_id, toNumber },
+      'call_analyzed for an unknown tenant — cannot rebuild calls row'
+    );
+    return null;
+  }
+
+  // Web calls (Retell dashboard tests) have no numbers at all, and
+  // contacts.phone / calls.from_number are both NOT NULL. An empty string is
+  // how this codebase already stores a phoneless party (see contactService's
+  // upsertByIdentity), so reuse that rather than inventing a sentinel.
+  const contact = fromNumber
+    ? await contactService.upsertByPhone(client.id, fromNumber, { phone: fromNumber })
+    : null;
+
+  const startMs = Number(analyzed.start_timestamp);
+  const endMs = Number(analyzed.end_timestamp);
+  await callService.upsertCallByRetellId({
+    client_id: client.id,
+    contact_id: contact?.id ?? null,
+    retell_call_id: retellCallId,
+    direction: analyzed.direction === 'outbound' ? 'outbound' : 'inbound',
+    from_number: fromNumber,
+    to_number: toNumber,
+    status: 'completed',
+    started_at: new Date(Number.isFinite(startMs) ? startMs : Date.now()).toISOString(),
+    ended_at: Number.isFinite(endMs) ? new Date(endMs).toISOString() : null,
+    duration_seconds:
+      typeof analyzed.duration_ms === 'number' ? Math.round(analyzed.duration_ms / 1000) : null,
+    recording_url: typeof analyzed.recording_url === 'string' ? analyzed.recording_url : null,
+  });
+
+  req.log.info({ retellCallId, clientId: client.id }, 'Rebuilt calls row from call_analyzed');
+  // Re-read rather than trusting the upsert's return: on a race with a late
+  // call_started the insert is ignored, and the winning row is the one to use.
+  return callService.findByRetellId(retellCallId);
+}
+
 async function onCallAnalyzed(body: RetellSummaryPayload, envelope: RetellEnvelope, req: FastifyRequest, reply: FastifyReply) {
   const { call } = body;
+  const analyzed = envelope.call as unknown as RetellAnalyzedCall;
 
   // Client-dashboard call_record (idempotent on retell_call_id). Resolves the
   // tenant from agent_id itself, so it runs independently of the calls row and
   // is safe even if call_started was missed.
-  await callRecordService.recordFromAnalyzed(envelope.call as unknown as RetellAnalyzedCall);
+  await callRecordService.recordFromAnalyzed(analyzed);
 
-  const existing = await callService.findByRetellId(call.call_id);
-  if (!existing) return reply.code(404).send({ error: 'Call not found' });
+  const existing = await ensureCallRow(analyzed, req);
+  if (!existing) return reply.code(404).send({ error: 'Client not found' });
 
   const analysis = call.call_analysis;
   await callService.upsertSummary({

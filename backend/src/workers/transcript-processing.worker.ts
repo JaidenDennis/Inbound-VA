@@ -13,13 +13,24 @@ async function processTranscript(job: Job<TranscriptProcessingJobData>): Promise
   const wordCount = transcript.reduce((acc, t) => acc + t.content.split(' ').length, 0);
   const fullText = transcript.map((t) => `[${t.role.toUpperCase()}]: ${t.content}`).join('\n');
 
-  // Upsert transcript record
-  await supabase.from('call_transcripts').upsert({
+  // Upsert transcript record.
+  //
+  // The error is checked and THROWN rather than ignored. This write silently
+  // failed 42P10 on every call the platform ever took (call_transcripts had a
+  // plain, not unique, index on call_id — see migration 028) and nobody found
+  // out, because an unchecked `{ error }` here reads exactly like success: the
+  // worker went on to log "Transcript processing complete" over a table that
+  // had never received a row. Throwing puts a failure into BullMQ's retry path
+  // and, once retries are exhausted, into failed_jobs where it is visible.
+  const { error: transcriptError } = await supabase.from('call_transcripts').upsert({
     call_id: callId,
     client_id: clientId,
     transcript,
     word_count: wordCount,
   }, { onConflict: 'call_id' });
+  if (transcriptError) {
+    throw new Error(`Failed to store transcript for call ${callId}: ${transcriptError.message}`);
+  }
 
   // Quality scoring and knowledge-gap extraction (migration 023).
   //

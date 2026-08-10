@@ -17,6 +17,22 @@ export class CallService {
     return call as Call;
   }
 
+  /**
+   * Insert a calls row, doing nothing if one already exists for that Retell id.
+   *
+   * Used to rebuild a row whose `call_started` was never delivered. Deliberately
+   * insert-or-ignore rather than a true upsert: a row that already exists was
+   * written by call_started/call_ended, which saw the live call, and must not be
+   * overwritten by a reconstruction. `retell_call_id` is UNIQUE, so this also
+   * settles the race where a retried call_started lands at the same moment.
+   */
+  async upsertCallByRetellId(data: Partial<Call>): Promise<void> {
+    const { error } = await supabase
+      .from('calls')
+      .upsert({ id: uuidv4(), ...data }, { onConflict: 'retell_call_id', ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
+  }
+
   async findByRetellId(retellCallId: string): Promise<Call | null> {
     const { data } = await supabase
       .from('calls')
