@@ -7,6 +7,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * client editing twelve FAQs must cause one provision, not twelve.
  */
 
+/**
+ * BullMQ's own custom-job-id rules, copied from Job.validateOptions:
+ *   - a purely numeric id is rejected
+ *   - an id containing ':' is rejected unless it has exactly two of them
+ *     (a legacy carve-out for repeatable jobs)
+ *
+ * The mock enforces them because the plain `add: vi.fn()` it replaces is why
+ * this file happily asserted `jobId === 'agent-sync:client-a'` for months while
+ * production answered 500 "Custom Id cannot contain :" to every knowledge-base
+ * save, the hours save and the Publish Now button. A queue double that accepts
+ * what the real queue rejects is not a double, it is a blindfold.
+ */
+export function assertValidBullMqJobId(jobId: unknown): void {
+  if (typeof jobId !== 'string') return; // undefined is legal — BullMQ assigns one
+  if (`${parseInt(jobId, 10)}` === jobId) {
+    throw new Error('Custom Id cannot be integers');
+  }
+  if (jobId.includes(':') && jobId.split(':').length !== 3) {
+    throw new Error('Custom Id cannot contain :');
+  }
+}
+
 const queue = vi.hoisted(() => ({
   add: vi.fn(),
   getJob: vi.fn(),
@@ -45,7 +67,10 @@ describe('agent sync — coalescing', () => {
     vi.clearAllMocks();
     db.updates.length = 0;
     queue.getJob.mockResolvedValue(null);
-    queue.add.mockResolvedValue({ id: 'job-1' });
+    queue.add.mockImplementation((_name: string, _data: unknown, opts?: { jobId?: string }) => {
+      assertValidBullMqJobId(opts?.jobId);
+      return Promise.resolve({ id: 'job-1' });
+    });
   });
 
   it('marks the client pending so the dashboard can say the agent is stale', async () => {
@@ -62,7 +87,7 @@ describe('agent sync — coalescing', () => {
     expect(queue.add).toHaveBeenCalledTimes(1);
     const [, payload, opts] = queue.add.mock.calls[0];
     expect(payload).toEqual({ clientId: 'client-a', userId: undefined });
-    expect(opts.jobId).toBe('agent-sync:client-a');
+    expect(opts.jobId).toBe('agent-sync-client-a');
     expect(opts.delay).toBe(SYNC_DEBOUNCE_MS);
   });
 
@@ -70,7 +95,7 @@ describe('agent sync — coalescing', () => {
     for (let i = 0; i < 12; i += 1) await agentSyncService.requestSync('client-a');
 
     const jobIds = new Set(queue.add.mock.calls.map((c) => c[2].jobId));
-    expect(jobIds).toEqual(new Set(['agent-sync:client-a']));
+    expect(jobIds).toEqual(new Set(['agent-sync-client-a']));
   });
 
   it('keeps different clients on separate jobs', async () => {
@@ -78,7 +103,7 @@ describe('agent sync — coalescing', () => {
     await agentSyncService.requestSync('client-b');
 
     const jobIds = queue.add.mock.calls.map((c) => c[2].jobId);
-    expect(jobIds).toEqual(['agent-sync:client-a', 'agent-sync:client-b']);
+    expect(jobIds).toEqual(['agent-sync-client-a', 'agent-sync-client-b']);
   });
 });
 
@@ -86,7 +111,10 @@ describe('agent sync — immediate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     db.updates.length = 0;
-    queue.add.mockResolvedValue({ id: 'job-1' });
+    queue.add.mockImplementation((_name: string, _data: unknown, opts?: { jobId?: string }) => {
+      assertValidBullMqJobId(opts?.jobId);
+      return Promise.resolve({ id: 'job-1' });
+    });
   });
 
   it('runs without the coalescing delay', async () => {
@@ -103,8 +131,43 @@ describe('agent sync — immediate', () => {
 
     await agentSyncService.requestSync('client-a', { immediate: true });
 
-    expect(queue.getJob).toHaveBeenCalledWith('agent-sync:client-a');
+    expect(queue.getJob).toHaveBeenCalledWith('agent-sync-client-a');
     expect(remove).toHaveBeenCalled();
+  });
+});
+
+describe('agent sync — job ids BullMQ will actually accept', () => {
+  // The regression that broke Publish Now, every knowledge-base save and the
+  // business-hours save with 500 "Custom Id cannot contain :".
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.updates.length = 0;
+    queue.getJob.mockResolvedValue(null);
+    queue.add.mockImplementation((_name: string, _data: unknown, opts?: { jobId?: string }) => {
+      assertValidBullMqJobId(opts?.jobId);
+      return Promise.resolve({ id: 'job-1' });
+    });
+  });
+
+  it('produces a colon-free id on the debounced path', async () => {
+    await agentSyncService.requestSync('3f2b9c14-8d7a-4e6f-9a1b-2c3d4e5f6a7b');
+    expect(queue.add.mock.calls[0][2].jobId).not.toContain(':');
+  });
+
+  it('produces a colon-free id on the immediate path', async () => {
+    // The one Publish Now uses. It was the worse of the two: `agent-sync:<id>:now:<ts>`
+    // carried three colons where BullMQ tolerates only exactly two.
+    await agentSyncService.requestSync('3f2b9c14-8d7a-4e6f-9a1b-2c3d4e5f6a7b', { immediate: true });
+    expect(queue.add.mock.calls[0][2].jobId).not.toContain(':');
+  });
+
+  it('the guard itself rejects what BullMQ rejects', () => {
+    expect(() => assertValidBullMqJobId('agent-sync:client-a')).toThrow('Custom Id cannot contain :');
+    expect(() => assertValidBullMqJobId('agent-sync:client-a:now:123')).toThrow('Custom Id cannot contain :');
+    expect(() => assertValidBullMqJobId('12345')).toThrow('Custom Id cannot be integers');
+    // Exactly two colons is BullMQ's legacy repeatable-job carve-out.
+    expect(() => assertValidBullMqJobId('a:b:c')).not.toThrow();
+    expect(() => assertValidBullMqJobId('agent-sync-client-a')).not.toThrow();
   });
 });
 

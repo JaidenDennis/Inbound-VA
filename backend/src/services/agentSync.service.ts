@@ -15,8 +15,22 @@ export const SYNC_DEBOUNCE_MS = 60_000;
 
 export type AgentSyncState = 'never' | 'pending' | 'synced' | 'failed';
 
+/**
+ * BullMQ rejects a custom job id containing ':' unless it has exactly two of
+ * them (a legacy carve-out for repeatable jobs — see Job.validateOptions). The
+ * original `agent-sync:${clientId}` had one, so EVERY call threw
+ * "Custom Id cannot contain :" before the job was ever queued.
+ *
+ * That single character took down three separate user-visible features, because
+ * everything that changes what the agent says routes through requestSync():
+ * the Publish Now button, every knowledge-base save (FAQs, services, pricing,
+ * promotions, policies) and the business-hours save. All of them 500'd.
+ *
+ * Separator is now '-'. Client ids are UUIDs, which contain no colons, so the
+ * result is colon-free by construction.
+ */
 function jobIdFor(clientId: string): string {
-  return `agent-sync:${clientId}`;
+  return `agent-sync-${clientId}`;
 }
 
 export class AgentSyncService {
@@ -43,7 +57,11 @@ export class AgentSyncService {
       // this one and re-provision for nothing.
       const pending = await agentProvisioningQueue.getJob(jobId);
       if (pending) await pending.remove().catch(() => undefined);
-      await agentProvisioningQueue.add('provision', { clientId, userId: opts.userId }, { jobId: `${jobId}:now:${Date.now()}` });
+      await agentProvisioningQueue.add(
+        'provision',
+        { clientId, userId: opts.userId },
+        { jobId: `${jobId}-now-${Date.now()}` }
+      );
       return;
     }
 
