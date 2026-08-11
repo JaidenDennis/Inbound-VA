@@ -1,4 +1,4 @@
-import Fastify, { type FastifyError, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyError } from 'fastify';
 import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -8,8 +8,7 @@ import { env } from './config/index.js';
 import { logger, LOG_REDACT_PATHS, initSentry, captureException } from './utils/index.js';
 import { redis } from './queues/index.js';
 import { registerAutomationSubscribers } from './automation/index.js';
-import { systemErrorService, fingerprintFor } from './services/systemError.service.js';
-import { systemAlertService } from './services/systemAlert.service.js';
+import { recordRequestError } from './utils/request-error.js';
 
 // Routes
 import { healthRoutes } from './routes/health.route.js';
@@ -46,49 +45,6 @@ import { reportRoutes } from './dashboard-api/reports.route.js';
 import { ownerReportRoutes } from './dashboard-api/owner-reports.route.js';
 import { queueRoutes } from './dashboard-api/queue.route.js';
 import { alertRoutes } from './dashboard-api/alerts.route.js';
-
-/**
- * Record a 5xx in `system_errors`, tagged with the tenant when the request
- * carried one. The client is taken from the verified JWT first and only then
- * from the URL/body, so a caller cannot mislabel someone else's error.
- */
-async function recordRequestError(
-  request: FastifyRequest,
-  error: FastifyError,
-  status: number
-): Promise<void> {
-  const jwtUser = (request as { jwtUser?: { clientId?: string | null } }).jwtUser;
-  const params = (request.params ?? {}) as Record<string, string>;
-  const query = (request.query ?? {}) as Record<string, string>;
-  const clientId = jwtUser?.clientId ?? query.clientId ?? params.clientId ?? null;
-
-  const fault = {
-    source: 'api' as const,
-    severity: status >= 500 ? ('error' as const) : ('warn' as const),
-    clientId,
-    requestId: request.id,
-    // routerPath is the pattern ("/clients/:id"), so every id hits one
-    // fingerprint instead of one per record.
-    route: request.routeOptions?.url ?? request.url,
-    method: request.method,
-    statusCode: status,
-    error,
-    context: { query, params },
-  };
-
-  await systemErrorService.record(fault);
-  await systemAlertService.maybeOpenTicket({
-    fingerprint: fingerprintFor({
-      source: 'api',
-      errorName: error.name || 'Error',
-      route: fault.route,
-      message: error.message ?? '',
-    }),
-    clientId,
-    title: `${request.method} ${fault.route}`,
-    detail: error.message ?? 'Request failed',
-  });
-}
 
 export async function buildApp() {
   // Report unhandled request errors to Sentry (no-op without SENTRY_DSN).
@@ -176,10 +132,10 @@ export async function buildApp() {
     // Only server-side (5xx) faults are worth alerting on; 4xx are client errors.
     const status = error.statusCode ?? 500;
     if (status >= 500) {
-      captureException(error, { url: request.url, method: request.method });
+      const sentryEventId = captureException(error, { url: request.url, method: request.method });
       // Persist for the system console. Fire-and-forget: the reply must not wait
       // on a log write, and a failure here is swallowed inside the service.
-      void recordRequestError(request, error, status);
+      void recordRequestError(request, error, status, sentryEventId);
     }
     if (error.statusCode) {
       reply.code(error.statusCode).send({ error: error.message });

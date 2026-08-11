@@ -17,7 +17,7 @@ const FLUSH_TIMEOUT_MS = 2_000;
 
 async function recordFatal(kind: string, err: Error, service: string): Promise<void> {
   logger.fatal({ err, kind, service }, 'Fatal process error');
-  captureException(err, { kind, service });
+  const sentryEventId = captureException(err, { kind, service });
 
   const write = systemErrorService.record({
     source: 'startup',
@@ -25,6 +25,7 @@ async function recordFatal(kind: string, err: Error, service: string): Promise<v
     route: kind,
     error: err,
     context: { service, kind },
+    sentryEventId,
   });
 
   await Promise.race([write, new Promise((resolve) => setTimeout(resolve, FLUSH_TIMEOUT_MS))]);
