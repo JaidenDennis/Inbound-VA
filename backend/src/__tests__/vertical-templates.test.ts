@@ -379,6 +379,23 @@ describe('apartment template specifics', () => {
     expect(p).toMatch(/Never troubleshoot a maintenance emergency and never log it as a routine work order/);
   });
 
+  it('covers medical emergencies in the one spoken life-safety line, not just gas and fire', () => {
+    const p = cfg({});
+    // The line is triggered by "a medical emergency" as well as gas/fire, so the
+    // words the agent actually says must cover a collapsed spouse — not recite
+    // gas-leak evacuation steps at them.
+    const spoken = /Say exactly: "([^"]+)"/.exec(p);
+    expect(spoken).not.toBeNull();
+    const line = spoken![1];
+    expect(line).toMatch(/hurt or having a medical emergency/i);
+    expect(line).toMatch(/fire/);
+    expect(line).toMatch(/hang up and dial 9-1-1 right now/);
+    // The gas instruction stays conditional so it is not read to a caller whose
+    // emergency has nothing to do with gas.
+    expect(line).toMatch(/if you smell gas, leave the building first/);
+    expect(p.match(/dial 9-1-1/g)).toHaveLength(1);
+  });
+
   it('lists the habitability emergencies that are not 9-1-1 calls', () => {
     const p = cfg({});
     expect(p).toMatch(/active flooding or a burst pipe/);
@@ -386,6 +403,46 @@ describe('apartment template specifics', () => {
     expect(p).toMatch(/no heat/);
     expect(p).toMatch(/elevator entrapment/);
     expect(p).toMatch(/broken exterior door or lock/);
+  });
+
+  it('sends habitability calls to emergency_flag but suppresses the 9-1-1 guidance it returns', () => {
+    const p = cfg({ emergency_maintenance_line: '904-555-0111' });
+    // emergency_flag's own tool description says "EMERGENCIES ONLY: medical
+    // emergency, threat, or immediate danger", so the prompt has to say out loud
+    // that it is still the right tool here.
+    expect(p).toMatch(/It is the right tool for these even though its description talks about immediate danger/);
+    // …and the endpoint answers with a canned "hang up and dial 9-1-1" line that
+    // must never reach a burst-pipe caller.
+    expect(p).toMatch(/emergency_flag answers with guidance that tells you to send the caller to emergency services/);
+    expect(p).toMatch(/you must NOT speak it, NOT paraphrase it, and NOT mention emergency services at all/);
+    expect(p).toMatch(/INSTEAD give the 24-hour emergency maintenance line/);
+    expect(p).toContain('904-555-0111');
+  });
+
+  it('forbids reading configured text that characterizes the area, residents, schools, or safety', () => {
+    const p = cfg({});
+    expect(p).toMatch(/Being configured does not make a line safe to say/);
+    expect(p).toMatch(
+      /characterizes the area, the neighborhood, the residents, the schools, the safety, or who would fit in here/
+    );
+    expect(p).toMatch(/do NOT read it aloud, do not summarize it, and do not agree with the caller about it, EVEN THOUGH it is configured/);
+  });
+
+  it('answers the assistance-animal question outright and records nothing about the disability', () => {
+    const p = cfg({ pets_allowed: false });
+    expect(p).toMatch(/ANSWER this question directly — do not deflect it and do not take a message instead of answering/);
+    expect(p).toMatch(
+      /assistance animals are not pets and are never subject to pet rent, pet fees, breed restrictions, or weight limits/
+    );
+    // Jointly satisfiable with rule 2: answering requires writing nothing down.
+    expect(p).toMatch(/never write the animal, the disability, or the reason into a slot, a note, or a message/);
+    expect(p).toMatch(/answering the policy question requires recording nothing at all/);
+    // Only the accommodation REQUEST is routed, via the existing escalation section.
+    expect(p).toMatch(/reasonable-accommodation or modification REQUEST goes to a person/);
+    expect(p).toMatch(/ESCALATE TO A HUMAN below already covers that/);
+    // The no-pets OFFERINGS line used to send the whole question away, which is
+    // the same stonewall by another route.
+    expect(p).not.toMatch(/route any assistance-animal question to the office/);
   });
 
   it('collects a full work order and promises nothing', () => {
@@ -445,7 +502,13 @@ describe('apartment template specifics', () => {
     expect(off).toMatch(/no online application is configured/i);
     expect(off).toMatch(/no resident portal is configured/i);
     expect(off).toMatch(/no 24-hour emergency line is configured/i);
-    expect(off).not.toMatch(/Self-guided tours are also available/);
+
+    // self_guided_tours is nested under tours_enabled: with phone tours off, the
+    // self-guided line must stay out even when the flag itself is on. Asserting
+    // this on an empty config would pass with the nesting removed entirely.
+    const selfGuidedOnly = cfg({ tours_enabled: false, self_guided_tours: true });
+    expect(selfGuidedOnly).toMatch(/Tours: NOT booked over the phone/);
+    expect(selfGuidedOnly).not.toMatch(/Self-guided tours are also available/);
   });
 
   it('states the pet policy without ever letting it touch assistance animals', () => {
