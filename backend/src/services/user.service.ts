@@ -6,6 +6,13 @@ import type { User, UserRole } from '../types/index.js';
 // Columns safe to return to clients — never expose password_hash.
 const PUBLIC_COLUMNS = 'id,email,name,role,client_id,is_active,last_login_at,created_at,updated_at';
 
+// Single source of truth for the users.email UNIQUE-violation message. Read at
+// four sites (here x2, and the 23505-translation catch blocks in
+// users.route.ts x2) — a reworded message anywhere but here would make those
+// route-level `message === DUPLICATE_EMAIL_ERROR` checks miss, and a thrown
+// Error with no statusCode falls through to a bare 500 instead of a 409.
+export const DUPLICATE_EMAIL_ERROR = 'A user with that email already exists';
+
 export interface CreateUserInput {
   email: string;
   name: string;
@@ -72,7 +79,7 @@ export class UserService {
       .single();
 
     if (error) {
-      if (error.code === '23505') throw new Error('A user with that email already exists');
+      if (error.code === '23505') throw new Error(DUPLICATE_EMAIL_ERROR);
       throw new Error(error.message);
     }
     logger.info({ userId: data.id, role: data.role, clientId: data.client_id }, 'User created');
@@ -94,7 +101,7 @@ export class UserService {
       .select(PUBLIC_COLUMNS)
       .single();
     if (error) {
-      if (error.code === '23505') throw new Error('A user with that email already exists');
+      if (error.code === '23505') throw new Error(DUPLICATE_EMAIL_ERROR);
       throw new Error(error.message);
     }
     return data as User;

@@ -54,14 +54,21 @@ export class SystemErrorService {
    * so a failure here must never mask or replace the original error.
    */
   async record(input: RecordErrorInput): Promise<string | null> {
-    const errorName = input.error.name || 'Error';
-    const message = redactText(input.error.message || 'Unknown error');
-    const stack = input.error.stack ? redactText(input.error.stack) : null;
+    // input.error is typed as Error | {name?, message, stack?}, but callers
+    // invoke record() with `void`, so a non-Error rejection (e.g. a rejected
+    // promise with `null`, or any value that isn't actually an Error/error-like
+    // object) would throw HERE, outside the try/catch below, and become an
+    // unhandled rejection instead of the best-effort no-op this method promises
+    // to be.
+    const err = input.error instanceof Error ? input.error : new Error(String(input.error));
+    const errorName = err.name || 'Error';
+    const message = redactText(err.message || 'Unknown error');
+    const stack = err.stack ? redactText(err.stack) : null;
     const fingerprint = fingerprintFor({
       source: input.source,
       errorName,
       route: input.route,
-      message: input.error.message || '',
+      message: err.message || '',
     });
 
     try {

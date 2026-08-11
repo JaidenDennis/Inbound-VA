@@ -60,6 +60,7 @@ export const ACTIVITY_SOURCE: Record<string, Term> = {
   worker: { label: 'Worker', hint: 'Raised in a background queue worker, away from any request.' },
   webhook: { label: 'Webhook', hint: 'Raised while processing a provider callback, such as Retell.' },
   startup: { label: 'Startup', hint: 'Raised while the process was booting. Often configuration.' },
+  email: { label: 'Email', hint: 'Raised sending mail: an unconfigured SMTP transport, or a send that failed.' },
 };
 
 /** Whether a human has looked at it. */

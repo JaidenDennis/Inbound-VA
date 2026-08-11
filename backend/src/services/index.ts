@@ -1,7 +1,7 @@
 export { clientService, ClientService } from './client.service.js';
 export { contactService, ContactService } from './contact.service.js';
 export { callService, CallService } from './call.service.js';
-export { userService, UserService } from './user.service.js';
+export { userService, UserService, DUPLICATE_EMAIL_ERROR } from './user.service.js';
 export { ticketService, TicketService } from './ticket.service.js';
 export { onboardingService, OnboardingService } from './onboarding.service.js';
 export { actionItemService, ActionItemService } from './actionItem.service.js';

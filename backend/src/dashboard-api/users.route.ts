@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { userService, writeAuditLog } from '../services/index.js';
+import { userService, writeAuditLog, DUPLICATE_EMAIL_ERROR } from '../services/index.js';
 import { requireAuth, requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
 import { ALL_ROLES, CLIENT_ROLES, roleScope, type JwtPayload, type UserRole } from '../types/index.js';
 
@@ -171,7 +171,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         updated = await userService.update(request.params.id, body);
       } catch (err) {
         const message = (err as Error).message;
-        if (message === 'A user with that email already exists') {
+        if (message === DUPLICATE_EMAIL_ERROR) {
           return reply.code(409).send({ error: message });
         }
         throw err;
@@ -233,7 +233,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         updated = await userService.update(actor.sub, body);
       } catch (err) {
         const message = (err as Error).message;
-        if (message === 'A user with that email already exists') {
+        if (message === DUPLICATE_EMAIL_ERROR) {
           return reply.code(409).send({ error: message });
         }
         throw err;

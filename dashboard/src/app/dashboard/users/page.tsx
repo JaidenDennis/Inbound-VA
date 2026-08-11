@@ -85,6 +85,14 @@ export default function UsersPage() {
     : editing.id === auth?.sub ? 'self'
     : 'other';
 
+  // The edit form's role dropdown must offer the TARGET's role family, not the
+  // caller's. Platform staff can see and edit client users (the list applies no
+  // client_id filter for them), so using `roles` (the actor's family) here would
+  // render platform-only options for a client user — the selected value would
+  // match none of them, and saving would send a platform role for a tenant user,
+  // which validateRoleScope rejects with a 400.
+  const editRoles: readonly UserRole[] = editing?.client_id ? CLIENT_ROLES : PLATFORM_ROLES;
+
   const startEdit = (u: AppUser) => {
     setEditing(u);
     setEditEmail(u.email);
@@ -218,7 +226,7 @@ export default function UsersPage() {
                 value={editRole}
                 onChange={(e) => setEditRole(e.target.value as UserRole)}
               >
-                {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                {editRoles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
               </select>
             </div>
           )}

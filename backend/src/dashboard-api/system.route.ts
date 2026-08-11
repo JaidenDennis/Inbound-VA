@@ -8,7 +8,7 @@ import type { JwtPayload } from '../types/index.js';
 
 const listQuerySchema = z.object({
   kind: z.string().optional(),
-  source: z.enum(['api', 'worker', 'webhook', 'startup']).optional(),
+  source: z.enum(['api', 'worker', 'webhook', 'startup', 'email']).optional(),
   severity: z.enum(['warn', 'error', 'fatal']).optional(),
   clientId: z.string().uuid().optional(),
   from: z.string().optional(),

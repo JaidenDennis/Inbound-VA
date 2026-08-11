@@ -12,7 +12,20 @@ vi.mock('../services/index.js', () => ({
   userService: svc,
   withAudit: vi.fn(async (o: { mutate: () => Promise<unknown> }) => o.mutate()),
   writeAuditLog: audit.writeAuditLog,
+  // Must mirror the real constant (user.service.ts): users.route.ts compares
+  // a thrown Error's message against this to translate a lost uniqueness race
+  // into 409. Leaving it out of the mock makes that comparison `=== undefined`
+  // and silently turns the 409 race test back into a 500.
+  DUPLICATE_EMAIL_ERROR: 'A user with that email already exists',
 }));
+
+// requireAuth() must be OBSERVABLE per-request, not just called once at route
+// registration. `preHandler: requireAuth()` calls the factory when the route is
+// registered either way — what proves the preHandler is actually wired up is
+// whether the function IT RETURNS runs on each request. A test that only checks
+// the factory was called would still pass if someone deleted `preHandler:
+// requireAuth()` entirely, since import-time evaluation still happens.
+const requireAuthInvocations = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('../middleware/index.js', () => ({
   // requireAuth is a factory in the real module (see auth.middleware.ts), just
@@ -20,15 +33,41 @@ vi.mock('../middleware/index.js', () => ({
   // preHandler. Mocking it as a bare `vi.fn()` (or as the preHandler itself)
   // would hand Fastify the wrong shape; a bare `vi.fn()` in particular reads
   // as callback-style (arity 3) and hangs the request forever.
-  requireAuth: () => async (_req: unknown, _reply: unknown) => undefined,
+  requireAuth: () => async (_req: unknown, _reply: unknown) => {
+    requireAuthInvocations.count += 1;
+  },
   requirePermission: () => async (_req: unknown, _reply: unknown) => undefined,
   assertClientAccess: (actor: { clientId?: string | null }, clientId: string | null) =>
     !actor.clientId || actor.clientId === clientId,
   isPlatformUser: (actor: { clientId?: string | null }) => !actor.clientId,
 }));
 
+// A separate, minimal Supabase double for the real UserService.update() tests
+// below (F5c). This intentionally bypasses the '../services/index.js' mock
+// above by importing '../services/user.service.js' directly — the module
+// under test there is the real implementation, not the `svc` stub, so the
+// lower-casing in UserService.update() itself is what gets exercised.
+let capturedUpdatePatch: Record<string, unknown> | null = null;
+vi.mock('../db/index.js', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      update: vi.fn((patch: Record<string, unknown>) => {
+        capturedUpdatePatch = patch;
+        return {
+          eq: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(() => Promise.resolve({ data: { id: 'u-1', ...patch }, error: null })),
+            })),
+          })),
+        };
+      }),
+    })),
+  },
+}));
+
 import Fastify from 'fastify';
 import { userRoutes } from '../dashboard-api/users.route.js';
+import { userService as realUserService } from '../services/user.service.js';
 
 const PLATFORM = { sub: 'staff-1', clientId: null, role: 'super_admin' };
 const CLIENT_ADMIN = { sub: 'ca-1', clientId: 'client-a', role: 'client_admin' };
@@ -150,6 +189,22 @@ describe('user editing', () => {
 
     expect(res.statusCode).toBe(200);
   });
+
+  it('403s a client_admin of client-a editing a user who belongs to client-b', async () => {
+    // Tenant isolation, not role-family validation: the target is a perfectly
+    // ordinary client role, just scoped to a different tenant than the actor.
+    // assertClientAccess (mocked above as `!actor.clientId || actor.clientId
+    // === clientId`) is what must catch this.
+    svc.findById.mockResolvedValue({ id: 'u-cross', client_id: 'client-b', role: 'client_viewer', is_active: true });
+    const app = await build(CLIENT_ADMIN);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/users/u-cross', payload: { email: 'new@example.com' },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(svc.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('self-service PATCH /me', () => {
@@ -193,5 +248,37 @@ describe('self-service PATCH /me', () => {
     const res = await app.inject({ method: 'PATCH', url: '/me', payload: { email: 'taken@example.com' } });
 
     expect(res.statusCode).toBe(409);
+  });
+
+  it('is gated on authentication — removing the preHandler must fail this test', async () => {
+    // requireAuth() (mocked at top of file) returns a preHandler that increments
+    // requireAuthInvocations.count each time it actually RUNS on a request. The
+    // factory call alone (at route registration) proves nothing — it happens
+    // whether or not `preHandler: requireAuth()` is wired into the route options,
+    // since `requireAuth()` is evaluated as an expression either way. Only the
+    // returned function running on THIS request proves the preHandler is attached.
+    requireAuthInvocations.count = 0;
+    svc.findById.mockResolvedValue({ id: 'ca-1', client_id: 'client-a', role: 'client_admin', is_active: true });
+    const app = await build(CLIENT_ADMIN);
+
+    await app.inject({ method: 'PATCH', url: '/me', payload: { email: 'me@example.com' } });
+
+    expect(requireAuthInvocations.count).toBe(1);
+  });
+});
+
+describe('UserService.update — email normalization (F5c)', () => {
+  // Bypasses the userService mock entirely to exercise the real
+  // implementation (see the '../db/index.js' mock above). This is what
+  // actually prevents case-duplicate accounts: create() already lower-cases on
+  // insert, and findByEmail() already lower-cases its lookup, so update() must
+  // lower-case too or "Sam@x.com" and "sam@x.com" would both pass the
+  // pre-check and collide only at the database constraint.
+  it('lower-cases the email in the patch sent to the database', async () => {
+    capturedUpdatePatch = null;
+
+    await realUserService.update('u-1', { email: 'MiXed@Example.COM' });
+
+    expect(capturedUpdatePatch).toMatchObject({ email: 'mixed@example.com' });
   });
 });
