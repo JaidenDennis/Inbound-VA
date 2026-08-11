@@ -6,6 +6,7 @@ import { dentalRoutingTemplate } from './dental-routing.template.js';
 import { orthodonticRoutingTemplate } from './orthodontic-routing.template.js';
 import { lawFirmRoutingTemplate } from './law-firm-routing.template.js';
 import { restaurantRoutingTemplate } from './restaurant-routing.template.js';
+import { apartmentRoutingTemplate } from './apartment-routing.template.js';
 
 // Vertical → template registry. New verticals register here without touching
 // the provisioning service (open for extension, closed for modification).
@@ -28,15 +29,21 @@ registerTemplate(dentalRoutingTemplate);
 registerTemplate(orthodonticRoutingTemplate);
 registerTemplate(lawFirmRoutingTemplate);
 registerTemplate(restaurantRoutingTemplate);
+registerTemplate(apartmentRoutingTemplate);
 
 /**
  * Map a client's industry to a default template vertical. Only a default —
  * provisioning always accepts an explicit template override, which is how a
  * client runs a vertical that doesn't match its industry label.
  *
- * The new vertical playbooks are additive: existing industries keep resolving
+ * Most new vertical playbooks are additive: existing industries keep resolving
  * exactly as they did before, so no already-provisioned client changes template
- * on its next re-provision.
+ * on its next re-provision. The exception is real_estate, which previously fell
+ * through to the med_spa default and now resolves to apartment_routing. This
+ * change was verified safe by querying the live database for clients with
+ * industry = 'real_estate' and finding none. Repointing an industry that
+ * already resolved to something else is a breaking change for existing clients
+ * of that industry and requires the same live verification before being done again.
  */
 export function resolveVertical(industry: string): string {
   switch (industry) {
@@ -48,6 +55,8 @@ export function resolveVertical(industry: string): string {
       return 'law_firm_routing';
     case 'restaurant':
       return 'restaurant_routing';
+    case 'real_estate':
+      return 'apartment_routing';
     case 'beauty':
     case 'medical':
       return 'med_spa';

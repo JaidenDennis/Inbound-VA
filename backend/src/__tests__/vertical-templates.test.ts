@@ -3,6 +3,7 @@ import { dentalRoutingTemplate } from '../providers/retell/templates/dental-rout
 import { orthodonticRoutingTemplate } from '../providers/retell/templates/orthodontic-routing.template.js';
 import { lawFirmRoutingTemplate } from '../providers/retell/templates/law-firm-routing.template.js';
 import { restaurantRoutingTemplate } from '../providers/retell/templates/restaurant-routing.template.js';
+import { apartmentRoutingTemplate } from '../providers/retell/templates/apartment-routing.template.js';
 import { inboundRoutingTemplate } from '../providers/retell/templates/inbound-routing.template.js';
 import { getTemplate, listVerticals, resolveVertical } from '../providers/retell/templates/index.js';
 import type { AgentTemplate, TemplateContext } from '../providers/retell/templates/template.types.js';
@@ -55,6 +56,7 @@ const ALL: Array<{ name: string; vertical: string; template: AgentTemplate }> = 
   { name: 'orthodontic', vertical: 'orthodontic_routing', template: orthodonticRoutingTemplate },
   { name: 'law firm', vertical: 'law_firm_routing', template: lawFirmRoutingTemplate },
   { name: 'restaurant', vertical: 'restaurant_routing', template: restaurantRoutingTemplate },
+  { name: 'apartment', vertical: 'apartment_routing', template: apartmentRoutingTemplate },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ describe.each(ALL)('$name routing template — shared contract', ({ vertical, te
     const nothing = template.build(
       ctx({ business_name: null }, { name: '' })
     ).responseEngine.general_prompt;
-    expect(nothing).toMatch(/our (dental office|orthodontic practice|law firm|restaurant)/);
+    expect(nothing).toMatch(/our (dental office|orthodontic practice|law firm|restaurant|apartment community)/);
   });
 
   it('inherits the full tool set and begin message from the routing backbone', () => {
@@ -330,6 +332,193 @@ describe('restaurant template specifics', () => {
   });
 });
 
+describe('apartment template specifics', () => {
+  const cfg = (agent_config: AgentConfig) =>
+    apartmentRoutingTemplate.build(ctx({ agent_config })).responseEngine.general_prompt;
+
+  it('states Fair Housing as overriding every other instruction', () => {
+    const p = cfg({});
+    expect(p).toMatch(/FAIR HOUSING — THIS OVERRIDES/);
+    expect(p).toMatch(/overrides hospitality, sales, and every other instruction/i);
+  });
+
+  it('refuses to steer on neighborhood, schools, safety, or who lives here', () => {
+    const p = cfg({});
+    expect(p).toMatch(/You never steer\./);
+    expect(p).toMatch(/What kind of people live here\?/);
+    expect(p).toMatch(/How are the schools\?/);
+    expect(p).toMatch(/never characterize the neighborhood/i);
+  });
+
+  it('forbids recording or acting on protected characteristics', () => {
+    const p = cfg({});
+    expect(p).toMatch(/familial status/);
+    expect(p).toMatch(/source of income/);
+    expect(p).toMatch(/do NOT write it into a slot, a note, or a message/);
+  });
+
+  it('exempts assistance animals from every pet term', () => {
+    const p = cfg({ pets_allowed: false });
+    expect(p).toMatch(/A service animal or assistance animal is NOT a pet/);
+    expect(p).toMatch(/never apply pet rent, a pet fee, a breed restriction, or a weight limit/i);
+    expect(p).toMatch(/never demand documentation/i);
+  });
+
+  it('never pre-approves or pre-denies an applicant', () => {
+    const p = cfg({});
+    expect(p).toMatch(/NEVER tell a caller whether they will be approved or denied/);
+    expect(p).toMatch(/read the published criteria exactly as written/i);
+  });
+
+  it('runs the emergency script before anything else and never troubleshoots', () => {
+    const p = cfg({});
+    expect(p).toMatch(/MAINTENANCE EMERGENCY — CHECK FIRST, EVERY TURN/);
+    expect(p).toContain('hang up and dial 9-1-1');
+    expect(p).toMatch(/leave the building first and call the gas company from outside/);
+    expect(p).toMatch(/emergency_flag/);
+    expect(p).toMatch(/Never troubleshoot a maintenance emergency and never log it as a routine work order/);
+  });
+
+  it('covers medical emergencies in the one spoken life-safety line, not just gas and fire', () => {
+    const p = cfg({});
+    // The line is triggered by "a medical emergency" as well as gas/fire, so the
+    // words the agent actually says must cover a collapsed spouse — not recite
+    // gas-leak evacuation steps at them.
+    const spoken = /Say exactly: "([^"]+)"/.exec(p);
+    expect(spoken).not.toBeNull();
+    const line = spoken![1];
+    expect(line).toMatch(/hurt or having a medical emergency/i);
+    expect(line).toMatch(/fire/);
+    expect(line).toMatch(/hang up and dial 9-1-1 right now/);
+    // The gas instruction stays conditional so it is not read to a caller whose
+    // emergency has nothing to do with gas.
+    expect(line).toMatch(/if you smell gas, leave the building first/);
+    expect(p.match(/dial 9-1-1/g)).toHaveLength(1);
+  });
+
+  it('lists the habitability emergencies that are not 9-1-1 calls', () => {
+    const p = cfg({});
+    expect(p).toMatch(/active flooding or a burst pipe/);
+    expect(p).toMatch(/sewage backup/);
+    expect(p).toMatch(/no heat/);
+    expect(p).toMatch(/elevator entrapment/);
+    expect(p).toMatch(/broken exterior door or lock/);
+  });
+
+  it('sends habitability calls to emergency_flag but suppresses the 9-1-1 guidance it returns', () => {
+    const p = cfg({ emergency_maintenance_line: '904-555-0111' });
+    // emergency_flag's own tool description says "EMERGENCIES ONLY: medical
+    // emergency, threat, or immediate danger", so the prompt has to say out loud
+    // that it is still the right tool here.
+    expect(p).toMatch(/It is the right tool for these even though its description talks about immediate danger/);
+    // …and the endpoint answers with a canned "hang up and dial 9-1-1" line that
+    // must never reach a burst-pipe caller.
+    expect(p).toMatch(/emergency_flag answers with guidance that tells you to send the caller to emergency services/);
+    expect(p).toMatch(/you must NOT speak it, NOT paraphrase it, and NOT mention emergency services at all/);
+    expect(p).toMatch(/INSTEAD give the 24-hour emergency maintenance line/);
+    expect(p).toContain('904-555-0111');
+  });
+
+  it('forbids reading configured text that characterizes the area, residents, schools, or safety', () => {
+    const p = cfg({});
+    expect(p).toMatch(/Being configured does not make a line safe to say/);
+    expect(p).toMatch(
+      /characterizes the area, the neighborhood, the residents, the schools, the safety, or who would fit in here/
+    );
+    expect(p).toMatch(/do NOT read it aloud, do not summarize it, and do not agree with the caller about it, EVEN THOUGH it is configured/);
+  });
+
+  it('answers the assistance-animal question outright and records nothing about the disability', () => {
+    const p = cfg({ pets_allowed: false });
+    expect(p).toMatch(/ANSWER this question directly — do not deflect it and do not take a message instead of answering/);
+    expect(p).toMatch(
+      /assistance animals are not pets and are never subject to pet rent, pet fees, breed restrictions, or weight limits/
+    );
+    // Jointly satisfiable with rule 2: answering requires writing nothing down.
+    expect(p).toMatch(/never write the animal, the disability, or the reason into a slot, a note, or a message/);
+    expect(p).toMatch(/answering the policy question requires recording nothing at all/);
+    // Only the accommodation REQUEST is routed, via the existing escalation section.
+    expect(p).toMatch(/reasonable-accommodation or modification REQUEST goes to a person/);
+    expect(p).toMatch(/ESCALATE TO A HUMAN below already covers that/);
+    // The no-pets OFFERINGS line used to send the whole question away, which is
+    // the same stonewall by another route.
+    expect(p).not.toMatch(/route any assistance-animal question to the office/);
+  });
+
+  it('collects a full work order and promises nothing', () => {
+    const p = cfg({});
+    expect(p).toMatch(/MAINTENANCE REQUESTS/);
+    expect(p).toMatch(/permission to enter/i);
+    expect(p).toMatch(/pets in the unit/i);
+    expect(p).toMatch(/leave_staff_message/);
+    expect(p).toMatch(/Never promise a repair time, a technician's name, or that a charge will be waived/);
+  });
+
+  it('carries exactly one life-safety script, ahead of every other rule', () => {
+    const p = cfg({});
+    expect(p).not.toMatch(/SAFETY — EMERGENCY HARD RULE/);
+    expect(p.match(/dial 9-1-1/g)).toHaveLength(1);
+    expect(p.indexOf('MAINTENANCE EMERGENCY — CHECK FIRST')).toBeLessThan(
+      p.indexOf('FAIR HOUSING — THIS OVERRIDES')
+    );
+  });
+
+  it('frames every rent as perishable and refuses to hold a unit', () => {
+    const p = cfg({});
+    expect(p).toMatch(/as of today, and subject to availability and change/);
+    expect(p).toMatch(/never hold or reserve a unit/i);
+    expect(p).toMatch(/never quote a specific unit number as available/i);
+  });
+
+  it('never takes money over the phone', () => {
+    const p = cfg({});
+    expect(p).toMatch(/NEVER take a card number, a bank account number, or a payment of any kind over the phone/);
+  });
+
+  it('states configured fees exactly and refuses to invent them', () => {
+    const p = cfg({ application_fee: 60, admin_fee: 200, income_requirement_multiple: 3 });
+    expect(p).toMatch(/Application fee: \$60 per adult applicant/);
+    expect(p).toMatch(/Administrative fee: \$200/);
+    expect(p).toMatch(/at least 3 times the monthly rent/);
+    expect(cfg({})).toMatch(/No published fees are configured/);
+  });
+
+  it('gates tours, application, portal, and emergency line on configuration', () => {
+    const on = cfg({
+      tours_enabled: true,
+      self_guided_tours: true,
+      online_application_url: 'https://apply.example.com',
+      resident_portal_url: 'https://portal.example.com',
+      emergency_maintenance_line: '904-555-0111',
+    });
+    expect(on).toMatch(/Tours: booked over the phone/);
+    expect(on).toMatch(/Self-guided tours are also available/);
+    expect(on).toContain('https://apply.example.com');
+    expect(on).toContain('https://portal.example.com');
+    expect(on).toContain('904-555-0111');
+
+    const off = cfg({});
+    expect(off).toMatch(/Tours: NOT booked over the phone/);
+    expect(off).toMatch(/no online application is configured/i);
+    expect(off).toMatch(/no resident portal is configured/i);
+    expect(off).toMatch(/no 24-hour emergency line is configured/i);
+
+    // self_guided_tours is nested under tours_enabled: with phone tours off, the
+    // self-guided line must stay out even when the flag itself is on. Asserting
+    // this on an empty config would pass with the nesting removed entirely.
+    const selfGuidedOnly = cfg({ tours_enabled: false, self_guided_tours: true });
+    expect(selfGuidedOnly).toMatch(/Tours: NOT booked over the phone/);
+    expect(selfGuidedOnly).not.toMatch(/Self-guided tours are also available/);
+  });
+
+  it('states the pet policy without ever letting it touch assistance animals', () => {
+    expect(cfg({ pets_allowed: true })).toMatch(/Pets: welcome, subject to the pet policy/);
+    const noPets = cfg({ pets_allowed: false });
+    expect(noPets).toMatch(/Pets: this community does not accept pets/);
+    expect(noPets).toMatch(/Assistance animals are NOT pets and are never refused on that basis/);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 describe('vertical resolution from industry', () => {
   it('maps each new industry to its dedicated playbook', () => {
@@ -337,6 +526,7 @@ describe('vertical resolution from industry', () => {
     expect(resolveVertical('orthodontic')).toBe('orthodontic_routing');
     expect(resolveVertical('legal')).toBe('law_firm_routing');
     expect(resolveVertical('restaurant')).toBe('restaurant_routing');
+    expect(resolveVertical('real_estate')).toBe('apartment_routing');
   });
 
   it('leaves pre-existing industry resolution untouched', () => {

@@ -113,7 +113,12 @@ Header comment:
 // ─────────────────────────────────────────────────────────────────────────────
 ```
 
-The prompt body for this task (later tasks insert the Fair Housing, emergency, maintenance, and money sections into the marked positions):
+The prompt body for this task. Later tasks insert their sections at two stable anchors, so no placeholder text is ever committed:
+
+- **Anchor A** — the line `${sharedRoutingContract(`. Tasks 2 and 3 insert immediately BEFORE it, in that order (Fair Housing, then maintenance emergency).
+- **Anchor B** — the line `=== COMMON QUESTIONS — answer in one short sentence ===`. Tasks 3 and 4 insert immediately BEFORE it, in that order (maintenance requests, then rent/fees, then offerings).
+
+Separate every inserted block from its neighbours with one blank line.
 
 ```typescript
 function buildApartmentPrompt(ctx: TemplateContext): string {
@@ -139,20 +144,10 @@ TIMEZONE: ${client.timezone}. Assume this timezone for any times unless the call
 Your first line greeted the caller by ${business}'s name, introduced you as ${agentName}, asked how you can help, and let them know the call is being recorded — do NOT repeat any of that. Simply listen and help.
 When a task needs to know who they are, collect their name (read it back per the name rule) and best phone number (read it back per the phone rule, then have them confirm), THEN call lookup_existing_client and greet a returning caller naturally. Never reference a past call or application before you have looked them up.
 
-<<< FAIR HOUSING BLOCK — Task 2 >>>
-
-<<< MAINTENANCE EMERGENCY BLOCK — Task 3 >>>
-
 ${sharedRoutingContract(
     'book_appointment (a tour), reschedule_appointment, cancel_appointment, lead_qualification, pricing, faq, waitlist, payment_questions, documentation_requests, maintenance_request, complaint, staff_transfer, callback_request, end_call',
     '7. SAY IT LIKE A LEASING OFFICE: the backend uses "appointment" wording internally, but you ALWAYS say "tour," "showing," or "visit" out loud — never "appointment." And before you share ANYTHING about a resident\'s account — a balance, a lease date, a work-order status, a document — call verify_identity first and only continue if it confirms.'
   )}
-
-<<< MAINTENANCE REQUEST BLOCK — Task 3 >>>
-
-<<< RENT AND FEES BLOCK — Task 4 >>>
-
-<<< OFFERINGS BLOCK — Task 4 >>>
 
 === COMMON QUESTIONS — answer in one short sentence ===
 - HOURS, ADDRESS, PARKING, AMENITIES, LAUNDRY, PACKAGES, TRASH, GUEST POLICY: answer ONLY from POLICIES or FAQs. If it isn't there, take a message — never guess a policy.
@@ -227,7 +222,7 @@ Do NOT touch `resolveVertical` yet — that is Task 5.
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `cd backend && npx vitest run src/__tests__/vertical-templates.test.ts`
-Expected: PASS. The `<<< ... >>>` markers are placeholder text and must NOT trip the no-placeholder assertion, which only greps for `{{`. They are removed by Tasks 2–4.
+Expected: PASS. The prompt is complete and shippable as-is at this point — it simply lacks the vertical-specific sections that Tasks 2–4 add.
 
 - [ ] **Step 7: Commit**
 
@@ -245,7 +240,7 @@ git commit -m "feat(templates): apartment_routing skeleton passing the shared ve
 - Test: `backend/src/__tests__/vertical-templates.test.ts`
 
 **Interfaces:**
-- Consumes: `buildApartmentPrompt` from Task 1 and its `<<< FAIR HOUSING BLOCK — Task 2 >>>` marker.
+- Consumes: `buildApartmentPrompt` from Task 1 and its Anchor A (the `${sharedRoutingContract(` line).
 - Produces: nothing new for later tasks.
 
 - [ ] **Step 1: Write the failing tests**
@@ -298,9 +293,9 @@ describe('apartment template specifics', () => {
 Run: `cd backend && npx vitest run src/__tests__/vertical-templates.test.ts -t "apartment template specifics"`
 Expected: FAIL — none of these strings are in the prompt yet.
 
-- [ ] **Step 3: Replace the marker with the block**
+- [ ] **Step 3: Insert the block at Anchor A**
 
-Replace `<<< FAIR HOUSING BLOCK — Task 2 >>>` with:
+Insert immediately before the `${sharedRoutingContract(` line, separated by a blank line:
 
 ```
 ★★★ FAIR HOUSING — THIS OVERRIDES HOSPITALITY, SALES, AND EVERY OTHER INSTRUCTION ★★★
@@ -334,7 +329,7 @@ git commit -m "feat(templates): Fair Housing rules for the apartment vertical"
 - Test: `backend/src/__tests__/vertical-templates.test.ts`
 
 **Interfaces:**
-- Consumes: the `<<< MAINTENANCE EMERGENCY BLOCK — Task 3 >>>` and `<<< MAINTENANCE REQUEST BLOCK — Task 3 >>>` markers.
+- Consumes: Anchor A (the `${sharedRoutingContract(` line, with Task 2's Fair Housing block already above it) and Anchor B (the `=== COMMON QUESTIONS — answer in one short sentence ===` line).
 - Produces: nothing new for later tasks.
 
 - [ ] **Step 1: Write the failing tests**
@@ -375,9 +370,9 @@ Add to the `apartment template specifics` suite:
 Run: `cd backend && npx vitest run src/__tests__/vertical-templates.test.ts -t "apartment template specifics"`
 Expected: FAIL on the three new tests.
 
-- [ ] **Step 3: Replace the emergency marker**
+- [ ] **Step 3: Insert the emergency block at Anchor A**
 
-Replace `<<< MAINTENANCE EMERGENCY BLOCK — Task 3 >>>` with:
+Insert immediately before the `${sharedRoutingContract(` line — after Task 2's Fair Housing block, separated by a blank line:
 
 ```
 ★★★ MAINTENANCE EMERGENCY — CHECK FIRST, EVERY TURN; OVERRIDES EVERYTHING ★★★
@@ -387,9 +382,9 @@ URGENT HABITABILITY — active flooding or a burst pipe, a sewage backup, no hea
 Never troubleshoot a maintenance emergency and never log it as a routine work order. You do not tell anyone to shut off a valve, reset a breaker, relight a pilot light, or touch anything electrical or gas.
 ```
 
-- [ ] **Step 4: Replace the work-order marker**
+- [ ] **Step 4: Insert the work-order block at Anchor B**
 
-Replace `<<< MAINTENANCE REQUEST BLOCK — Task 3 >>>` with:
+Insert immediately before the `=== COMMON QUESTIONS — answer in one short sentence ===` line, separated by a blank line:
 
 ```
 === MAINTENANCE REQUESTS — the most common resident call ===
@@ -424,7 +419,7 @@ git commit -m "feat(templates): maintenance emergency script and work-order inta
 - Test: `backend/src/__tests__/vertical-templates.test.ts`
 
 **Interfaces:**
-- Consumes: `AgentConfig` flags from Task 1; the `<<< RENT AND FEES BLOCK — Task 4 >>>` and `<<< OFFERINGS BLOCK — Task 4 >>>` markers.
+- Consumes: `AgentConfig` flags from Task 1; Anchor B (the `=== COMMON QUESTIONS — answer in one short sentence ===` line, with Task 3's maintenance-request block already above it).
 - Produces: private functions `renderFees(cfg: AgentConfig): string` and `renderApartmentOfferings(cfg: AgentConfig): string`, both module-private (not exported).
 
 - [ ] **Step 1: Write the failing tests**
@@ -540,9 +535,11 @@ Add `AgentConfig` to the type import at the top of the file:
 import type { AgentConfig } from '../../../types/index.js';
 ```
 
-- [ ] **Step 4: Replace the two markers**
+- [ ] **Step 4: Insert the two blocks at Anchor B**
 
-Replace `<<< RENT AND FEES BLOCK — Task 4 >>>` with:
+Insert both immediately before the `=== COMMON QUESTIONS — answer in one short sentence ===` line — after Task 3's maintenance-request block, rent/fees first, each separated by a blank line.
+
+Rent and fees:
 
 ```
 === RENT AND FEES — quote only what is configured ===
@@ -551,7 +548,7 @@ NEVER take a card number, a bank account number, or a payment of any kind over t
 ${renderFees(cfg)}
 ```
 
-Replace `<<< OFFERINGS BLOCK — Task 4 >>>` with:
+Offerings:
 
 ```
 === OFFERINGS ===
@@ -561,7 +558,7 @@ ${renderApartmentOfferings(cfg)}
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `cd backend && npx vitest run src/__tests__/vertical-templates.test.ts`
-Expected: PASS. Confirm no `<<<` markers remain: `grep -c '<<<' backend/src/providers/retell/templates/apartment-routing.template.ts` returns 0.
+Expected: PASS. Confirm the section order in the built prompt is: Fair Housing → maintenance emergency → routing contract → maintenance requests → rent and fees → offerings → common questions.
 
 - [ ] **Step 6: Typecheck and lint**
 
@@ -725,6 +722,6 @@ Provisioning writes to Supabase and Retell, not to the working tree. Run `git st
 
 **Spec coverage:** Fair Housing → Task 2. Maintenance emergency → Task 3. Work-order fallback intent → Task 3. Pricing perishability and no-payments → Task 4. Identity-before-account-data → Task 1 (routing-contract rule 7). Legal escalation → Task 1 (escalation section). Nine config flags → Task 1, consumed in Task 4. Intent table → Task 1. `resolveVertical` plus its risk gate → Task 5. Demo client with fake prices and fees → Task 6. Provisioning and the 402 caveat → Task 7. No gaps.
 
-**Placeholder scan:** the `<<< ... >>>` markers in Task 1 are deliberate, each named with the task that removes it, and Task 4 Step 5 asserts none remain. No TBDs.
+**Placeholder scan:** none. Tasks 2–4 insert their sections at the two named anchors, so every commit leaves a complete, shippable prompt and no placeholder text ever enters source. No TBDs.
 
 **Type consistency:** `renderFees` and `renderApartmentOfferings` both take `AgentConfig` and return `string`, matching their call sites in Task 4 Step 4. Flag names in the Task 6 seed (`tours_enabled`, `self_guided_tours`, `online_application_url`, `resident_portal_url`, `emergency_maintenance_line`, `application_fee`, `admin_fee`, `income_requirement_multiple`, `pets_allowed`) match the declarations in Task 1 Step 1 exactly. `apartmentRoutingTemplate` is the export name used in Task 1 Step 4, Task 1 Step 5, and every test suite.

@@ -99,6 +99,24 @@ export interface AgentConfig {
   private_events?: boolean;
   /** Largest party the agent may book itself; bigger goes to a human. */
   max_party_size?: number;
+  /** Leasing office books tours by phone (apartment). */
+  tours_enabled?: boolean;
+  /** Self-guided tours are offered alongside agent-led ones (apartment). */
+  self_guided_tours?: boolean;
+  /** Where prospects apply; the agent never takes an application by phone. */
+  online_application_url?: string;
+  /** Where residents pay rent and file work orders. */
+  resident_portal_url?: string;
+  /** 24-hour emergency maintenance number, spoken during an emergency. */
+  emergency_maintenance_line?: string;
+  /** Application fee per adult applicant, in dollars. */
+  application_fee?: number;
+  /** One-time administrative fee, in dollars. */
+  admin_fee?: number;
+  /** Published income requirement as a multiple of monthly rent, e.g. 3. */
+  income_requirement_multiple?: number;
+  /** Community accepts pets (assistance animals are never governed by this). */
+  pets_allowed?: boolean;
 
   [key: string]: unknown;
 }
