@@ -1,6 +1,7 @@
 import Fastify, { type FastifyError } from 'fastify';
 import { ZodError } from 'zod';
 import cors from '@fastify/cors';
+import { buildCorsOptions } from './config/cors.js';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
@@ -88,10 +89,10 @@ export async function buildApp() {
         '(e.g. https://gravvia-dashboard.onrender.com) and redeploy.'
     );
   }
-  await app.register(cors, {
-    origin: env.NODE_ENV === 'production' ? corsOrigins : true,
-    credentials: true,
-  });
+  // `methods` is load-bearing: @fastify/cors defaults it to GET,HEAD,POST when
+  // omitted, which is how every PUT/PATCH/DELETE from the dashboard came to be
+  // rejected at the preflight without ever reaching a handler. See config/cors.ts.
+  await app.register(cors, buildCorsOptions(env.NODE_ENV === 'production' ? corsOrigins : true));
 
   await app.register(rateLimit, {
     max: env.RATE_LIMIT_MAX,
