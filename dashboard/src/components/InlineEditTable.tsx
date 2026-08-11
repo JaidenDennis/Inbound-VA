@@ -7,11 +7,13 @@ import { Plus, Trash2, Check, X, Pencil } from 'lucide-react';
 export interface FieldSpec {
   key: string;
   label: string;
-  type?: 'text' | 'textarea' | 'number';
+  type?: 'text' | 'textarea' | 'number' | 'select';
   required?: boolean;
   placeholder?: string;
   /** Column width hint for the table header. */
   width?: string;
+  /** Options for `type: 'select'`. An empty-string value renders as "no choice". */
+  options?: Array<{ value: string; label: string }>;
   render?: (value: unknown) => ReactNode;
 }
 
@@ -112,6 +114,19 @@ export function InlineEditTable<T extends { id: string }>({
         value={draft[field.key] ?? ''}
         onChange={(e) => setDraft((d) => ({ ...d, [field.key]: e.target.value }))}
       />
+    ) : field.type === 'select' ? (
+      <select
+        id={`field-${field.key}`}
+        className={inputCls}
+        value={draft[field.key] ?? ''}
+        onChange={(e) => setDraft((d) => ({ ...d, [field.key]: e.target.value }))}
+      >
+        {(field.options ?? []).map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
     ) : (
       <input
         id={`field-${field.key}`}

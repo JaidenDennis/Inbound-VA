@@ -12,6 +12,7 @@ import { Info } from 'lucide-react';
 import { CopilotFaqs } from '@/components/CopilotFaqs';
 import { PoliciesEditor } from './components/PoliciesEditor';
 import { HoursEditor } from './components/HoursEditor';
+import { CategoryEditor } from './components/CategoryEditor';
 
 /**
  * Everything the agent knows.
@@ -36,7 +37,15 @@ const TABLE_FIELDS: Record<string, FieldSpec[]> = {
   faqs: [
     { key: 'question', label: 'Question', required: true, width: '35%' },
     { key: 'answer', label: 'Answer', type: 'textarea', required: true },
-    { key: 'category', label: 'Category', width: '15%' },
+    {
+      key: 'category',
+      label: 'Category',
+      type: 'select',
+      width: '15%',
+      // Populated per-client at render time from GET /knowledge/categories —
+      // this placeholder only covers "uncategorised" before that load lands.
+      options: [{ value: '', label: '— none —' }],
+    },
   ],
   services: [
     { key: 'name', label: 'Service', required: true, width: '25%' },
@@ -58,12 +67,20 @@ const TABLE_FIELDS: Record<string, FieldSpec[]> = {
   ],
 };
 
-/** Blank strings must not be sent as empty values for numeric or nullable columns. */
+/**
+ * Blank strings must not be sent as empty values for numeric or free-text
+ * nullable columns — an untouched field should not overwrite existing data
+ * with ''. `select` is the exception: '' is its deliberate "no choice" value
+ * (e.g. FAQ category's "— none —"), and the PATCH route only clears a field
+ * when the key is present in the body at all, so an omitted key here would
+ * silently leave the old value in place instead of clearing it.
+ */
 function cleanPayload(values: Record<string, string>, fields: FieldSpec[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const field of fields) {
     const raw = values[field.key];
-    if (raw === undefined || raw === '') continue;
+    if (raw === undefined) continue;
+    if (raw === '' && field.type !== 'select') continue;
     out[field.key] = field.type === 'number' ? Number(raw) : raw;
   }
   return out;
@@ -85,6 +102,7 @@ function KnowledgeTable({
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const fields = TABLE_FIELDS[tab];
 
   const load = useCallback(() => {
@@ -97,7 +115,34 @@ function KnowledgeTable({
       .finally(() => setLoading(false));
   }, [tab, clientId]);
 
+  // The category dropdown's options come from the client's own list, not a
+  // static config — active categories only, same set the FAQ route validates
+  // writes against.
+  const loadCategories = useCallback(() => {
+    if (tab !== 'faqs') return;
+    api
+      .get('/knowledge/categories', { params: { clientId } })
+      .then((r) => setCategories(r.data.data ?? []))
+      .catch(() => setCategories([]));
+  }, [tab, clientId]);
+
   useEffect(load, [load]);
+  useEffect(loadCategories, [loadCategories]);
+
+  const resolvedFields: FieldSpec[] =
+    tab === 'faqs'
+      ? fields.map((f) =>
+          f.key === 'category'
+            ? {
+                ...f,
+                options: [
+                  { value: '', label: '— none —' },
+                  ...categories.map((c) => ({ value: c.name, label: c.name })),
+                ],
+              }
+            : f
+        )
+      : fields;
 
   return (
     <>
@@ -105,6 +150,18 @@ function KnowledgeTable({
         <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
+      )}
+
+      {/* Platform-only; the component itself gates on isPlatform, since every
+          write here 403s for a client user. */}
+      {tab === 'faqs' && (
+        <CategoryEditor
+          clientId={clientId}
+          onChanged={() => {
+            loadCategories();
+            onChanged();
+          }}
+        />
       )}
 
       {/* Suggestions only make sense where the model has something to ground a
@@ -122,17 +179,17 @@ function KnowledgeTable({
 
       <InlineEditTable
         rows={rows}
-        fields={fields}
+        fields={resolvedFields}
         loading={loading}
         readOnly={!canWrite}
         emptyMessage={`No ${tab} yet. Add the first one so your agent can answer about it.`}
         onCreate={async (values) => {
-          await api.post(`/knowledge/${tab}`, cleanPayload(values, fields), { params: { clientId } });
+          await api.post(`/knowledge/${tab}`, cleanPayload(values, resolvedFields), { params: { clientId } });
           onChanged();
           load();
         }}
         onUpdate={async (id, values) => {
-          await api.patch(`/knowledge/${tab}/${id}`, cleanPayload(values, fields));
+          await api.patch(`/knowledge/${tab}/${id}`, cleanPayload(values, resolvedFields));
           onChanged();
           load();
         }}
