@@ -88,10 +88,23 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
     if (!window.confirm('Renaming this category updates every FAQ currently using it. Continue?')) return;
     setSaving(true);
     try {
-      await api.patch(`/knowledge/categories/${id}`, { name });
+      const res = await api.patch(`/knowledge/categories/${id}`, { name });
       cancelRename();
       load();
       onChanged?.();
+      // The rename succeeds on its own; moving the FAQs filed under the old
+      // name is a second step that can fail independently, and the API says so
+      // with a 200 + `warning` rather than a 400 that denies the rename it just
+      // made. Same amber treatment PoliciesEditor uses for the same shape —
+      // this is not a success and it is not a failure.
+      const warning = res.data?.warning as string | undefined;
+      if (warning) {
+        toast(warning, {
+          icon: '⚠️',
+          duration: 10000,
+          style: { background: '#FCF2E0', color: '#8A5600', border: '1px solid #EFD5A6' },
+        });
+      }
     } catch (err) {
       toast.error(errorMessage(err, 'Could not rename category'));
     } finally {

@@ -393,3 +393,60 @@ describe('the editor-to-storage mapping', () => {
     ).rejects.toMatchObject({ code: 'unknown-field' });
   });
 });
+
+/**
+ * Since migration 032, `client_settings.business_policies` is a RENDERED
+ * column: `client_policies` holds the titled entries an operator edits and
+ * `renderPolicies()` rebuilds the array from them on every write to
+ * /knowledge/policies. Anything else that writes that column is a second,
+ * unreconciled writer — publishing a draft would rewrite the agent's policy
+ * text while the Policies tab still showed the old rows, and that tab's next
+ * save would silently revert the published version. So the draft layer must
+ * not carry the field at all.
+ */
+describe('business_policies is not part of the draftable projection', () => {
+  it('is absent from DRAFTABLE_FIELDS', () => {
+    expect(draft.agentDraftService.DRAFTABLE_FIELDS).not.toContain('business_policies');
+  });
+
+  it('refuses a draft patch that carries it, rather than storing what publish would apply', async () => {
+    await expect(
+      draft.saveDraft({
+        clientId: CLIENT,
+        patch: { business_policies: ['Deposits: Non-refundable.'] },
+        actorId: 'u1',
+        actorRole: 'client_owner',
+      })
+    ).rejects.toMatchObject({ code: 'unknown-field' });
+
+    expect(db.drafts).toHaveLength(0);
+  });
+
+  it('publishing a draft never writes the column', async () => {
+    await draft.saveDraft({
+      clientId: CLIENT,
+      patch: { agent_tone: 'formal' },
+      actorId: 'u1',
+      actorRole: 'client_owner',
+    });
+    await draft.publishDraft({ clientId: CLIENT, actorId: 'u1', actorRole: 'client_owner' });
+
+    expect(db.settingsWrites.length).toBeGreaterThan(0);
+    for (const write of db.settingsWrites) expect(write).not.toHaveProperty('business_policies');
+  });
+
+  // The fingerprint and the draftable set must stay the same projection. If
+  // policies still counted toward staleness, saving the Policies tab would
+  // invalidate an unrelated pending agent review for no reason.
+  it('does not count toward the staleness fingerprint', () => {
+    const withPolicies = draft.fingerprintSettings(
+      { ...baseSettings(), business_policies: ['Deposits: Non-refundable.'] } as never,
+      '11labs-Emily'
+    );
+    const without = draft.fingerprintSettings(
+      { ...baseSettings(), business_policies: [] } as never,
+      '11labs-Emily'
+    );
+    expect(withPolicies).toBe(without);
+  });
+});

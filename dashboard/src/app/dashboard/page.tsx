@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { KPICard } from '@/components/KPICard';
 import { StatusLamp, LampStatus, type LampLevel } from '@/components/StatusLamp';
 import { useSession } from '@/lib/SessionProvider';
+import type { Permission } from '@/lib/session';
 
 interface Overview {
   totalCalls: number;
@@ -271,6 +272,73 @@ function Skeleton() {
   );
 }
 
+/**
+ * The client landing page's content.
+ *
+ * Platform staff get the system lamps and the cross-tenant roll-up; a client
+ * user gets neither (the roll-up endpoint is platform-only by design), so this
+ * gives them somewhere to go instead of an empty screen. Deliberately no
+ * figures: the only client-scoped numbers live on Business, and duplicating
+ * them here would mean a second source that can disagree with it.
+ */
+function ClientSignposts({ can }: { can: (permission: Permission) => boolean }) {
+  const all: Array<{ href: string; label: string; blurb: string; permission: Permission }> = [
+    {
+      href: '/dashboard/business',
+      label: 'Business',
+      blurb: 'Calls, leads and bookings for your account.',
+      permission: 'analytics:read',
+    },
+    {
+      href: '/dashboard/queue',
+      label: 'Work Queue',
+      blurb: 'Calls the agent flagged for a person to pick up.',
+      permission: 'flags:read',
+    },
+    {
+      href: '/dashboard/knowledge',
+      label: 'Knowledge',
+      blurb: 'What the agent tells callers — FAQs, services, policies, hours.',
+      permission: 'knowledge:read',
+    },
+    {
+      href: '/dashboard/support',
+      label: 'Support',
+      blurb: 'Raise something with us and track where it stands.',
+      permission: 'tickets:read',
+    },
+  ];
+
+  const links = all.filter((l) => can(l.permission));
+  if (links.length === 0) return null;
+
+  return (
+    <section aria-labelledby="signpost-heading" className="mb-7">
+      <h2 id="signpost-heading" className="mb-3 font-heading text-sm font-semibold text-ink-900">
+        Your account
+      </h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {links.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="group flex items-start justify-between gap-3 rounded-xl border border-panel-200 bg-white px-5 py-4 transition-colors hover:border-panel-300 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+          >
+            <span>
+              <span className="block font-heading text-sm font-semibold text-ink-900">{l.label}</span>
+              <span className="mt-1 block text-xs leading-relaxed text-panel-500">{l.blurb}</span>
+            </span>
+            <ArrowRight
+              className="mt-0.5 h-4 w-4 flex-shrink-0 text-panel-400 transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function DashboardPage() {
   const { can, isPlatform } = useSession();
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -289,7 +357,15 @@ export default function DashboardPage() {
       if (mode === 'refresh') setRefreshing(true);
 
       const [ov, groups] = await Promise.all([
-        api.get('/analytics/overview').then((r) => r.data as Overview).catch(() => null),
+        // /analytics/overview is platform-only (requirePlatform in
+        // analytics.route.ts) because it rolls up every tenant. This is the
+        // CLIENT nav's landing page too, so calling it unconditionally meant
+        // every client user hit a 403 here and got a permanent "analytics did
+        // not respond" alert on the first screen they see. Same treatment as
+        // health below: don't ask for what this user cannot have.
+        isPlatform
+          ? api.get('/analytics/overview').then((r) => r.data as Overview).catch(() => null)
+          : Promise.resolve(null),
         // Health is staff-only; a client user must not trigger a 403 on load.
         canSeeSystem
           ? api
@@ -304,10 +380,12 @@ export default function DashboardPage() {
       // On a refresh, a transient failure must not blank a panel that was
       // showing good data a second ago; keep the last good values and let the
       // staleness clock tell the operator the reading is aging.
+      // `failed` means "we asked and got nothing back". A client user is never
+      // asked, so it must stay false for them or the alert returns.
       if (ov) {
         setOverview(ov);
         setFailed(false);
-      } else if (mode === 'initial') {
+      } else if (mode === 'initial' && isPlatform) {
         setFailed(true);
       }
 
@@ -331,7 +409,7 @@ export default function DashboardPage() {
       setLoading(false);
       setRefreshing(false);
     },
-    [canSeeSystem]
+    [canSeeSystem, isPlatform]
   );
 
   /**
@@ -387,7 +465,7 @@ export default function DashboardPage() {
         description={
           isPlatform
             ? 'System state first, then thirty days of call performance across every client.'
-            : 'Thirty days of call performance for your account.'
+            : 'Where to go next. Your call figures live on the Business page.'
         }
       />
 
@@ -428,6 +506,12 @@ export default function DashboardPage() {
           </div>
         </section>
       ) : null}
+
+      {/* A client user is not shown the cross-tenant roll-up above, so without
+          this the landing page would be a heading and nothing else. Links only
+          — no numbers are invented here, and each one is gated on the same
+          permission the sidebar uses, so nothing appears that would 403. */}
+      {!isPlatform && <ClientSignposts can={can} />}
 
       {health && <WorstFirst rows={health.worst} />}
     </div>

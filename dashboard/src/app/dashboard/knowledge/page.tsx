@@ -129,6 +129,24 @@ function KnowledgeTable({
   useEffect(load, [load]);
   useEffect(loadCategories, [loadCategories]);
 
+  // Categories that rows actually carry but the curated list no longer offers:
+  // free-text values written before `knowledge_categories` existed, or a
+  // category since removed. Without an option for them the `<select>` renders
+  // blank while the row says otherwise — the editor lying about what is stored.
+  // They are appended, marked, and round-trip unchanged (the API only
+  // re-validates `category` when it actually changes).
+  const known = new Set(categories.map((c) => c.name));
+  const legacyCategories =
+    tab === 'faqs'
+      ? [
+          ...new Set(
+            rows
+              .map((r) => (typeof r.category === 'string' ? r.category : ''))
+              .filter((name) => name !== '' && !known.has(name))
+          ),
+        ]
+      : [];
+
   const resolvedFields: FieldSpec[] =
     tab === 'faqs'
       ? fields.map((f) =>
@@ -138,6 +156,7 @@ function KnowledgeTable({
                 options: [
                   { value: '', label: '— none —' },
                   ...categories.map((c) => ({ value: c.name, label: c.name })),
+                  ...legacyCategories.map((name) => ({ value: name, label: `${name} (not on the list)` })),
                 ],
               }
             : f

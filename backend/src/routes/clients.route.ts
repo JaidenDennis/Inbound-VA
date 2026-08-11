@@ -29,7 +29,12 @@ const updateSettingsSchema = z.object({
   faqs: z.array(z.record(z.unknown())).optional(),
   services: z.array(z.record(z.unknown())).optional(),
   pricing: z.array(z.record(z.unknown())).optional(),
-  business_policies: z.array(z.string()).optional(),
+  // `business_policies` is deliberately absent. Since migration 032 it is a
+  // RENDERED column: `client_policies` holds the titled entries an operator
+  // edits and `renderPolicies()` rebuilds the array from them on every write
+  // (see knowledge.route.ts's /knowledge/policies). A second writer here would
+  // change the agent's text while the Policies tab still showed the old rows,
+  // and the next save from that tab would silently revert it. One writer only.
   booking_enabled: z.boolean().optional(),
   booking_rules: z.record(z.unknown()).optional(),
   notification_emails: z.array(z.string()).optional(),

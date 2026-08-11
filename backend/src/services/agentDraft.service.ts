@@ -33,6 +33,14 @@ import type { ClientSettings, UserRole } from '../types/index.js';
  * than `client_settings`. From the editor's point of view it is one more agent
  * setting, and splitting the draft across two shapes to mirror the storage layout
  * would leak schema into the review screen.
+ *
+ * `business_policies` is deliberately NOT here. Since migration 032 it is a
+ * rendered column: `client_policies` holds the titled entries and
+ * `renderPolicies()` rebuilds the array from them (knowledge.route.ts's
+ * /knowledge/policies). While it was draftable, publishing a draft rewrote the
+ * agent's policy text behind the Policies tab's back, and the tab's next save
+ * silently reverted the published version. Policies are edited on their own tab
+ * and reach the agent through that one writer.
  */
 const DRAFTABLE_FIELDS = [
   'business_name',
@@ -48,7 +56,6 @@ const DRAFTABLE_FIELDS = [
   'faqs',
   'services',
   'pricing',
-  'business_policies',
   'voice_id',
 ] as const;
 

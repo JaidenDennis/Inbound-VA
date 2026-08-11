@@ -74,22 +74,44 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
     return assertClientAccess(user, clientId) ? clientId : null;
   }
 
+  /** A refused category write: the status to answer with, and why. */
+  type CategoryRefusal = { status: number; error: string };
+
   /**
    * A FAQ category must be one the client actually has, or null.
    *
    * The dropdown already limits what the UI can send; this is the API-side half,
    * because a route that only validates in the browser does not validate.
+   *
+   * The query's `error` is checked, not discarded. Destructuring only `{ data }`
+   * made every failure mode look identical to "not on the list": a transient
+   * Supabase error, or a database missing migration 031 (no
+   * `knowledge_categories` table at all), would turn every categorised FAQ write
+   * into a 400 telling the operator their category does not exist — which is
+   * both false and unactionable. A real lookup failure is a 500.
    */
-  async function assertCategoryAllowed(clientId: string, category: unknown): Promise<string | null> {
+  async function assertCategoryAllowed(clientId: string, category: unknown): Promise<CategoryRefusal | null> {
     if (category === undefined || category === null || category === '') return null;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('knowledge_categories')
       .select('id')
       .eq('client_id', clientId)
       .eq('name', category as string)
       .eq('active', true)
       .maybeSingle();
-    return data ? null : `Unknown category: ${String(category)}`;
+
+    if (error) {
+      logger.error(
+        { err: error, clientId, category },
+        'category allow-list lookup failed — refusing the FAQ write rather than guessing'
+      );
+      return {
+        status: 500,
+        error: 'Could not check the category list. Nothing was saved — try again.',
+      };
+    }
+
+    return data ? null : { status: 400, error: `Unknown category: ${String(category)}` };
   }
 
   for (const [name, config] of Object.entries(RESOURCES) as [ResourceName, typeof RESOURCES[ResourceName]][]) {
@@ -119,8 +141,8 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         const body = config.schema.parse(request.body);
 
         if (name === 'faqs') {
-          const categoryError = await assertCategoryAllowed(clientId, (body as { category?: unknown }).category);
-          if (categoryError) return reply.code(400).send({ error: categoryError });
+          const refusal = await assertCategoryAllowed(clientId, (body as { category?: unknown }).category);
+          if (refusal) return reply.code(refusal.status).send({ error: refusal.error });
         }
 
         let created: Record<string, unknown>;
@@ -170,9 +192,28 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
 
         const body = config.schema.partial().parse(request.body);
 
+        // Validate the category only when it actually CHANGES.
+        //
+        // Rows predating `knowledge_categories` (migration 031) carry free-text
+        // categories that are on no curated list. The editor sends every field
+        // it renders on every save, so validating an unchanged value made those
+        // rows uneditable outright: correcting a typo in the ANSWER would 400
+        // with "Unknown category", and the operator has no way to clear it —
+        // the fix is a category edit, which is platform-only. Comparing against
+        // the stored value keeps the allow-list where it belongs (you still
+        // cannot move a FAQ onto a category the client does not have) while
+        // leaving legacy rows editable. `''` and `null` are the same value here
+        // — both mean uncategorised — so switching between them is not a
+        // "change" that needs checking.
         if (name === 'faqs' && 'category' in (body as Record<string, unknown>)) {
-          const categoryError = await assertCategoryAllowed(rowClientId, (body as { category?: unknown }).category);
-          if (categoryError) return reply.code(400).send({ error: categoryError });
+          const incoming = (body as { category?: unknown }).category;
+          const next = incoming === undefined || incoming === null || incoming === '' ? null : incoming;
+          const current = (existing as { category?: string | null }).category ?? null;
+
+          if (next !== current) {
+            const refusal = await assertCategoryAllowed(rowClientId, next);
+            if (refusal) return reply.code(refusal.status).send({ error: refusal.error });
+          }
         }
 
         let updated: Record<string, unknown>;
@@ -345,6 +386,16 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
    * off the client's category list. The cascade below is scoped to this
    * category's own client_id — never a cross-tenant rewrite, even if another
    * tenant happens to have a category with the same old name.
+   *
+   * The cascade runs AFTER the audited mutation, not inside it — the same
+   * restructuring the policies PUT above went through. `withAudit` only writes
+   * its log once `mutate()` resolves (audit.service.ts), so a cascade that
+   * threw from inside `mutate()` produced the worst possible combination: the
+   * category already renamed, the FAQ rows still on the old name, NO audit
+   * record of the rename at all, and a 400 telling the caller nothing had
+   * happened. The audited mutation now ends at the successful category update —
+   * the point where a real, recorded change exists — and the cascade reports a
+   * 200-with-warning instead of a misleading 400.
    */
   app.patch<{ Params: { id: string } }>('/knowledge/categories/:id', {
     preHandler: requirePlatform('knowledge:write'),
@@ -386,17 +437,6 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
               throw wrapped;
             }
 
-            // The cascade: scoped to row.client_id AND the OLD name, so it can
-            // only ever touch this one client's FAQ rows.
-            if (body.name && body.name !== row.name) {
-              const { error: cascadeError } = await supabase
-                .from('faqs')
-                .update({ category: body.name })
-                .eq('client_id', row.client_id)
-                .eq('category', row.name);
-              if (cascadeError) throw new Error(cascadeError.message);
-            }
-
             return data as Record<string, unknown>;
           },
         }) as Record<string, unknown>;
@@ -406,6 +446,35 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(409).send({ error: 'That category already exists for this client' });
         }
         return reply.code(400).send({ error: wrapped.message });
+      }
+
+      // The cascade: scoped to row.client_id AND the OLD name, so it can only
+      // ever touch this one client's FAQ rows. Outside the audited mutation
+      // (see the header note) with its own try/catch: the rename itself has
+      // already happened and is already recorded, so a failure here must not be
+      // reported as if nothing did.
+      if (body.name && body.name !== row.name) {
+        const { error: cascadeError } = await supabase
+          .from('faqs')
+          .update({ category: body.name })
+          .eq('client_id', row.client_id)
+          .eq('category', row.name);
+
+        if (cascadeError) {
+          logger.error(
+            { err: cascadeError, clientId: row.client_id, userId: user.sub, categoryId: row.id, from: row.name, to: body.name },
+            'FAQ category cascade failed after a successful category rename — FAQ rows are stranded on the old name'
+          );
+          // No afterWrite: the FAQ rows are exactly as they were, and
+          // `knowledge_categories` is read by nothing but this file, so the
+          // agent's prompt is unchanged and a re-provision would push nothing.
+          // Shape stays the category row (as on success) plus `warning`, the
+          // same 200-with-warning contract the policies PUT uses.
+          return reply.code(200).send({
+            ...updated,
+            warning: `The category was renamed to "${body.name}", but the FAQs still filed under "${row.name}" could not be moved and are now on a category that no longer exists. Rename it back to "${row.name}", or retry, before anyone edits those FAQs.`,
+          });
+        }
       }
 
       await afterWrite(row.client_id, user.sub);

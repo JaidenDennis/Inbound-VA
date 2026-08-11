@@ -199,6 +199,9 @@ const svc = vi.hoisted(() => ({
     return opts.mutate();
   }),
   requestSync: vi.fn(async () => undefined),
+  // Every settings patch clients.route.ts hands to the service, so the
+  // single-writer tests below can assert on what it would actually store.
+  settingsWrites: [] as Record<string, unknown>[],
 }));
 
 vi.mock('../services/index.js', async () => {
@@ -208,6 +211,13 @@ vi.mock('../services/index.js', async () => {
     writeAuditLog: svc.writeAuditLog,
     withAudit: svc.withAudit,
     renderPolicies: vi.fn((clientId: string) => real(clientId)),
+    clientService: {
+      getSettings: vi.fn(async (clientId: string) => ({ client_id: clientId, business_policies: [] })),
+      updateSettings: vi.fn(async (clientId: string, patch: Record<string, unknown>) => {
+        svc.settingsWrites.push(patch);
+        return { client_id: clientId, ...patch };
+      }),
+    },
   };
 });
 
@@ -217,6 +227,7 @@ vi.mock('../services/permission.service.js', async () => {
 });
 
 const { knowledgeRoutes } = await import('../dashboard-api/knowledge.route.js');
+const { clientRoutes } = await import('../routes/clients.route.js');
 
 const CLIENT = '11111111-1111-1111-1111-111111111111';
 const OTHER = '22222222-2222-2222-2222-222222222222';
@@ -242,8 +253,24 @@ function tokenFor(app: Awaited<ReturnType<typeof buildApp>>, role: string, clien
   return app.jwt.sign({ sub: 'u-' + role, email: 'x@y.com', role, clientId });
 }
 
+/** A bare app carrying only the legacy `/clients/:id/settings` writer. */
+async function buildClientsApp() {
+  const app = Fastify();
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({ error: 'Validation failed', details: error.flatten().fieldErrors });
+    }
+    reply.code(500).send({ error: 'Internal server error' });
+  });
+  await app.register(jwt, { secret: env.JWT_SECRET });
+  await app.register(clientRoutes);
+  await app.ready();
+  return app;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  svc.settingsWrites = [];
   db.policies = [];
   db.failNextPolicyInsert = false;
   db.failNextPolicyDelete = false;
@@ -632,6 +659,69 @@ describe('PUT /knowledge/policies', () => {
     expect(svc.withAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'knowledge.policies.updated' })
     );
+    await app.close();
+  });
+});
+
+/**
+ * One writer, and only one.
+ *
+ * `renderPolicies()` owns `client_settings.business_policies` — it is rebuilt
+ * from `client_policies` on every write to /knowledge/policies. The legacy
+ * `PATCH /clients/:id/settings` route used to accept the array directly, which
+ * made two unreconciled writers: a settings patch changed the text the agent
+ * speaks while the Policies tab still listed the old rows, and the next save
+ * from that tab silently reverted it. The column is no longer on that route's
+ * whitelist, so the patch is dropped like any other unrecognised key rather
+ * than reaching storage.
+ */
+describe('PATCH /clients/:id/settings is not a business_policies writer', () => {
+  it('drops business_policies from the patch while still applying the rest', async () => {
+    const app = await buildClientsApp();
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/clients/${CLIENT}/settings`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+      payload: {
+        agent_tone: 'formal',
+        business_policies: ['Deposits: Written straight past the Policies tab.'],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(svc.settingsWrites).toHaveLength(1);
+    expect(svc.settingsWrites[0]).toEqual({ agent_tone: 'formal' });
+    expect(svc.settingsWrites[0]).not.toHaveProperty('business_policies');
+    await app.close();
+  });
+
+  it('a patch carrying nothing but business_policies stores nothing', async () => {
+    const app = await buildClientsApp();
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/clients/${CLIENT}/settings`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+      payload: { business_policies: ['Nope.'] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(svc.settingsWrites).toEqual([{}]);
+    await app.close();
+  });
+
+  it('the policies PUT remains the writer that does reach business_policies', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/knowledge/policies?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { policies: [{ title: 'Deposits', body: 'Non-refundable.' }] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(db.settings.find((s) => s.client_id === CLIENT)).toMatchObject({
+      business_policies: ['Deposits: Non-refundable.'],
+    });
     await app.close();
   });
 });

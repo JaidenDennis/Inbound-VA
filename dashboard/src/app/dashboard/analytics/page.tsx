@@ -40,6 +40,11 @@ export default function AnalyticsPage() {
 
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  // Distinct from `loading`. Rendering on `loading || !data` alone meant a
+  // failed request — which sets data to null — left "Loading analytics..."
+  // pulsing forever, so a 403 or a dead service was indistinguishable from a
+  // slow one.
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -50,10 +55,25 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
+    // No synchronous state reset here: both branches below set `data` and
+    // `error` together, so the pair can never disagree, and resetting in the
+    // effect body would add a cascading render for no benefit.
     api
       .get('/analytics/overview', { params: clientId ? { clientId } : {} })
-      .then((r) => setData(r.data))
-      .catch(() => setData(null))
+      .then((r) => {
+        setData(r.data);
+        setError(null);
+      })
+      .catch((e) => {
+        setData(null);
+        const status = (e as { response?: { status?: number } })?.response?.status;
+        setError(
+          status === 403
+            ? 'This roll-up is staff-only. Your own figures are on the Business page.'
+            : ((e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+              'The analytics service did not respond.')
+        );
+      })
       .finally(() => setLoading(false));
   }, [clientId]);
 
@@ -99,8 +119,18 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {loading || !data ? (
+      {loading ? (
         <div className="text-gray-400 animate-pulse">Loading analytics...</div>
+      ) : error || !data ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-lamp-bad-rim bg-lamp-bad-wash px-5 py-4 text-sm text-lamp-bad-ink"
+        >
+          <p className="font-semibold">Figures did not load.</p>
+          <p className="mt-1 text-xs leading-relaxed">
+            {error ?? 'The analytics service did not respond.'} Reload to try again.
+          </p>
+        </div>
       ) : (
         <>
           <p className="text-sm text-gray-400 mb-6">

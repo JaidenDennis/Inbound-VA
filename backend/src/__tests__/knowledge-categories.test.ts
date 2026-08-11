@@ -25,6 +25,15 @@ const db = vi.hoisted(() => ({
   // there and FAQ creation validates against `knowledge_categories` before
   // inserting into this array.
   faqs: [] as Array<Record<string, unknown>>,
+  // When true, the NEXT update against `faqs` fails and changes nothing —
+  // used to drive the rename cascade's failure path, which must leave the
+  // rename recorded and answer 200-with-warning rather than a 400 that denies
+  // a change which really happened.
+  failNextFaqUpdate: false,
+  // When true, reads of `knowledge_categories` return a Supabase error. A
+  // transient failure, or a database missing migration 031, must not be
+  // indistinguishable from "that category is not on the list".
+  failCategoryLookup: false,
 }));
 
 vi.mock('../db/index.js', () => {
@@ -92,6 +101,10 @@ vi.mock('../db/index.js', () => {
 
     function resolveUpdate() {
       if (!store) return { data: null, error: null };
+      if (table === 'faqs' && db.failNextFaqUpdate) {
+        db.failNextFaqUpdate = false;
+        return { data: null, error: { message: 'simulated faqs update failure' } };
+      }
       const rows = matchRows();
       for (const row of rows) Object.assign(row, state.updateBody);
       return { data: rows[0] ?? null, error: null };
@@ -134,6 +147,9 @@ vi.mock('../db/index.js', () => {
         return Promise.resolve({ ...result, data: clone(result.data) });
       },
       maybeSingle: () => {
+        if (table === 'knowledge_categories' && db.failCategoryLookup) {
+          return Promise.resolve({ data: null, error: { message: 'simulated lookup failure' } });
+        }
         const { data } = resolveSelect();
         const rows = data as Array<Record<string, unknown>>;
         return Promise.resolve({ data: clone(rows[0] ?? null), error: null });
@@ -154,8 +170,24 @@ vi.mock('../db/index.js', () => {
 });
 
 const svc = vi.hoisted(() => ({
-  writeAuditLog: vi.fn(async () => undefined),
-  withAudit: vi.fn(async (opts: { mutate: () => Promise<unknown> }) => opts.mutate()),
+  writeAuditLog: vi.fn(async (_entry?: Record<string, unknown>) => undefined),
+  // Mirrors the real withAudit's ORDER (audit.service.ts): before(), then
+  // mutate(), and the log written only once mutate() has resolved. A mock that
+  // just called mutate() could not tell "the change was recorded" apart from
+  // "the change happened and vanished from the trail" — which is exactly the
+  // failure the cascade restructuring below exists to prevent.
+  withAudit: vi.fn(
+    async (opts: {
+      action: string;
+      before: () => Promise<unknown>;
+      mutate: () => Promise<unknown>;
+    }) => {
+      const oldValue = await opts.before();
+      const newValue = await opts.mutate();
+      await svc.writeAuditLog({ action: opts.action, oldValue, newValue });
+      return newValue;
+    }
+  ),
   requestSync: vi.fn(async () => undefined),
 }));
 
@@ -192,6 +224,8 @@ function tokenFor(app: Awaited<ReturnType<typeof buildApp>>, role: string, clien
 
 beforeEach(() => {
   vi.clearAllMocks();
+  db.failNextFaqUpdate = false;
+  db.failCategoryLookup = false;
   db.categories = [
     { id: 'cat-1', client_id: CLIENT, name: 'Billing', sort_order: 1, active: true },
     { id: 'cat-2', client_id: CLIENT, name: 'Visit', sort_order: 0, active: true },
@@ -205,6 +239,16 @@ beforeEach(() => {
     // this row. It must survive every test in this file untouched.
     { id: 'faq-2', client_id: OTHER, category: 'Billing', question: 'Cost?', answer: '$200', active: true },
     { id: 'faq-3', client_id: CLIENT, category: 'Visit', question: 'Hours?', answer: '9-5', active: true },
+    // A row predating migration 031: free-text category, on no curated list.
+    // Real clients have these, and they must stay editable.
+    {
+      id: 'faq-legacy',
+      client_id: CLIENT,
+      category: 'Insurance & Coverage',
+      question: 'Do you bill insurance?',
+      answer: 'We do.',
+      active: true,
+    },
   ];
 });
 
@@ -407,6 +451,220 @@ describe('POST /knowledge/faqs validates category against the client\'s active l
     });
     expect(res.statusCode).toBe(201);
     expect(res.json()).toMatchObject({ question: 'What forms of payment?', category: 'Billing' });
+    await app.close();
+  });
+});
+
+/**
+ * The cascade is a SECOND step, after a change that already happened.
+ *
+ * It used to run inside `withAudit`'s `mutate()` and throw on failure. Because
+ * `withAudit` only writes its log once `mutate()` resolves, a cascade failure
+ * produced the worst possible combination: the category already renamed, the
+ * FAQ rows stranded on the old name, no audit record of any of it, and a 400
+ * telling the caller nothing had happened. That is the same failure the
+ * policies PUT was restructured twice to eliminate.
+ */
+describe('PATCH /knowledge/categories/:id — the FAQ cascade fails after the rename is already committed', () => {
+  it('answers 200 with a warning rather than a 400 that denies the rename', async () => {
+    db.failNextFaqUpdate = true;
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/categories/cat-1', // 'Billing', CLIENT
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+      payload: { name: 'Payments' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // The rename really happened, so the response reports it — plus the truth
+    // about the half that did not.
+    expect(body).toMatchObject({ name: 'Payments' });
+    expect(body.warning).toMatch(/Billing/);
+    expect(body.warning).toMatch(/Payments/);
+    await app.close();
+  });
+
+  it('still records the rename in the audit trail', async () => {
+    db.failNextFaqUpdate = true;
+    const app = await buildApp();
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/categories/cat-1',
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+      payload: { name: 'Payments' },
+    });
+
+    // The point of the restructuring: a recorded change, not a silent one.
+    expect(svc.writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(svc.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'knowledge.category.updated',
+        oldValue: expect.objectContaining({ name: 'Billing' }),
+        newValue: expect.objectContaining({ name: 'Payments' }),
+      })
+    );
+    await app.close();
+  });
+
+  it('leaves the FAQ rows exactly as they were and does not queue a re-provision', async () => {
+    db.failNextFaqUpdate = true;
+    const app = await buildApp();
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/categories/cat-1',
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+      payload: { name: 'Payments' },
+    });
+
+    expect(db.faqs.find((f) => f.id === 'faq-1')).toMatchObject({ category: 'Billing' });
+    // `knowledge_categories` is read by nothing outside this route file, so
+    // with the FAQ rows untouched the agent's prompt is unchanged — a sync
+    // would push nothing and only muddy the "why did this agent re-provision"
+    // question later.
+    expect(svc.requestSync).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('a successful rename still audits and still queues the re-provision', async () => {
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/categories/cat-1',
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+      payload: { name: 'Payments' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().warning).toBeUndefined();
+    expect(svc.writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(svc.requestSync).toHaveBeenCalledWith(CLIENT, expect.anything());
+    await app.close();
+  });
+});
+
+/**
+ * A category lookup that fails is not a category that does not exist.
+ *
+ * `assertCategoryAllowed` used to destructure only `{ data }`, so a transient
+ * Supabase error — or a database without migration 031 at all — turned every
+ * categorised FAQ write into "Unknown category: X": false, unactionable, and
+ * indistinguishable from the real thing.
+ */
+describe('a failing category lookup is a 500, not a 400', () => {
+  it('POST /knowledge/faqs answers 500 and writes nothing', async () => {
+    db.failCategoryLookup = true;
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/knowledge/faqs?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { question: 'Do you take insurance?', answer: 'Yes.', category: 'Billing' },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error).not.toMatch(/Unknown category/);
+    expect(db.faqs.find((f) => f.question === 'Do you take insurance?')).toBeUndefined();
+    await app.close();
+  });
+
+  it('an uncategorised write never reaches the lookup, so it still succeeds', async () => {
+    db.failCategoryLookup = true;
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/knowledge/faqs?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { question: 'Where are you?', answer: '123 Main St.', category: null },
+    });
+
+    expect(res.statusCode).toBe(201);
+    await app.close();
+  });
+});
+
+/**
+ * Rows carrying a category that predates the curated list must stay editable.
+ *
+ * The dashboard sends every field it renders on every save, so validating an
+ * unchanged category made those FAQs uneditable outright — a typo in the ANSWER
+ * would 400 with "Unknown category", and the operator could not fix the
+ * category either, because editing the list is platform-only. The API now
+ * validates `category` only when it actually changes.
+ */
+describe('PATCH /knowledge/faqs/:id validates the category only when it changes', () => {
+  it('edits the answer of a legacy-category FAQ, resending the same category', async () => {
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/faqs/faq-legacy',
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: {
+        question: 'Do you bill insurance?',
+        answer: 'We bill most major carriers.',
+        category: 'Insurance & Coverage', // unchanged, and on no curated list
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(db.faqs.find((f) => f.id === 'faq-legacy')).toMatchObject({
+      answer: 'We bill most major carriers.',
+      // Round-trips untouched: the edit does not quietly reclassify the row.
+      category: 'Insurance & Coverage',
+    });
+    await app.close();
+  });
+
+  it('still refuses a MOVE onto a category the client does not have', async () => {
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/faqs/faq-1', // currently 'Billing'
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { category: 'NotARealCategory' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/Unknown category/);
+    expect(db.faqs.find((f) => f.id === 'faq-1')).toMatchObject({ category: 'Billing' });
+    await app.close();
+  });
+
+  it('allows a move onto a category that IS on the active list', async () => {
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/faqs/faq-legacy',
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { category: 'Billing' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(db.faqs.find((f) => f.id === 'faq-legacy')).toMatchObject({ category: 'Billing' });
+    await app.close();
+  });
+
+  it('clearing a legacy category to uncategorised is allowed', async () => {
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/faqs/faq-legacy',
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { category: '' },
+    });
+
+    expect(res.statusCode).toBe(200);
     await app.close();
   });
 });
