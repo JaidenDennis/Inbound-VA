@@ -84,7 +84,7 @@ UPDATE client_settings AS cs SET
     'Lease renewals are offered 90 days before the current lease ends.'
   ],
   faqs = '[
-    {"question":"What do you have available?","answer":"Availability changes daily. As of today we have studios, 1, 2, and 3 bedroom floor plans — I can walk through pricing, or set up a tour so you can see what''s open.","category":"pricing"},
+    {"question":"What do you have available?","answer":"Availability changes daily. As of today we have studios, 1, 2, and 3 bedroom floor plans — I can walk through pricing, or set up a tour so you can see what''s open.","category":"availability"},
     {"question":"How much is rent?","answer":"Studios start around $1,395, 1 bedrooms from about $1,595 to $1,750, 2 bedrooms from about $2,050 to $2,295, and 3 bedrooms start around $2,650. These are as of today and subject to availability and change.","category":"pricing"},
     {"question":"What''s included in rent?","answer":"Water, sewer, and trash are included as a flat $65 monthly utility fee. Electric is separate and billed directly to the resident.","category":"utilities"},
     {"question":"How do I apply?","answer":"You can apply online. Once submitted, applications are typically processed within 2 to 3 business days.","category":"application"},
