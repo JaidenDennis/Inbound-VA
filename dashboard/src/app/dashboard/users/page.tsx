@@ -20,7 +20,7 @@ interface AppUser {
 }
 
 export default function UsersPage() {
-  const { isPlatform, auth } = useSession();
+  const { isPlatform, auth, loading: sessionLoading } = useSession();
   // Only roles from the caller's own family are offered. The API rejects the
   // other family anyway; showing them would just produce a confusing 403.
   const roles: readonly UserRole[] = isPlatform ? PLATFORM_ROLES : CLIENT_ROLES;
@@ -84,7 +84,7 @@ export default function UsersPage() {
     e.preventDefault();
     if (!editing) return;
     setSavingEdit(true);
-    const isSelf = editing.id === auth?.sub;
+    const isSelf = !sessionLoading && editing.id === auth?.sub;
     try {
       // Role is omitted for yourself: the API rejects a self-role change with
       // 403, and offering a control that always fails is worse than not
@@ -195,7 +195,7 @@ export default function UsersPage() {
             value={editPassword}
             onChange={(e) => setEditPassword(e.target.value)}
           />
-          {editing.id !== auth?.sub && (
+          {!sessionLoading && editing.id !== auth?.sub && (
             <div>
               <label htmlFor="edit-user-role" className="sr-only">Role</label>
               <select
@@ -209,7 +209,7 @@ export default function UsersPage() {
             </div>
           )}
           <div className="col-span-2 flex gap-2">
-            <button type="submit" disabled={savingEdit}
+            <button type="submit" disabled={savingEdit || sessionLoading}
               className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">
               {savingEdit ? 'Saving...' : 'Save'}
             </button>
