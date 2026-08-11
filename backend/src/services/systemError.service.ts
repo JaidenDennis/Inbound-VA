@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { supabase } from '../db/index.js';
-import { logger } from '../utils/index.js';
+import { logger } from '../utils/logger.js';
 import { redactContext, redactText } from '../utils/redact.js';
 
 export type ErrorSource = 'api' | 'worker' | 'webhook' | 'startup' | 'email';
