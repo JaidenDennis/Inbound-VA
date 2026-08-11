@@ -3,6 +3,7 @@ import { dentalRoutingTemplate } from '../providers/retell/templates/dental-rout
 import { orthodonticRoutingTemplate } from '../providers/retell/templates/orthodontic-routing.template.js';
 import { lawFirmRoutingTemplate } from '../providers/retell/templates/law-firm-routing.template.js';
 import { restaurantRoutingTemplate } from '../providers/retell/templates/restaurant-routing.template.js';
+import { apartmentRoutingTemplate } from '../providers/retell/templates/apartment-routing.template.js';
 import { inboundRoutingTemplate } from '../providers/retell/templates/inbound-routing.template.js';
 import { getTemplate, listVerticals, resolveVertical } from '../providers/retell/templates/index.js';
 import type { AgentTemplate, TemplateContext } from '../providers/retell/templates/template.types.js';
@@ -55,6 +56,7 @@ const ALL: Array<{ name: string; vertical: string; template: AgentTemplate }> = 
   { name: 'orthodontic', vertical: 'orthodontic_routing', template: orthodonticRoutingTemplate },
   { name: 'law firm', vertical: 'law_firm_routing', template: lawFirmRoutingTemplate },
   { name: 'restaurant', vertical: 'restaurant_routing', template: restaurantRoutingTemplate },
+  { name: 'apartment', vertical: 'apartment_routing', template: apartmentRoutingTemplate },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ describe.each(ALL)('$name routing template — shared contract', ({ vertical, te
     const nothing = template.build(
       ctx({ business_name: null }, { name: '' })
     ).responseEngine.general_prompt;
-    expect(nothing).toMatch(/our (dental office|orthodontic practice|law firm|restaurant)/);
+    expect(nothing).toMatch(/our (dental office|orthodontic practice|law firm|restaurant|apartment community)/);
   });
 
   it('inherits the full tool set and begin message from the routing backbone', () => {

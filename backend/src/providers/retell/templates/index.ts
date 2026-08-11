@@ -6,6 +6,7 @@ import { dentalRoutingTemplate } from './dental-routing.template.js';
 import { orthodonticRoutingTemplate } from './orthodontic-routing.template.js';
 import { lawFirmRoutingTemplate } from './law-firm-routing.template.js';
 import { restaurantRoutingTemplate } from './restaurant-routing.template.js';
+import { apartmentRoutingTemplate } from './apartment-routing.template.js';
 
 // Vertical → template registry. New verticals register here without touching
 // the provisioning service (open for extension, closed for modification).
@@ -28,6 +29,7 @@ registerTemplate(dentalRoutingTemplate);
 registerTemplate(orthodonticRoutingTemplate);
 registerTemplate(lawFirmRoutingTemplate);
 registerTemplate(restaurantRoutingTemplate);
+registerTemplate(apartmentRoutingTemplate);
 
 /**
  * Map a client's industry to a default template vertical. Only a default —
