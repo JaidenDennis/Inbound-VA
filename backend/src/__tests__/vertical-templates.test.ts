@@ -332,6 +332,45 @@ describe('restaurant template specifics', () => {
   });
 });
 
+describe('apartment template specifics', () => {
+  const cfg = (agent_config: AgentConfig) =>
+    apartmentRoutingTemplate.build(ctx({ agent_config })).responseEngine.general_prompt;
+
+  it('states Fair Housing as overriding every other instruction', () => {
+    const p = cfg({});
+    expect(p).toMatch(/FAIR HOUSING — THIS OVERRIDES/);
+    expect(p).toMatch(/overrides hospitality, sales, and every other instruction/i);
+  });
+
+  it('refuses to steer on neighborhood, schools, safety, or who lives here', () => {
+    const p = cfg({});
+    expect(p).toMatch(/You never steer\./);
+    expect(p).toMatch(/What kind of people live here\?/);
+    expect(p).toMatch(/How are the schools\?/);
+    expect(p).toMatch(/never characterize the neighborhood/i);
+  });
+
+  it('forbids recording or acting on protected characteristics', () => {
+    const p = cfg({});
+    expect(p).toMatch(/familial status/);
+    expect(p).toMatch(/source of income/);
+    expect(p).toMatch(/do NOT write it into a slot, a note, or a message/);
+  });
+
+  it('exempts assistance animals from every pet term', () => {
+    const p = cfg({ pets_allowed: false });
+    expect(p).toMatch(/A service animal or assistance animal is NOT a pet/);
+    expect(p).toMatch(/never apply pet rent, a pet fee, a breed restriction, or a weight limit/i);
+    expect(p).toMatch(/never demand documentation/i);
+  });
+
+  it('never pre-approves or pre-denies an applicant', () => {
+    const p = cfg({});
+    expect(p).toMatch(/NEVER tell a caller whether they will be approved or denied/);
+    expect(p).toMatch(/read the published criteria exactly as written/i);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 describe('vertical resolution from industry', () => {
   it('maps each new industry to its dedicated playbook', () => {
