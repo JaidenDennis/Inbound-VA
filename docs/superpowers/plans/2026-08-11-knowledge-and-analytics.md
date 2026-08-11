@@ -4,7 +4,7 @@
 
 **Goal:** Replace free-text knowledge categories with a staff-managed per-client list, restructure policies from anonymous strings into titled entries, and turn Analytics into a platform-only cross-company roll-up.
 
-**Architecture:** Three independent slices of the 2026-08-10 spec — W2 (categories), W3 (policies), W4 (analytics). Two additive migrations. The agent-facing contract (`clients.business_policies`, and the `category` field on FAQs) is preserved by re-rendering, so no Retell template changes.
+**Architecture:** Three independent slices of the 2026-08-10 spec — W2 (categories), W3 (policies), W4 (analytics). Two additive migrations. The agent-facing contract (`client_settings.business_policies`, and the `category` field on FAQs) is preserved by re-rendering, so no Retell template changes.
 
 **Tech Stack:** Node 22, TypeScript, Fastify 5, Supabase Postgres, Zod, Vitest, Next.js 16 + Tailwind.
 
@@ -32,7 +32,7 @@
 Checked against the code, not assumed:
 
 - **Only FAQs' `category` reaches the agent.** `knowledge.service.ts:133` maps `category` for FAQs. The `services` mapping (`:112-118`) reads name/description/duration/price only — `services.category` is stored but never consumed. W2 therefore targets FAQs.
-- **`clients.business_policies` is read in 11 places**: 7 Retell templates (`dental-routing`, `law-firm-routing`, `med-spa`, `med-spa-routing`, `orthodontic-routing`, `restaurant-routing`, `inbound-routing`), plus `retell-functions.route.ts:671`, `agentDraft.service.ts:51`, `configDiff.service.ts:146`, `client.types.ts:121`. W3 must not break these.
+- **`client_settings.business_policies` is read in 11 places**: 7 Retell templates (`dental-routing`, `law-firm-routing`, `med-spa`, `med-spa-routing`, `orthodontic-routing`, `restaurant-routing`, `inbound-routing`), plus `retell-functions.route.ts:671`, `agentDraft.service.ts:51`, `configDiff.service.ts:146`, `client.types.ts:121`. W3 must not break these.
 - **`/analytics/overview` already supports the platform-wide view**: `analytics.route.ts:18` computes `const clientId = user.clientId ?? request.query.clientId`, and omitting it aggregates every tenant. No new SQL is needed for W4.
 - **Analytics and Business are BOTH gated on `analytics:read` and BOTH appear in the client nav** (`Sidebar.tsx:55,58`) and the platform nav (`:81,83`). Making Analytics platform-only requires changing the route guard AND the client nav entry.
 - **`requirePlatform(permission)`** exists and composes `requirePermission` then an `isPlatformUser` check (`auth.middleware.ts`). Usage pattern: `preHandler: requirePlatform('agents:read')`.
@@ -48,7 +48,7 @@ Checked against the code, not assumed:
 | `supabase/migrations/031_knowledge_categories.sql` | Per-client FAQ category list |
 | `supabase/migrations/032_client_policies.sql` | Titled policies + backfill from `business_policies` |
 | `backend/src/dashboard-api/knowledge.route.ts` | Category CRUD, FAQ category validation, policies CRUD |
-| `backend/src/services/policyRender.service.ts` | Renders `client_policies` → `clients.business_policies` |
+| `backend/src/services/policyRender.service.ts` | Renders `client_policies` → `client_settings.business_policies` |
 | `dashboard/src/app/dashboard/knowledge/components/CategoryEditor.tsx` | Staff-only category list editor |
 | `dashboard/src/app/dashboard/knowledge/components/PoliciesEditor.tsx` | Title + body entries |
 | `dashboard/src/app/dashboard/knowledge/page.tsx` | FAQ category becomes a `<select>` |
@@ -521,11 +521,11 @@ git commit -m "feat(knowledge): FAQ category dropdown and staff category editor"
 **Interfaces:**
 - Produces:
   - table `client_policies(id, client_id, title, body, sort_order, active, created_at, updated_at)`
-  - `renderPolicies(clientId): Promise<string[]>` in `policyRender.service.ts` — rebuilds `clients.business_policies` from the table and returns what it wrote
+  - `renderPolicies(clientId): Promise<string[]>` in `policyRender.service.ts` — rebuilds `client_settings.business_policies` from the table and returns what it wrote
   - `GET /knowledge/policies` now returns `{ data: Array<{id,title,body,sort_order}> }` (SHAPE CHANGE — Task 5 updates the UI)
   - `PUT /knowledge/policies` accepts `{ policies: Array<{title, body}> }` (SHAPE CHANGE)
 
-**The load-bearing decision:** `clients.business_policies` (a `TEXT[]`) stays the agent-facing contract. It is read in 11 places (listed in Verified Facts). Every write to `client_policies` re-renders that array as `"Title: Body"` strings ordered by `sort_order`. Nothing downstream changes, and the prompt gets better-structured text than today's anonymous strings.
+**The load-bearing decision:** `client_settings.business_policies` (a `TEXT[]`) stays the agent-facing contract. It is read in 11 places (listed in Verified Facts). Every write to `client_policies` re-renders that array as `"Title: Body"` strings ordered by `sort_order`. Nothing downstream changes, and the prompt gets better-structured text than today's anonymous strings.
 
 - [ ] **Step 1: Write the migration**
 
@@ -534,11 +534,11 @@ git commit -m "feat(knowledge): FAQ category dropdown and staff category editor"
 -- GRAVVIA ENGAGE – policies as titled entries
 -- Run order: 032  (NEVER edit earlier migrations)
 --
--- clients.business_policies is a bare TEXT[] of anonymous strings, rendered in
+-- client_settings.business_policies is a bare TEXT[] of anonymous strings, rendered in
 -- the console as one broad text box that operators find hard to fill in well.
 -- Policies become rows with a title and a body.
 --
--- clients.business_policies IS DELIBERATELY KEPT and stays the agent-facing
+-- client_settings.business_policies IS DELIBERATELY KEPT and stays the agent-facing
 -- contract. It is read by seven Retell templates plus retell-functions.route.ts,
 -- agentDraft.service.ts, configDiff.service.ts and client.types.ts. Migrating
 -- all of those to a relational read is a large blast radius for no user-visible
@@ -575,7 +575,7 @@ SELECT c.id,
        'Policy ' || p.ord::text,
        p.policy,
        p.ord - 1
-FROM clients c
+FROM client_settings cs
 CROSS JOIN LATERAL unnest(c.business_policies) WITH ORDINALITY AS p(policy, ord)
 WHERE COALESCE(array_length(c.business_policies, 1), 0) > 0
   AND NOT EXISTS (SELECT 1 FROM client_policies cp WHERE cp.client_id = c.id);
@@ -586,7 +586,7 @@ WHERE COALESCE(array_length(c.business_policies, 1), 0) > 0
 ```sql
 -- Rollback for 032_client_policies.sql
 --
--- clients.business_policies was never dropped and has been kept in sync by
+-- client_settings.business_policies was never dropped and has been kept in sync by
 -- renderPolicies() on every write, so dropping this table loses no policy text.
 DROP TABLE IF EXISTS client_policies;
 ```
@@ -613,7 +613,7 @@ Create `backend/src/__tests__/client-policies.test.ts`. The critical assertion i
 - `renderPolicies` produces `"Title: Body"` per active policy, ordered by `sort_order`.
 - Inactive policies are excluded.
 - A policy with an empty body renders as just the title (no trailing `": "`).
-- The rendered array is written to `clients.business_policies`.
+- The rendered array is written to `client_settings.business_policies`.
 - Ordering is by `sort_order`, not insertion order.
 
 - [ ] **Step 6: Run and confirm failure**
@@ -629,7 +629,7 @@ Create `backend/src/services/policyRender.service.ts`:
 import { supabase } from '../db/index.js';
 
 /**
- * Rebuild `clients.business_policies` from `client_policies`.
+ * Rebuild `client_settings.business_policies` from `client_policies`.
  *
  * That TEXT[] is the agent-facing contract: seven Retell templates and four
  * other call sites read it, so it stays authoritative and this function keeps
@@ -670,7 +670,7 @@ Export it from `backend/src/services/index.ts` alongside the other service expor
 
 - [ ] **Step 8: Replace the policies routes**
 
-In `knowledge.route.ts`, replace the existing `GET /knowledge/policies` and `PUT /knowledge/policies` handlers (they currently read and write `clients.business_policies` directly) with handlers over `client_policies`:
+In `knowledge.route.ts`, replace the existing `GET /knowledge/policies` and `PUT /knowledge/policies` handlers (they currently read and write `client_settings.business_policies` directly) with handlers over `client_policies`:
 
 - `GET` returns `{ data: Array<{ id, title, body, sort_order }> }` for active policies ordered by `sort_order`.
 - `PUT` accepts `z.object({ policies: z.array(z.object({ title: z.string().min(1).max(200), body: z.string().max(4000).default('') })).max(50) })`, replaces the client's set (soft-delete the old rows or delete and re-insert — either is fine, but the whole set must end up matching the payload exactly, with `sort_order` following array order), then calls `renderPolicies(clientId)` and `afterWrite(clientId, user.sub)`.
