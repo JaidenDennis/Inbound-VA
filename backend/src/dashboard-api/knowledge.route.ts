@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
-import { requirePermission, assertClientAccess } from '../middleware/index.js';
+import { requirePermission, requirePlatform, assertClientAccess } from '../middleware/index.js';
 import { agentSyncService, writeAuditLog, withAudit } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
@@ -217,6 +217,92 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
       },
     });
   }
+
+  /**
+   * FAQ categories.
+   *
+   * Reading is tenant-scoped and open to anyone with knowledge:read, because the
+   * FAQ form needs the list to populate its dropdown. Writing is platform-only:
+   * the point of the change is that clients pick from a curated list rather than
+   * inventing one, so a client who could edit the list would be back where they
+   * started.
+   */
+  const categorySchema = z.object({
+    name: z.string().min(1).max(100),
+    sort_order: z.number().int().min(0).max(9999).optional(),
+    active: z.boolean().optional(),
+  });
+
+  app.get<{ Querystring: { clientId?: string; includeInactive?: string } }>('/knowledge/categories', {
+    preHandler: requirePermission('knowledge:read'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      let query = supabase
+        .from('knowledge_categories')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('sort_order')
+        .order('name');
+      if (request.query.includeInactive !== 'true') query = query.eq('active', true);
+
+      const { data, error } = await query;
+      if (error) return reply.code(500).send({ error: error.message });
+      reply.send({ data: data ?? [] });
+    },
+  });
+
+  app.post<{ Querystring: { clientId?: string } }>('/knowledge/categories', {
+    preHandler: requirePlatform('knowledge:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const clientId = scopeFor(user, request.query.clientId);
+      if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
+
+      const body = categorySchema.parse(request.body);
+
+      // Routed through withAudit — like every other configure-axis write in this
+      // file — rather than a direct writeAuditLog call, so this stays covered by
+      // the same audit-coverage guard the rest of knowledge.route.ts is (spec
+      // §2.5). `before` is `null`: this is a create, nothing existed yet.
+      let created: Record<string, unknown>;
+      try {
+        created = await withAudit<Record<string, unknown> | null>({
+          actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'knowledge.category.created',
+          entityType: 'knowledge_category',
+          before: async () => null,
+          mutate: async () => {
+            const { data, error } = await supabase
+              .from('knowledge_categories')
+              .insert({ ...body, client_id: clientId })
+              .select()
+              .single();
+            if (error) {
+              // 23505 is the (client_id, name) unique index. Carry the code
+              // through so the catch below can answer the question the caller
+              // asked rather than leaking a constraint name as a 500.
+              const wrapped = new Error(error.message) as Error & { code?: string };
+              wrapped.code = error.code;
+              throw wrapped;
+            }
+            return data as Record<string, unknown>;
+          },
+        }) as Record<string, unknown>;
+      } catch (err) {
+        const wrapped = err as Error & { code?: string };
+        if (wrapped.code === '23505') {
+          return reply.code(409).send({ error: 'That category already exists for this client' });
+        }
+        return reply.code(400).send({ error: wrapped.message });
+      }
+
+      await afterWrite(clientId, user.sub);
+      reply.code(201).send(created);
+    },
+  });
 
   /**
    * Business policies — cancellation, deposits, insurance, parking, anything the
