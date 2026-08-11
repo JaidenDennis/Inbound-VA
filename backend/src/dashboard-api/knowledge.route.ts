@@ -543,31 +543,34 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
             return rows;
           },
           mutate: async () => {
-            // Insert-first, delete-second — NOT delete-then-insert. A plain
-            // delete-then-insert leaves the client with ZERO policy rows for
-            // the entire window until the insert lands, and if the insert
-            // fails the client is left with nothing: `client_policies` is
-            // empty, `business_policies` still holds the old text (renderPolicies
-            // never runs because mutate() threw), and withAudit's own log write
-            // is skipped too — a throwing mutate() never reaches the
-            // writeAuditLog call (see withAudit in audit.service.ts), so even
-            // the `before` snapshot goes unrecorded. That combination is
-            // unrecoverable production data loss.
+            // Insert-only inside the audited mutation — NOT insert-then-delete.
+            // withAudit only calls writeAuditLog AFTER mutate() returns
+            // successfully (see audit.service.ts); a throwing mutate() skips
+            // the log entirely. An earlier version of this fix put the cleanup
+            // delete of the previous rows INSIDE mutate(), which meant a
+            // failed delete threw, which meant: the insert had already
+            // committed (so client_policies now held both old and new rows),
+            // business_policies was never re-rendered, AND there was no audit
+            // record of any of it — the caller got a 400 that flatly
+            // contradicted what had actually happened. That is the same
+            // "data changed, no trail, caller misinformed" failure F1 exists
+            // to close, just relocated from the insert step to the delete
+            // step.
             //
-            // Inserting first means an insert failure leaves the PREVIOUS rows
-            // (and business_policies, and the `before` snapshot already
-            // captured above) completely untouched — the write simply did not
-            // happen, and the 400 below is accurate. This codebase has no
-            // precedent for wrapping a multi-statement write in a transactional
-            // Postgres RPC (the existing `.rpc()` calls throughout the backend
-            // are all read-only reporting functions, e.g. `report_kpis`,
-            // `report_pulse`); reordering to insert-first gets the same safety
-            // property using the same delete/insert primitives already used
-            // everywhere else in this file, with no new migration required.
+            // The fix: mutate() ends at the successful insert — the point
+            // where a real, recorded change exists — and the cleanup delete
+            // of the previous rows happens AFTER this returns, outside the
+            // audited mutation (see below), the same way renderPolicies is
+            // already handled: its own try/catch, logged loudly, reported as
+            // a 200-with-warning rather than folded into a misleading 400.
+            //
+            // The one case where the delete IS the audited change is an empty
+            // payload: there is no insert, so clearing the set to nothing has
+            // nothing else to record. If that delete fails here, nothing was
+            // written at all, so the 400 below is accurate and no audit entry
+            // is expected — consistent with how every other resource in this
+            // file behaves when its only mutation fails.
             if (body.policies.length === 0) {
-              // Nothing new to protect — just remove what existed. If this
-              // delete fails, the previous rows simply remain (mutate throws,
-              // nothing was lost).
               if (previousIds.length > 0) {
                 const { error: deleteError } = await supabase
                   .from('client_policies')
@@ -589,19 +592,6 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
               .insert(rows)
               .select();
             if (insertError) throw new Error(insertError.message);
-
-            // Only now remove the rows that predate this write, by id — never
-            // the ones just inserted. If THIS delete fails, the client ends up
-            // with both old and new rows visible at once (a duplicate an
-            // operator can spot and clean up), never with nothing.
-            if (previousIds.length > 0) {
-              const { error: deleteError } = await supabase
-                .from('client_policies')
-                .delete()
-                .in('id', previousIds);
-              if (deleteError) throw new Error(deleteError.message);
-            }
-
             return (data ?? []) as Record<string, unknown>[];
           },
         }) as Array<Record<string, unknown>>;
@@ -609,16 +599,50 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: (err as Error).message });
       }
 
-      // The rows above are already saved — a failure past this point must
-      // not read as "the save failed". renderPolicies keeps
-      // client_settings.business_policies (the agent's actual input) in sync
-      // with what was just written; if THAT fails, the new rows still exist
-      // but the agent keeps speaking the previous text until the next
-      // successful save or sync. That is logged loudly here (the same
-      // "succeeded but not fully recorded" precedent as the audit-write
-      // failure path in audit.service.ts) and reported to the caller as a
-      // 200 with an explicit warning — not folded into the 400 above, which
-      // would wrongly imply nothing was saved.
+      // Cleanup: remove the rows that predated this write, by id — never the
+      // ones just inserted. Only reachable when mutate() took the insert
+      // branch above; an empty payload already removed `previousIds` as part
+      // of the audited mutation itself. This step runs OUTSIDE withAudit and
+      // is not itself audited: the real, recorded change already happened
+      // (the insert), so a failure here produces visible duplicate rows —
+      // recoverable, inspectable, logged — never silent data loss and never a
+      // response that claims the save failed when it didn't.
+      if (body.policies.length > 0 && previousIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('client_policies')
+          .delete()
+          .in('id', previousIds);
+        if (deleteError) {
+          logger.error(
+            { err: deleteError, clientId, userId: user.sub, previousIds },
+            'cleanup delete of previous client_policies rows failed after a successful insert — duplicates remain'
+          );
+          // Do NOT run renderPolicies from here: with the old AND new rows
+          // both still active, rendering now would write both sets into
+          // business_policies, duplicating every policy in the agent's
+          // prompt. Stop short of touching the agent-facing array until the
+          // duplicate is cleared, and say so — a bare 200 would hide the
+          // duplicate, and a 400 would deny that the insert (which really
+          // happened, and is already audited) ever occurred.
+          return reply.code(200).send({
+            data: saved,
+            warning: `Policies were saved, but ${previousIds.length} previous ${previousIds.length === 1 ? 'entry' : 'entries'} could not be removed and still exist alongside the new set. The agent's text was left unchanged to avoid duplicating policies — retry this save, or remove the stale client_policies rows directly.`,
+          });
+        }
+      }
+
+      // Only now — with exactly the intended set present, old rows gone
+      // either via the cleanup above or, for an empty payload, the audited
+      // mutation itself — is it safe to rebuild the agent-facing array.
+      // Running this any earlier (e.g. right after the insert, before the
+      // cleanup delete) would render the transient old+new set and write
+      // duplicate policies into business_policies even on the HAPPY path.
+      //
+      // The rows are already saved at this point — a renderPolicies failure
+      // past here must not read as "the save failed" either. Logged loudly
+      // (the same "succeeded but not fully recorded" precedent as the
+      // audit-write failure path in audit.service.ts) and reported as a 200
+      // with an explicit warning.
       try {
         await renderPolicies(clientId);
       } catch (err) {

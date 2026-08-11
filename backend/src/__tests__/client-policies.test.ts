@@ -27,6 +27,10 @@ const db = vi.hoisted(() => ({
   // insert error mid-write so the "insert-first" ordering can be proven —
   // the previous rows must survive that failure untouched.
   failNextPolicyInsert: false,
+  // F5 coverage: when true, the NEXT delete against `client_policies` fails
+  // (and removes nothing), simulating the cleanup delete failing AFTER a
+  // successful insert — the case where old and new rows end up coexisting.
+  failNextPolicyDelete: false,
 }));
 
 vi.mock('../db/index.js', () => {
@@ -104,6 +108,10 @@ vi.mock('../db/index.js', () => {
 
     function resolveDelete() {
       if (!store) return { data: null, error: null };
+      if (table === 'client_policies' && db.failNextPolicyDelete) {
+        db.failNextPolicyDelete = false;
+        return { data: null, error: { message: 'simulated delete failure' } };
+      }
       const toDelete = matchRows();
       for (const row of toDelete) {
         const idx = store.indexOf(row);
@@ -238,6 +246,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.policies = [];
   db.failNextPolicyInsert = false;
+  db.failNextPolicyDelete = false;
   db.settings = [
     { client_id: CLIENT, business_policies: [] },
     { client_id: OTHER, business_policies: [] },
@@ -538,6 +547,63 @@ describe('PUT /knowledge/policies', () => {
     expect(db.policies.find((p) => p.client_id === CLIENT && p.title === 'Fresh Policy')).toBeTruthy();
 
     // No sync was requested off the back of a text that was never refreshed.
+    expect(svc.requestSync).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  // F5: F1's fix moved the cleanup delete to run AFTER the audited insert
+  // instead of inside mutate() — so a failure in THAT delete can no longer
+  // produce "mutate() threw -> withAudit skips writeAuditLog entirely ->
+  // no trail of a change that actually happened" (audit.service.ts only
+  // logs once mutate() returns). Prove the new shape: the insert really
+  // landed (so a real withAudit would have logged it — mutate() returned
+  // normally, it did not throw), the response is not a 400 that would deny
+  // the insert happened, the failure is reported rather than swallowed, and
+  // — the ordering half of this fix — business_policies is NOT rendered
+  // from the transient old+new set, which would have duplicated every
+  // policy in the agent's prompt.
+  it('F5: a failed cleanup delete after a successful insert is not misreported as a 400, and does not duplicate the agent-facing text', async () => {
+    db.policies = [
+      { id: 'keep-1', client_id: CLIENT, title: 'Original', body: 'Stays until cleanup runs.', sort_order: 0, active: true },
+    ];
+    db.settings = db.settings.map((s) =>
+      s.client_id === CLIENT ? { ...s, business_policies: ['Original: Stays until cleanup runs.'] } : s
+    );
+    db.failNextPolicyDelete = true;
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/knowledge/policies?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { policies: [{ title: 'New', body: 'Just written.' }] },
+    });
+
+    // Not a 400 — a 400 here would flatly contradict what happened: the
+    // insert is real and already committed.
+    expect(res.statusCode).toBe(200);
+    expect(res.json().warning).toBeTruthy();
+    expect(res.json().warning).toMatch(/duplicat|previous|removed/i);
+
+    // Both rows are present — the insert (the audited change) really landed,
+    // and the old row could not be cleaned up. mutate() returned normally
+    // (it did not throw), so a real withAudit would have recorded this write.
+    const titles = db.policies.filter((p) => p.client_id === CLIENT).map((p) => p.title);
+    expect(titles).toContain('Original');
+    expect(titles).toContain('New');
+    expect(svc.withAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'knowledge.policies.updated' })
+    );
+
+    // renderPolicies was NOT run against the transient duplicate set —
+    // business_policies still holds exactly the pre-write text, not a
+    // duplicated old+new array (e.g. NOT ['Original: ...', 'New: ...']).
+    expect(db.settings.find((s) => s.client_id === CLIENT)).toMatchObject({
+      business_policies: ['Original: Stays until cleanup runs.'],
+    });
+
+    // No sync was requested against text that was deliberately left stale.
     expect(svc.requestSync).not.toHaveBeenCalled();
 
     await app.close();
