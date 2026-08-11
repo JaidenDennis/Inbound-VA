@@ -63,3 +63,4 @@ export type { Branding } from './branding.service.js';
 export type { ChannelHealth, HealthStatus } from './integrationHealth.service.js';
 export { agentDraftService, DraftError, fingerprintSettings } from './agentDraft.service.js';
 export type { DraftRow, DraftState, PublishResult } from './agentDraft.service.js';
+export { renderPolicies } from './policyRender.service.js';

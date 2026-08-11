@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePermission, requirePlatform, assertClientAccess } from '../middleware/index.js';
-import { agentSyncService, writeAuditLog, withAudit } from '../services/index.js';
+import { agentSyncService, writeAuditLog, withAudit, renderPolicies } from '../services/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -465,10 +465,13 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
    * Business policies — cancellation, deposits, insurance, parking, anything the
    * agent must state verbatim rather than improvise.
    *
-   * Unlike the four resources above these are not a table: they are a text array
-   * on client_settings that `renderPolicies()` reads straight into the prompt.
-   * They had no editor at all, so the only way to change what the agent said
-   * about a refund policy was a raw settings PATCH.
+   * These are now rows in `client_policies` (migration 032) with a title and a
+   * body, rather than a bare text array — the array was one broad text box that
+   * operators found hard to fill in well. `client_settings.business_policies`
+   * stays the agent-facing contract (seven Retell templates and four other call
+   * sites read it straight), so every write here calls `renderPolicies()` to
+   * rebuild that array as `"Title: Body"` strings immediately afterward. Nothing
+   * downstream of that array changes.
    */
   app.get<{ Querystring: { clientId?: string } }>('/knowledge/policies', {
     preHandler: requirePermission('knowledge:read'),
@@ -477,13 +480,15 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
       const clientId = scopeFor(user, request.query.clientId);
       if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
 
-      const { data } = await supabase
-        .from('client_settings')
-        .select('business_policies')
+      const { data, error } = await supabase
+        .from('client_policies')
+        .select('id, title, body, sort_order')
         .eq('client_id', clientId)
-        .maybeSingle();
+        .eq('active', true)
+        .order('sort_order');
+      if (error) return reply.code(500).send({ error: error.message });
 
-      reply.send({ data: (data as { business_policies: string[] | null } | null)?.business_policies ?? [] });
+      reply.send({ data: data ?? [] });
     },
   });
 
@@ -495,40 +500,71 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
       if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
 
       // Whole-list replace rather than per-item CRUD: policies are short, are
-      // reordered as often as they are edited, and have no stable id to patch.
+      // reordered as often as they are edited, and the payload carries no
+      // stable id to patch against. sort_order follows array position.
       const body = z
-        .object({ policies: z.array(z.string().min(1).max(1000)).max(50) })
+        .object({
+          policies: z
+            .array(
+              z.object({
+                title: z.string().min(1).max(200),
+                body: z.string().max(4000).default(''),
+              })
+            )
+            .max(50),
+        })
         .parse(request.body);
 
+      let saved: Array<Record<string, unknown>>;
       try {
-        await withAudit<{ business_policies: string[] }>({
+        saved = await withAudit<Array<Record<string, unknown>>>({
           actor: { userId: user.sub, clientId, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
           action: 'knowledge.policies.updated',
-          entityType: 'client_settings',
+          entityType: 'client_policies',
           entityId: clientId,
           before: async () => {
             const { data } = await supabase
-              .from('client_settings')
-              .select('business_policies')
+              .from('client_policies')
+              .select('title, body, sort_order')
               .eq('client_id', clientId)
-              .maybeSingle();
-            return { business_policies: (data as { business_policies: string[] | null } | null)?.business_policies ?? [] };
+              .eq('active', true)
+              .order('sort_order');
+            return (data ?? []) as Record<string, unknown>[];
           },
           mutate: async () => {
-            const { error } = await supabase
-              .from('client_settings')
-              .update({ business_policies: body.policies })
+            // Delete-and-reinsert: simpler than diffing against existing rows,
+            // and the whole set must end up matching the payload exactly anyway.
+            const { error: deleteError } = await supabase
+              .from('client_policies')
+              .delete()
               .eq('client_id', clientId);
-            if (error) throw new Error(error.message);
-            return { business_policies: body.policies };
+            if (deleteError) throw new Error(deleteError.message);
+
+            if (body.policies.length === 0) return [];
+
+            const rows = body.policies.map((p, i) => ({
+              client_id: clientId,
+              title: p.title,
+              body: p.body,
+              sort_order: i,
+            }));
+            const { data, error: insertError } = await supabase
+              .from('client_policies')
+              .insert(rows)
+              .select();
+            if (insertError) throw new Error(insertError.message);
+            return (data ?? []) as Record<string, unknown>[];
           },
-        });
+        }) as Array<Record<string, unknown>>;
+
+        // Keep the agent-facing array true to what was just saved.
+        await renderPolicies(clientId);
       } catch (err) {
         return reply.code(400).send({ error: (err as Error).message });
       }
 
       await afterWrite(clientId, user.sub);
-      reply.send({ data: body.policies });
+      reply.send({ data: saved });
     },
   });
 
