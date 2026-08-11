@@ -25,7 +25,11 @@ export async function onFinalFailure(queueName: string, job: Job | undefined, er
     { queue: queueName, jobId: job.id, attempts: job.attemptsMade, err },
     'Job exhausted retries → MANUAL_REVIEW'
   );
-  captureException(err, { queue: queueName, jobId: job.id, jobData: job.data });
+  const sentryEventId = captureException(err, {
+    queue: queueName,
+    jobId: job.id,
+    jobData: job.data,
+  });
 
   try {
     await supabase.from('failed_jobs').insert({
@@ -40,7 +44,7 @@ export async function onFinalFailure(queueName: string, job: Job | undefined, er
     logger.error({ e, queue: queueName, jobId: job.id }, 'Failed to record failed_job row');
   }
 
-  await recordSystemError(queueName, job, err);
+  await recordSystemError(queueName, job, err, sentryEventId);
   await sendAlertEmail(queueName, job, err);
 }
 
@@ -52,7 +56,12 @@ export async function onFinalFailure(queueName: string, job: Job | undefined, er
  * function already means the job retried and still failed, so the recurrence
  * threshold has effectively been met.
  */
-async function recordSystemError(queueName: string, job: Job, err: Error): Promise<void> {
+async function recordSystemError(
+  queueName: string,
+  job: Job,
+  err: Error,
+  sentryEventId: string | null
+): Promise<void> {
   const data = (job.data ?? {}) as Record<string, unknown>;
   const clientId =
     (typeof data.clientId === 'string' && data.clientId) ||
@@ -66,6 +75,7 @@ async function recordSystemError(queueName: string, job: Job, err: Error): Promi
     route: queueName,
     error: err,
     context: { queue: queueName, jobId: job.id, attempts: job.attemptsMade, jobData: data },
+    sentryEventId,
   });
 
   await systemAlertService.maybeOpenTicket({

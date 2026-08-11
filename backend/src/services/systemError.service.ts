@@ -16,6 +16,8 @@ export interface RecordErrorInput {
   statusCode?: number | null;
   error: Error | { name?: string; message: string; stack?: string };
   context?: Record<string, unknown>;
+  /** Sentry's id for the same incident, when Sentry is enabled. */
+  sentryEventId?: string | null;
 }
 
 /**
@@ -78,6 +80,7 @@ export class SystemErrorService {
           stack,
           context: redactContext(input.context),
           fingerprint,
+          sentry_event_id: input.sentryEventId ?? null,
         })
         .select('id')
         .single();

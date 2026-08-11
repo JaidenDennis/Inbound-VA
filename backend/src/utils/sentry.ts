@@ -21,8 +21,14 @@ export function initSentry(component: 'api' | 'workers'): void {
   logger.info({ component }, 'Sentry initialized');
 }
 
-/** Report an error to Sentry if enabled; safe no-op otherwise. */
-export function captureException(err: unknown, context?: Record<string, unknown>): void {
-  if (!enabled) return;
-  Sentry.captureException(err, context ? { extra: context } : undefined);
+/**
+ * Report an error to Sentry if enabled; safe no-op otherwise.
+ *
+ * Returns the Sentry event id so the caller can store it. That id is the only
+ * thing that ties a row in our own error console to the issue in Sentry, and it
+ * is available exactly once — at capture time.
+ */
+export function captureException(err: unknown, context?: Record<string, unknown>): string | null {
+  if (!enabled) return null;
+  return Sentry.captureException(err, context ? { extra: context } : undefined) ?? null;
 }
