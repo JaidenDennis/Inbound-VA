@@ -1,6 +1,8 @@
 import type { AgentTemplate, TemplateContext } from './template.types.js';
+import type { AgentConfig } from '../../../types/index.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
 import {
+  bulletsOr,
   extraInstructions,
   identity,
   renderFaqs,
@@ -24,9 +26,51 @@ import {
 // begin message, and agent pacing are reused from inboundRoutingTemplate.
 // ─────────────────────────────────────────────────────────────────────────────
 
+function renderFees(cfg: AgentConfig): string {
+  const lines: string[] = [];
+  if (typeof cfg.application_fee === 'number')
+    lines.push(`- Application fee: $${cfg.application_fee} per adult applicant, 18 or older. It is paid with the application, never over the phone.`);
+  if (typeof cfg.admin_fee === 'number')
+    lines.push(`- Administrative fee: $${cfg.admin_fee}, one time.`);
+  if (typeof cfg.income_requirement_multiple === 'number')
+    lines.push(`- Income requirement: gross monthly income of at least ${cfg.income_requirement_multiple} times the monthly rent. State it exactly as written and NEVER work out whether a caller meets it.`);
+  return bulletsOr(lines, 'No published fees are configured — never invent one. Offer to have the leasing office confirm.');
+}
+
+function renderApartmentOfferings(cfg: AgentConfig): string {
+  const lines: string[] = [];
+  lines.push(
+    cfg.tours_enabled
+      ? `- Tours: booked over the phone.${cfg.self_guided_tours ? ' Self-guided tours are also available — offer that option when a caller wants to come on their own schedule.' : ''}`
+      : '- Tours: NOT booked over the phone. Take their name and number and have the leasing office reach out.'
+  );
+  lines.push(
+    typeof cfg.online_application_url === 'string' && cfg.online_application_url.trim()
+      ? `- Applications: apply online at ${cfg.online_application_url.trim()}. Never take an application, a fee, or a payment over the phone.`
+      : '- Applications: no online application is configured; route applicants to the leasing office.'
+  );
+  lines.push(
+    typeof cfg.resident_portal_url === 'string' && cfg.resident_portal_url.trim()
+      ? `- Resident portal: ${cfg.resident_portal_url.trim()} — rent, statements, and work orders live there.`
+      : '- Resident portal: no resident portal is configured; route rent and account questions to the office.'
+  );
+  lines.push(
+    typeof cfg.emergency_maintenance_line === 'string' && cfg.emergency_maintenance_line.trim()
+      ? `- 24-hour emergency maintenance: ${cfg.emergency_maintenance_line.trim()}. Give this number during an urgent habitability call.`
+      : '- 24-hour emergency maintenance: no 24-hour emergency line is configured — flag the emergency and hand off to staff immediately.'
+  );
+  lines.push(
+    cfg.pets_allowed
+      ? '- Pets: welcome, subject to the pet policy in POLICIES. Assistance animals are never governed by that policy.'
+      : '- Pets: this community does not accept pets. Assistance animals are NOT pets and are never refused on that basis — route any assistance-animal question to the office.'
+  );
+  return bulletsOr(lines, 'No offerings are configured; take a message for the leasing office.');
+}
+
 function buildApartmentPrompt(ctx: TemplateContext): string {
   const { client, settings } = ctx;
   const { business, agentName } = identity(ctx, 'our apartment community');
+  const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'friendly';
   const personality = settings.agent_personality || 'warm, clear, and helpful';
 
@@ -75,6 +119,14 @@ For anything routine — a leak that is not flooding, an appliance, a garbage di
 5. BEST CALLBACK NUMBER (read it back per the phone rule, then confirm).
 Then confirm the set back in one short sentence and pass it to the office with leave_staff_message.
 Never promise a repair time, a technician's name, or that a charge will be waived. If they ask when someone will come, say the office schedules work orders and will follow up — never guess. If the same issue has already been reported and nothing has happened, treat it as a complaint and hand off rather than filing a duplicate.
+
+=== RENT AND FEES — quote only what is configured ===
+Rent at an apartment community changes constantly. Every rent you quote is "as of today, and subject to availability and change" — say that, every time, in your own natural words. Never guarantee a rate, never hold or reserve a unit, never quote a specific unit number as available unless it appears in your configuration, and never promise a move-in date.
+NEVER take a card number, a bank account number, or a payment of any kind over the phone — not an application fee, not a deposit, not rent. Point them to the resident portal or the leasing office, and if they start reading a number aloud, stop them warmly before they finish.
+${renderFees(cfg)}
+
+=== OFFERINGS ===
+${renderApartmentOfferings(cfg)}
 
 === COMMON QUESTIONS — answer in one short sentence ===
 - HOURS, ADDRESS, PARKING, AMENITIES, LAUNDRY, PACKAGES, TRASH, GUEST POLICY: answer ONLY from POLICIES or FAQs. If it isn't there, take a message — never guess a policy.

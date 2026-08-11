@@ -405,6 +405,55 @@ describe('apartment template specifics', () => {
       p.indexOf('FAIR HOUSING — THIS OVERRIDES')
     );
   });
+
+  it('frames every rent as perishable and refuses to hold a unit', () => {
+    const p = cfg({});
+    expect(p).toMatch(/as of today, and subject to availability and change/);
+    expect(p).toMatch(/never hold or reserve a unit/i);
+    expect(p).toMatch(/never quote a specific unit number as available/i);
+  });
+
+  it('never takes money over the phone', () => {
+    const p = cfg({});
+    expect(p).toMatch(/NEVER take a card number, a bank account number, or a payment of any kind over the phone/);
+  });
+
+  it('states configured fees exactly and refuses to invent them', () => {
+    const p = cfg({ application_fee: 60, admin_fee: 200, income_requirement_multiple: 3 });
+    expect(p).toMatch(/Application fee: \$60 per adult applicant/);
+    expect(p).toMatch(/Administrative fee: \$200/);
+    expect(p).toMatch(/at least 3 times the monthly rent/);
+    expect(cfg({})).toMatch(/No published fees are configured/);
+  });
+
+  it('gates tours, application, portal, and emergency line on configuration', () => {
+    const on = cfg({
+      tours_enabled: true,
+      self_guided_tours: true,
+      online_application_url: 'https://apply.example.com',
+      resident_portal_url: 'https://portal.example.com',
+      emergency_maintenance_line: '904-555-0111',
+    });
+    expect(on).toMatch(/Tours: booked over the phone/);
+    expect(on).toMatch(/Self-guided tours are also available/);
+    expect(on).toContain('https://apply.example.com');
+    expect(on).toContain('https://portal.example.com');
+    expect(on).toContain('904-555-0111');
+
+    const off = cfg({});
+    expect(off).toMatch(/Tours: NOT booked over the phone/);
+    expect(off).toMatch(/no online application is configured/i);
+    expect(off).toMatch(/no resident portal is configured/i);
+    expect(off).toMatch(/no 24-hour emergency line is configured/i);
+    expect(off).not.toMatch(/Self-guided tours are also available/);
+  });
+
+  it('states the pet policy without ever letting it touch assistance animals', () => {
+    expect(cfg({ pets_allowed: true })).toMatch(/Pets: welcome, subject to the pet policy/);
+    const noPets = cfg({ pets_allowed: false });
+    expect(noPets).toMatch(/Pets: this community does not accept pets/);
+    expect(noPets).toMatch(/Assistance animals are NOT pets and are never refused on that basis/);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
