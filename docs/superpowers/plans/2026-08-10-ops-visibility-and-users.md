@@ -646,7 +646,7 @@ vi.mock('../middleware/index.js', () => ({
 }));
 
 import Fastify from 'fastify';
-import { usersRoutes } from '../dashboard-api/users.route.js';
+import { userRoutes } from '../dashboard-api/users.route.js';
 
 const PLATFORM = { sub: 'staff-1', clientId: null, role: 'super_admin' };
 const CLIENT_ADMIN = { sub: 'ca-1', clientId: 'client-a', role: 'client_admin' };
@@ -657,7 +657,7 @@ async function build(actor: Record<string, unknown>) {
   app.addHook('preHandler', async (req) => {
     (req as unknown as { user: unknown }).user = actor;
   });
-  await app.register(usersRoutes);
+  await app.register(userRoutes);
   return app;
 }
 
@@ -923,7 +923,7 @@ Expected: FAIL — `/me` returns 404.
 
 - [ ] **Step 3: Implement the route**
 
-Add inside `usersRoutes`, after the existing PATCH:
+Add inside `userRoutes`, after the existing PATCH:
 
 ```typescript
   /**
