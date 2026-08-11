@@ -54,13 +54,21 @@ export class SystemErrorService {
    * so a failure here must never mask or replace the original error.
    */
   async record(input: RecordErrorInput): Promise<string | null> {
-    // input.error is typed as Error | {name?, message, stack?}, but callers
-    // invoke record() with `void`, so a non-Error rejection (e.g. a rejected
-    // promise with `null`, or any value that isn't actually an Error/error-like
-    // object) would throw HERE, outside the try/catch below, and become an
-    // unhandled rejection instead of the best-effort no-op this method promises
-    // to be.
-    const err = input.error instanceof Error ? input.error : new Error(String(input.error));
+    // input.error is typed as Error | {name?, message, stack?}. Plain
+    // error-like objects are a legitimate, intended input (mailer.ts and
+    // retell-signature.middleware.ts both report faults this way without
+    // ever throwing a real Error), so they must be read directly rather than
+    // stringified — `String({...})` collapses to '[object Object]' and
+    // destroys both the message and, via fingerprintFor, the grouping.
+    // Only a genuinely hostile value (null, undefined, a string, a number,
+    // or an object with no string `message`) falls back to a constructed
+    // Error. These reads sit outside the try/catch below and callers invoke
+    // record() with `void`, so this must never throw regardless of input.
+    const raw = input.error;
+    const isErrorLike =
+      raw instanceof Error ||
+      (raw !== null && typeof raw === 'object' && typeof (raw as { message?: unknown }).message === 'string');
+    const err = isErrorLike ? (raw as Error | { name?: string; message: string; stack?: string }) : new Error(String(raw));
     const errorName = err.name || 'Error';
     const message = redactText(err.message || 'Unknown error');
     const stack = err.stack ? redactText(err.stack) : null;

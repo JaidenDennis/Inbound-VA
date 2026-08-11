@@ -1,6 +1,30 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { redactContext, redactText } from '../utils/redact.js';
-import { normalizeMessage, fingerprintFor } from '../services/systemError.service.js';
+import { normalizeMessage, fingerprintFor, systemErrorService } from '../services/systemError.service.js';
+
+/**
+ * Captures the payload passed to `supabase.from('system_errors').insert(...)`
+ * so `record()` can be exercised end-to-end without a real database. Declared
+ * with `let` (not `const`) because the `vi.mock` factory below closes over it
+ * lazily — the factory only runs when `systemError.service.ts` first imports
+ * `../db/index.js`, by which point this array already exists.
+ */
+let insertCalls: Record<string, unknown>[] = [];
+
+vi.mock('../db/index.js', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      insert: vi.fn((payload: Record<string, unknown>) => {
+        insertCalls.push(payload);
+        return {
+          select: vi.fn(() => ({
+            single: vi.fn(async () => ({ data: { id: 'row-1' }, error: null })),
+          })),
+        };
+      }),
+    })),
+  },
+}));
 
 /**
  * These are the tests that keep `system_errors` from becoming a credential
@@ -140,5 +164,98 @@ describe('fingerprinting', () => {
     const b = fingerprintFor({ source: 'api', errorName: 'TypeError', route: '/b', message: 'x is not a function' });
     const c = fingerprintFor({ source: 'worker', errorName: 'TypeError', route: '/a', message: 'x is not a function' });
     expect(new Set([a, b, c]).size).toBe(3);
+  });
+});
+
+/**
+ * Regression coverage for `SystemErrorService.record()`'s input normalisation.
+ * A prior "fix" replaced the direct `.name`/`.message`/`.stack` reads with
+ * `input.error instanceof Error ? input.error : new Error(String(input.error))`.
+ * That broke the plain-object branch of `RecordErrorInput['error']`
+ * (`{ name?, message, stack? }`), which is a real, intended input — not a
+ * mistake — used by `mailer.ts` (SmtpNotConfigured) and
+ * `retell-signature.middleware.ts` (WebhookSignatureError). Under the naive
+ * form, `String({ name: 'X', message: 'Y' })` is the literal string
+ * `'[object Object]'`, which becomes both the stored `message` and, via
+ * `fingerprintFor`, the fingerprint — so distinct faults collapse into one
+ * group and the diagnostic text is destroyed.
+ */
+describe('SystemErrorService.record — error normalisation', () => {
+  it('case 1: a genuine Error instance keeps its own name, message and stack', async () => {
+    insertCalls = [];
+    const error = new Error('database connection lost');
+    error.name = 'ConnectionError';
+
+    await systemErrorService.record({ source: 'worker', error });
+
+    expect(insertCalls).toHaveLength(1);
+    expect(insertCalls[0].error_name).toBe('ConnectionError');
+    expect(insertCalls[0].message).toBe('database connection lost');
+    expect(insertCalls[0].stack).toEqual(expect.stringContaining('ConnectionError'));
+  });
+
+  it('case 2: an error-like plain object preserves its real name and message, not "[object Object]"', async () => {
+    insertCalls = [];
+    // Shaped exactly like the mailer.ts / retell-signature.middleware.ts callers:
+    // a plain object, never thrown, carrying `name` and `message` only.
+    const errorLike = {
+      name: 'SmtpNotConfigured',
+      message: 'SMTP_PASS is unset, so no email is being sent.',
+    };
+
+    await systemErrorService.record({ source: 'email', error: errorLike });
+
+    expect(insertCalls).toHaveLength(1);
+    // This is the regression: the naive `instanceof Error` form stringifies
+    // the whole object via `String(errorLike)`, producing 'Error' /
+    // '[object Object]' for these two fields instead of the real values.
+    expect(insertCalls[0].error_name).toBe('SmtpNotConfigured');
+    expect(insertCalls[0].message).toBe('SMTP_PASS is unset, so no email is being sent.');
+    expect(insertCalls[0].message).not.toBe('[object Object]');
+  });
+
+  it('case 2b: two error-like objects with different messages produce different fingerprints', async () => {
+    // The signature-middleware caller reports two distinct causes (no header
+    // vs digest mismatch) through this same object shape. If the message text
+    // is lost, both collapse to '[object Object]' and become one fingerprint
+    // group in the error console, which is exactly the bug this guards against.
+    insertCalls = [];
+    await systemErrorService.record({
+      source: 'webhook',
+      error: { name: 'WebhookSignatureError', message: 'Missing signature header' },
+    });
+    await systemErrorService.record({
+      source: 'webhook',
+      error: { name: 'WebhookSignatureError', message: 'Signature digest mismatch' },
+    });
+
+    expect(insertCalls).toHaveLength(2);
+    expect(insertCalls[0].message).toBe('Missing signature header');
+    expect(insertCalls[1].message).toBe('Signature digest mismatch');
+    expect(insertCalls[0].fingerprint).not.toBe(insertCalls[1].fingerprint);
+  });
+
+  it('case 3: a hostile, non-error-like value does not throw and still records a sensible fault', async () => {
+    insertCalls = [];
+
+    // None of these are Error instances or `{ message: string }` objects.
+    // `record()` is invoked with `void` by real callers, so if any of these
+    // threw synchronously ahead of the try/catch, `await` would reject here
+    // and fail the test — that rejection is exactly what would otherwise
+    // surface as an unhandled rejection in production, instead of the
+    // best-effort no-op this method promises to be.
+    const results = await Promise.all([
+      systemErrorService.record({ source: 'api', error: null as unknown as Error }),
+      systemErrorService.record({ source: 'api', error: undefined as unknown as Error }),
+      systemErrorService.record({ source: 'api', error: 'just a string' as unknown as Error }),
+      systemErrorService.record({ source: 'api', error: { code: 500 } as unknown as Error }),
+    ]);
+
+    expect(results).toEqual(['row-1', 'row-1', 'row-1', 'row-1']);
+    expect(insertCalls).toHaveLength(4);
+    for (const call of insertCalls) {
+      expect(typeof call.error_name).toBe('string');
+      expect(typeof call.message).toBe('string');
+    }
   });
 });
