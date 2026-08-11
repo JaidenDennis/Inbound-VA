@@ -369,6 +369,33 @@ describe('apartment template specifics', () => {
     expect(p).toMatch(/NEVER tell a caller whether they will be approved or denied/);
     expect(p).toMatch(/read the published criteria exactly as written/i);
   });
+
+  it('runs the emergency script before anything else and never troubleshoots', () => {
+    const p = cfg({});
+    expect(p).toMatch(/MAINTENANCE EMERGENCY — CHECK FIRST, EVERY TURN/);
+    expect(p).toContain('hang up and dial 9-1-1');
+    expect(p).toMatch(/leave the building first and call the gas company from outside/);
+    expect(p).toMatch(/emergency_flag/);
+    expect(p).toMatch(/Never troubleshoot a maintenance emergency and never log it as a routine work order/);
+  });
+
+  it('lists the habitability emergencies that are not 9-1-1 calls', () => {
+    const p = cfg({});
+    expect(p).toMatch(/active flooding or a burst pipe/);
+    expect(p).toMatch(/sewage backup/);
+    expect(p).toMatch(/no heat/);
+    expect(p).toMatch(/elevator entrapment/);
+    expect(p).toMatch(/broken exterior door or lock/);
+  });
+
+  it('collects a full work order and promises nothing', () => {
+    const p = cfg({});
+    expect(p).toMatch(/MAINTENANCE REQUESTS/);
+    expect(p).toMatch(/permission to enter/i);
+    expect(p).toMatch(/pets in the unit/i);
+    expect(p).toMatch(/leave_staff_message/);
+    expect(p).toMatch(/Never promise a repair time, a technician's name, or that a charge will be waived/);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
