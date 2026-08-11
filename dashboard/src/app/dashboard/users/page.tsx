@@ -73,9 +73,17 @@ export default function UsersPage() {
     }
   };
 
-  // Derive whether we're editing ourselves. Computed at component level so both the
-  // role control visibility (JSX) and the request routing (saveEdit) read the same value.
-  const isSelfEdit = editing && !sessionLoading && editing.id === auth?.sub;
+  // Derive the edit target state. Computed at component level so both the role control
+  // visibility (JSX) and the request routing (saveEdit) read the same value. Uses a union
+  // type to distinguish three states: 'unknown' (loading), 'self', 'other'. This ensures:
+  // - role control only renders for 'other' (positive test, 'unknown' never falls through)
+  // - saveEdit only allows submission for 'self' or 'other' (not 'unknown')
+  // - routing/payload logic correctly handles all three cases
+  const editTarget: 'none' | 'unknown' | 'self' | 'other' =
+    !editing ? 'none'
+    : sessionLoading ? 'unknown'
+    : editing.id === auth?.sub ? 'self'
+    : 'other';
 
   const startEdit = (u: AppUser) => {
     setEditing(u);
@@ -87,9 +95,9 @@ export default function UsersPage() {
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
-    // Explicit guard: do not allow submission until session is loaded. isSelfEdit
-    // depends on sessionLoading, so we must wait for it to be determined.
-    if (sessionLoading) return;
+    // Explicit guard: do not allow submission until edit target is known (self or other).
+    // If still loading ('unknown'), we do not know whether this is a self-edit, so reject.
+    if (editTarget === 'unknown') return;
     setSavingEdit(true);
     try {
       // Role is omitted for yourself: the API rejects a self-role change with
@@ -97,9 +105,9 @@ export default function UsersPage() {
       // offering it. /me also only accepts { name?, email?, password? }.
       const payload: Record<string, unknown> = { email: editEmail };
       if (editPassword) payload.password = editPassword;
-      if (!isSelfEdit) payload.role = editRole;
+      if (editTarget !== 'self') payload.role = editRole;
 
-      await api.patch(isSelfEdit ? '/me' : `/users/${editing.id}`, payload);
+      await api.patch(editTarget === 'self' ? '/me' : `/users/${editing.id}`, payload);
       toast.success('User updated');
       setEditing(null);
       load();
@@ -201,7 +209,7 @@ export default function UsersPage() {
             value={editPassword}
             onChange={(e) => setEditPassword(e.target.value)}
           />
-          {!isSelfEdit && (
+          {editTarget === 'other' && (
             <div>
               <label htmlFor="edit-user-role" className="sr-only">Role</label>
               <select
