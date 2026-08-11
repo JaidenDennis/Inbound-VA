@@ -4,10 +4,13 @@
 -- the apartment_routing template under the workflow engine. Idempotent.
 --
 -- Note on the catalog: for an apartment community, `services` holds what can
--- be BOOKED (tour types) — not floor plans or fees. Floor plans, rent, and
--- fees live in `pricing`, and general facts live in `faqs`, which is what
--- knowledge_search reads. The template forbids describing a unit, a rent, or
--- a fee that is not in one of those sections.
+-- be BOOKED (tour types) — not floor plans or fees. `pricing` holds FLOOR PLANS
+-- AND RENT only, because every row is spoken as "starts around $X". Fixed fees
+-- belong elsewhere: the application fee, administrative fee, and income
+-- requirement come from `agent_config` (rendered under RENT AND FEES, stated
+-- exactly), and every other fee lives in `business_policies` or `faqs`, which is
+-- what knowledge_search reads. The template forbids describing a unit, a rent,
+-- or a fee that is not in one of those sections.
 --
 -- All pricing is fictional demo data.
 --
@@ -57,27 +60,29 @@ UPDATE client_settings AS cs SET
     {"name":"Virtual Tour","description":"live video tour with a leasing agent","duration_minutes":30,"price":0},
     {"name":"Application Appointment","description":"meet with the leasing office to complete an application","duration_minutes":30,"price":0}
   ]'::jsonb,
+  -- `pricing` renders under "FLOOR PLANS AND RENT" and every row is spoken as
+  -- "starts around $X" — so it holds FLOOR PLANS ONLY. Fixed fees would both be
+  -- misquoted as approximate and pollute the list the agent reads when a caller
+  -- asks what is available. Fees live in agent_config (application, admin,
+  -- income multiple → rendered under RENT AND FEES), business_policies, or faqs.
   pricing = '[
     {"name":"Studio — The Cove, 520 sq ft","price":1395,"unit":"month","notes":"as of today, subject to availability and change"},
     {"name":"1 Bedroom — The Marina, 715 sq ft","price":1595,"unit":"month","notes":"1 bedrooms range from about $1,595 to $1,750 depending on floor and view"},
     {"name":"2 Bedroom — The Harbor, 1,040 sq ft","price":2050,"unit":"month","notes":"2 bedrooms range from about $2,050 to $2,295"},
-    {"name":"3 Bedroom — The Lighthouse, 1,310 sq ft","price":2650,"unit":"month","notes":"limited availability"},
-    {"name":"Application fee","price":60,"unit":"adult applicant","notes":"non-refundable, paid with the online application"},
-    {"name":"Administrative fee","price":200,"notes":"one time, due at lease signing"},
-    {"name":"Pet fee","price":350,"unit":"pet","notes":"non-refundable, plus $35 per month pet rent; two pets maximum"},
-    {"name":"Garage parking","price":125,"unit":"month","notes":"assigned; surface lot parking is included at no charge"},
-    {"name":"Storage unit","price":45,"unit":"month","notes":"subject to availability"},
-    {"name":"Month-to-month premium","price":300,"unit":"month","notes":"added to rent for a month-to-month term after the initial lease"}
+    {"name":"3 Bedroom — The Lighthouse, 1,310 sq ft","price":2650,"unit":"month","notes":"limited availability"}
   ]'::jsonb,
   business_policies = ARRAY[
     'The security deposit is $500 or one month''s rent, depending on the results of screening.',
     'The standard lease term is 12 months; 6, 9, and 18-month terms are also available at different rates.',
     'The published income requirement is gross monthly income of at least 3 times the monthly rent, verified during the application.',
-    'The application fee is non-refundable and charged per adult applicant, 18 or older.',
+    'The application fee is non-refundable and charged per adult applicant, 18 or older, and is paid with the online application.',
+    'The administrative fee is a one-time charge collected at lease signing.',
     'Rent is due on the 1st of the month; a $75 late fee applies after the 5th.',
     'Residents must give 60 days'' written notice before vacating.',
     'Two pets are allowed per unit with a combined weight limit of 65 lbs; certain breeds are restricted as listed on the pet addendum. Service and assistance animals are not pets and are never subject to pet rent, pet fees, breed restrictions, or weight limits.',
-    'One surface parking space is included per unit; garage parking is available for an additional fee, and guest parking is clearly marked.',
+    'One surface parking space is included per unit at no charge; an assigned garage space is $125 per month, subject to availability, and guest parking is clearly marked.',
+    'Storage units are available for $45 per month, subject to availability.',
+    'A month-to-month term after the initial lease adds a $300 per month premium to the rent.',
     'Packages are held in the parcel room and accessed with the resident app.',
     'Smoking is prohibited inside all units and within 25 feet of any building.',
     'The leasing office is open during posted office hours; a 24-hour emergency maintenance line is available after hours.',
