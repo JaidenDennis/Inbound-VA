@@ -20,7 +20,7 @@ interface AppUser {
 }
 
 export default function UsersPage() {
-  const { isPlatform } = useSession();
+  const { isPlatform, auth } = useSession();
   // Only roles from the caller's own family are offered. The API rejects the
   // other family anyway; showing them would just produce a confusing 403.
   const roles: readonly UserRole[] = isPlatform ? PLATFORM_ROLES : CLIENT_ROLES;
@@ -39,6 +39,13 @@ export default function UsersPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(defaultRole);
   const [saving, setSaving] = useState(false);
+
+  // edit-in-place form
+  const [editing, setEditing] = useState<AppUser | null>(null);
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('client_viewer');
+  const [editPassword, setEditPassword] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => setRole(defaultRole), [defaultRole]);
 
@@ -63,6 +70,44 @@ export default function UsersPage() {
       setError(msg ?? 'Failed to create user');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEdit = (u: AppUser) => {
+    setEditing(u);
+    setEditEmail(u.email);
+    setEditRole(u.role as UserRole);
+    setEditPassword('');
+  };
+
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    setSavingEdit(true);
+    const isSelf = editing.id === auth?.sub;
+    try {
+      // Role is omitted for yourself: the API rejects a self-role change with
+      // 403, and offering a control that always fails is worse than not
+      // offering it. /me also only accepts { name?, email?, password? }.
+      const payload: Record<string, unknown> = { email: editEmail };
+      if (editPassword) payload.password = editPassword;
+      if (!isSelf) payload.role = editRole;
+
+      await api.patch(isSelf ? '/me' : `/users/${editing.id}`, payload);
+      toast.success('User updated');
+      setEditing(null);
+      load();
+    } catch (err) {
+      const status = (err as { response?: { status?: number } }).response?.status;
+      toast.error(
+        status === 409
+          ? 'That email is already in use'
+          : status === 403
+            ? 'You do not have permission to make that change'
+            : 'Could not update user'
+      );
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -131,6 +176,51 @@ export default function UsersPage() {
         </form>
       )}
 
+      {editing && (
+        <form onSubmit={saveEdit} className="bg-white rounded-xl border border-gray-200 p-5 mb-6 grid grid-cols-2 gap-3">
+          <div className="col-span-2 text-gray-700 font-medium">Edit {editing.name || editing.email}</div>
+          <input
+            className={inputCls}
+            type="email"
+            placeholder="Email"
+            required
+            value={editEmail}
+            onChange={(e) => setEditEmail(e.target.value)}
+          />
+          <input
+            className={inputCls}
+            type="password"
+            placeholder="New password (leave blank to keep)"
+            minLength={8}
+            value={editPassword}
+            onChange={(e) => setEditPassword(e.target.value)}
+          />
+          {editing.id !== auth?.sub && (
+            <div>
+              <label htmlFor="edit-user-role" className="sr-only">Role</label>
+              <select
+                id="edit-user-role"
+                className={inputCls}
+                value={editRole}
+                onChange={(e) => setEditRole(e.target.value as UserRole)}
+              >
+                {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="col-span-2 flex gap-2">
+            <button type="submit" disabled={savingEdit}
+              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">
+              {savingEdit ? 'Saving...' : 'Save'}
+            </button>
+            <button type="button" onClick={() => setEditing(null)}
+              className="border border-gray-300 text-sm font-semibold px-5 py-2 rounded-lg transition hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
       {loading ? (
         <TableShell>
           <div aria-hidden className="divide-y divide-panel-100">
@@ -174,8 +264,14 @@ export default function UsersPage() {
                   </TD>
                   <TD align="right">
                     <button
-                      onClick={() => toggleActive(u)}
+                      onClick={() => startEdit(u)}
                       className="cursor-pointer whitespace-nowrap rounded px-1.5 py-1 text-xs font-medium text-ink-800 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-900 hover:decoration-panel-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => toggleActive(u)}
+                      className="ml-3 cursor-pointer whitespace-nowrap rounded px-1.5 py-1 text-xs font-medium text-ink-800 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-900 hover:decoration-panel-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       {u.is_active ? 'Disable' : 'Enable'}
                     </button>
