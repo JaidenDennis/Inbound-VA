@@ -82,7 +82,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
 
       let query = supabase
         .from('system_errors')
-        .select('fingerprint, error_name, message, route, source, severity, client_id, occurred_at, ticket_id')
+        .select('fingerprint, error_name, message, route, source, severity, client_id, occurred_at, ticket_id, sentry_event_id')
         .gte('occurred_at', since)
         .order('occurred_at', { ascending: false })
         .limit(2000);
@@ -96,12 +96,12 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
       type Row = {
         fingerprint: string; error_name: string; message: string; route: string | null;
         source: string; severity: string; client_id: string | null; occurred_at: string;
-        ticket_id: string | null;
+        ticket_id: string | null; sentry_event_id: string | null;
       };
       const groups = new Map<string, {
         fingerprint: string; errorName: string; message: string; route: string | null;
         source: string; severity: string; clientIds: Set<string>; count: number;
-        firstSeen: string; lastSeen: string; ticketId: string | null;
+        firstSeen: string; lastSeen: string; ticketId: string | null; latestSentryEventId: string | null;
       }>();
 
       for (const row of (data ?? []) as Row[]) {
@@ -109,7 +109,10 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         if (existing) {
           existing.count += 1;
           if (row.occurred_at < existing.firstSeen) existing.firstSeen = row.occurred_at;
-          if (row.occurred_at > existing.lastSeen) existing.lastSeen = row.occurred_at;
+          if (row.occurred_at > existing.lastSeen) {
+            existing.lastSeen = row.occurred_at;
+            existing.latestSentryEventId = row.sentry_event_id;
+          }
           if (row.client_id) existing.clientIds.add(row.client_id);
           existing.ticketId ??= row.ticket_id;
         } else {
@@ -125,6 +128,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
             firstSeen: row.occurred_at,
             lastSeen: row.occurred_at,
             ticketId: row.ticket_id,
+            latestSentryEventId: row.sentry_event_id,
           });
         }
       }

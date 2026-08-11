@@ -45,6 +45,7 @@ interface GroupedRow {
   firstSeen: string;
   lastSeen: string;
   ticketId: string | null;
+  latestSentryEventId: string | null;
 }
 
 interface ErrorDetail extends ActivityRow {
@@ -308,6 +309,17 @@ function GroupedTable({
                 <TD className="max-w-md">
                   <p className="font-medium text-ink-900">{g.errorName}</p>
                   <p className="truncate text-panel-500" title={g.message}>{g.message}</p>
+                  {g.latestSentryEventId && (
+                    <a
+                      href={`https://sentry.io/issues/?query=${encodeURIComponent(g.latestSentryEventId)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs underline underline-offset-2 text-panel-500 hover:text-panel-700"
+                      title={`Most recent occurrence: Sentry event ${g.latestSentryEventId}`}
+                    >
+                      Sentry
+                    </a>
+                  )}
                 </TD>
                 <TD mono>{g.route ?? '—'}</TD>
                 <TD className="text-panel-600">{g.clientIds.length || '—'}</TD>
