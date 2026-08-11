@@ -20,21 +20,38 @@ import { env } from '../config/index.js';
 
 const db = vi.hoisted(() => ({
   categories: [] as Array<Record<string, unknown>>,
+  // Added for Task 2 (rename cascade / FAQ validation): the mock now backs two
+  // tables. `faqs` needs read/insert/update because the cascade rewrites rows
+  // there and FAQ creation validates against `knowledge_categories` before
+  // inserting into this array.
+  faqs: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('../db/index.js', () => {
+  function tableStore(table: string): Array<Record<string, unknown>> | null {
+    if (table === 'knowledge_categories') return db.categories;
+    if (table === 'faqs') return db.faqs;
+    return null;
+  }
+
   function makeChain(table: string) {
+    const store = tableStore(table);
     const state: {
       filters: Record<string, unknown>;
       orders: string[];
       insertBody?: Record<string, unknown>;
+      updateBody?: Record<string, unknown>;
     } = { filters: {}, orders: [] };
 
-    function resolveSelect() {
-      if (table !== 'knowledge_categories') return { data: [], error: null };
-      let rows = db.categories.filter((row) =>
+    function matchRows() {
+      if (!store) return [];
+      return store.filter((row) =>
         Object.entries(state.filters).every(([col, val]) => row[col] === val)
       );
+    }
+
+    function resolveSelect() {
+      let rows = matchRows();
       for (const col of [...state.orders].reverse()) {
         rows = [...rows].sort((a, b) => {
           const av = a[col];
@@ -47,32 +64,61 @@ vi.mock('../db/index.js', () => {
     }
 
     function resolveInsert() {
+      if (!store) return { data: null, error: null };
       const body = state.insertBody as Record<string, unknown>;
-      const dup = db.categories.find(
-        (c) => c.client_id === body.client_id && c.name === body.name
-      );
-      if (dup) {
-        return {
-          data: null,
-          error: { code: '23505', message: 'duplicate key value violates unique constraint' },
-        };
+      if (table === 'knowledge_categories') {
+        const dup = db.categories.find(
+          (c) => c.client_id === body.client_id && c.name === body.name
+        );
+        if (dup) {
+          return {
+            data: null,
+            error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+          };
+        }
       }
+      const prefix = table === 'faqs' ? 'faq' : 'cat';
       const row = {
-        id: `cat-${db.categories.length + 1}`,
+        id: `${prefix}-${store.length + 1}`,
         sort_order: 0,
         active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...body,
       };
-      db.categories.push(row);
+      store.push(row);
       return { data: row, error: null };
+    }
+
+    function resolveUpdate() {
+      if (!store) return { data: null, error: null };
+      const rows = matchRows();
+      for (const row of rows) Object.assign(row, state.updateBody);
+      return { data: rows[0] ?? null, error: null };
+    }
+
+    // Real supabase-js returns a fresh, disconnected JSON payload from every
+    // call — reading a row and later updating the underlying table never
+    // retroactively changes an object you already hold. Cloning at this
+    // boundary reproduces that: without it, a handler that reads `existing`
+    // once and updates the same table later (as the category PATCH route
+    // does, before cascading to faqs) would see `existing` mutate out from
+    // under it, because `matchRows()`/`resolveUpdate()` intentionally mutate
+    // the live store in place so later queries observe the write.
+    function clone<T>(value: T): T {
+      if (Array.isArray(value)) return value.map((v) => ({ ...(v as object) })) as T;
+      if (value && typeof value === 'object') return { ...(value as object) } as T;
+      return value;
     }
 
     const chain: Record<string, unknown> = {
       select: () => chain,
       insert: (body: Record<string, unknown>) => {
         state.insertBody = body;
+        return chain;
+      },
+      update: (body: Record<string, unknown>) => {
+        state.updateBody = body;
         return chain;
       },
       eq: (col: string, val: unknown) => {
@@ -83,8 +129,19 @@ vi.mock('../db/index.js', () => {
         state.orders.push(col);
         return chain;
       },
-      single: () => Promise.resolve(resolveInsert()),
-      then: (resolve: (v: unknown) => void) => resolve(resolveSelect()),
+      single: () => {
+        const result = state.updateBody ? resolveUpdate() : resolveInsert();
+        return Promise.resolve({ ...result, data: clone(result.data) });
+      },
+      maybeSingle: () => {
+        const { data } = resolveSelect();
+        const rows = data as Array<Record<string, unknown>>;
+        return Promise.resolve({ data: clone(rows[0] ?? null), error: null });
+      },
+      then: (resolve: (v: unknown) => void) => {
+        const result = state.updateBody ? resolveUpdate() : resolveSelect();
+        resolve({ ...result, data: clone(result.data) });
+      },
     };
     return chain;
   }
@@ -140,6 +197,14 @@ beforeEach(() => {
     { id: 'cat-2', client_id: CLIENT, name: 'Visit', sort_order: 0, active: true },
     { id: 'cat-3', client_id: CLIENT, name: 'Retired', sort_order: 2, active: false },
     { id: 'cat-4', client_id: OTHER, name: 'Other Tenant Category', sort_order: 0, active: true },
+  ];
+  db.faqs = [
+    { id: 'faq-1', client_id: CLIENT, category: 'Billing', question: 'How much?', answer: '$100', active: true },
+    // Same category NAME as faq-1, but a different tenant — a rename cascade
+    // scoped only by category text (and not also by client_id) would corrupt
+    // this row. It must survive every test in this file untouched.
+    { id: 'faq-2', client_id: OTHER, category: 'Billing', question: 'Cost?', answer: '$200', active: true },
+    { id: 'faq-3', client_id: CLIENT, category: 'Visit', question: 'Hours?', answer: '9-5', active: true },
   ];
 });
 
@@ -222,6 +287,126 @@ describe('POST /knowledge/categories (platform only)', () => {
       payload: { name: 'Billing' }, // already exists for CLIENT (cat-1)
     });
     expect(res.statusCode).toBe(409);
+    await app.close();
+  });
+});
+
+describe('PATCH /knowledge/categories/:id (platform only, cascades a rename)', () => {
+  it("renaming a category updates every faqs row for that client whose category equalled the old name — and does NOT touch other clients' rows", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/categories/cat-1', // 'Billing', CLIENT
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+      payload: { name: 'Payments' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ name: 'Payments' });
+
+    // The category row itself renamed.
+    expect(db.categories.find((c) => c.id === 'cat-1')).toMatchObject({ name: 'Payments' });
+
+    // CLIENT's faq-1 ('Billing') cascaded to the new name.
+    expect(db.faqs.find((f) => f.id === 'faq-1')).toMatchObject({ category: 'Payments' });
+
+    // OTHER's faq-2 shared the OLD name 'Billing' but belongs to a different
+    // tenant — a cascade scoped only by category text, not also by client_id,
+    // would have rewritten it too. It must be untouched.
+    expect(db.faqs.find((f) => f.id === 'faq-2')).toMatchObject({ category: 'Billing' });
+
+    // An unrelated category ('Visit') on the SAME client is untouched too.
+    expect(db.faqs.find((f) => f.id === 'faq-3')).toMatchObject({ category: 'Visit' });
+
+    await app.close();
+  });
+
+  it('a client-scoped user is forbidden, even with knowledge:write', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/knowledge/categories/cat-1',
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { name: 'Payments' },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(db.categories.find((c) => c.id === 'cat-1')).toMatchObject({ name: 'Billing' });
+    await app.close();
+  });
+});
+
+describe('DELETE /knowledge/categories/:id (platform only, soft delete)', () => {
+  it('deactivates the category without touching the text of FAQ rows that use it', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/knowledge/categories/cat-2', // 'Visit', CLIENT
+      headers: { authorization: `Bearer ${tokenFor(app, 'super_admin', null)}` },
+    });
+    expect(res.statusCode).toBe(204);
+
+    // Soft delete: the row still exists, just inactive.
+    expect(db.categories.find((c) => c.id === 'cat-2')).toMatchObject({ active: false });
+
+    // faq-3 used 'Visit' — its question/answer/category text is untouched.
+    expect(db.faqs.find((f) => f.id === 'faq-3')).toMatchObject({
+      category: 'Visit',
+      question: 'Hours?',
+      answer: '9-5',
+    });
+
+    await app.close();
+  });
+
+  it('a client-scoped user is forbidden, even with knowledge:write', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/knowledge/categories/cat-2',
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(db.categories.find((c) => c.id === 'cat-2')).toMatchObject({ active: true });
+    await app.close();
+  });
+});
+
+describe('POST /knowledge/faqs validates category against the client\'s active list', () => {
+  it('rejects a category not on the list with 400', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/knowledge/faqs?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { question: 'Do you take insurance?', answer: 'Yes.', category: 'NotARealCategory' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(db.faqs.find((f) => f.question === 'Do you take insurance?')).toBeUndefined();
+    await app.close();
+  });
+
+  it('allows category: null (uncategorised)', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/knowledge/faqs?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { question: 'Where are you located?', answer: '123 Main St.', category: null },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ question: 'Where are you located?', category: null });
+    await app.close();
+  });
+
+  it('allows a category that is on the active list', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/knowledge/faqs?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { question: 'What forms of payment?', answer: 'Card or cash.', category: 'Billing' },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ question: 'What forms of payment?', category: 'Billing' });
     await app.close();
   });
 });

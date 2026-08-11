@@ -73,6 +73,24 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
     return assertClientAccess(user, clientId) ? clientId : null;
   }
 
+  /**
+   * A FAQ category must be one the client actually has, or null.
+   *
+   * The dropdown already limits what the UI can send; this is the API-side half,
+   * because a route that only validates in the browser does not validate.
+   */
+  async function assertCategoryAllowed(clientId: string, category: unknown): Promise<string | null> {
+    if (category === undefined || category === null || category === '') return null;
+    const { data } = await supabase
+      .from('knowledge_categories')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('name', category as string)
+      .eq('active', true)
+      .maybeSingle();
+    return data ? null : `Unknown category: ${String(category)}`;
+  }
+
   for (const [name, config] of Object.entries(RESOURCES) as [ResourceName, typeof RESOURCES[ResourceName]][]) {
     app.get<{ Querystring: { clientId?: string; includeInactive?: string } }>(`/knowledge/${name}`, {
       preHandler: requirePermission('knowledge:read'),
@@ -98,6 +116,11 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         if (!clientId) return reply.code(403).send({ error: 'Forbidden' });
 
         const body = config.schema.parse(request.body);
+
+        if (name === 'faqs') {
+          const categoryError = await assertCategoryAllowed(clientId, (body as { category?: unknown }).category);
+          if (categoryError) return reply.code(400).send({ error: categoryError });
+        }
 
         let created: Record<string, unknown>;
         try {
@@ -145,6 +168,11 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
         if (!assertClientAccess(user, rowClientId)) return reply.code(403).send({ error: 'Forbidden' });
 
         const body = config.schema.partial().parse(request.body);
+
+        if (name === 'faqs' && 'category' in (body as Record<string, unknown>)) {
+          const categoryError = await assertCategoryAllowed(rowClientId, (body as { category?: unknown }).category);
+          if (categoryError) return reply.code(400).send({ error: categoryError });
+        }
 
         let updated: Record<string, unknown>;
         try {
@@ -301,6 +329,135 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
 
       await afterWrite(clientId, user.sub);
       reply.code(201).send(created);
+    },
+  });
+
+  /**
+   * Rename or reactivate/adjust a category. Platform-only, same reasoning as
+   * the POST above.
+   *
+   * `faqs.category` stores the NAME, not a foreign key (see the migration
+   * header on knowledge_categories) — a deliberate choice that avoids an FK
+   * migration against live rows and keeps `knowledge.service.ts`'s prompt
+   * builder reading `r.category` unchanged. The cost is that a rename MUST
+   * rewrite every FAQ row that used the old name, or those FAQs silently fall
+   * off the client's category list. The cascade below is scoped to this
+   * category's own client_id — never a cross-tenant rewrite, even if another
+   * tenant happens to have a category with the same old name.
+   */
+  app.patch<{ Params: { id: string } }>('/knowledge/categories/:id', {
+    preHandler: requirePlatform('knowledge:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+
+      const { data: existing } = await supabase
+        .from('knowledge_categories')
+        .select('*')
+        .eq('id', request.params.id)
+        .maybeSingle();
+      if (!existing) return reply.code(404).send({ error: 'Not found' });
+
+      const row = existing as { id: string; client_id: string; name: string };
+      if (!assertClientAccess(user, row.client_id)) return reply.code(403).send({ error: 'Forbidden' });
+
+      const body = categorySchema.partial().parse(request.body);
+
+      let updated: Record<string, unknown>;
+      try {
+        updated = await withAudit<Record<string, unknown> | null>({
+          actor: { userId: user.sub, clientId: row.client_id, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'knowledge.category.updated',
+          entityType: 'knowledge_category',
+          entityId: row.id,
+          before: async () => existing as Record<string, unknown>,
+          mutate: async () => {
+            const { data, error } = await supabase
+              .from('knowledge_categories')
+              .update({ ...body, updated_at: new Date().toISOString() })
+              .eq('id', request.params.id)
+              .select()
+              .single();
+            if (error) {
+              // 23505 is the (client_id, name) unique index — same handling as
+              // the POST above.
+              const wrapped = new Error(error.message) as Error & { code?: string };
+              wrapped.code = error.code;
+              throw wrapped;
+            }
+
+            // The cascade: scoped to row.client_id AND the OLD name, so it can
+            // only ever touch this one client's FAQ rows.
+            if (body.name && body.name !== row.name) {
+              const { error: cascadeError } = await supabase
+                .from('faqs')
+                .update({ category: body.name })
+                .eq('client_id', row.client_id)
+                .eq('category', row.name);
+              if (cascadeError) throw new Error(cascadeError.message);
+            }
+
+            return data as Record<string, unknown>;
+          },
+        }) as Record<string, unknown>;
+      } catch (err) {
+        const wrapped = err as Error & { code?: string };
+        if (wrapped.code === '23505') {
+          return reply.code(409).send({ error: 'That category already exists for this client' });
+        }
+        return reply.code(400).send({ error: wrapped.message });
+      }
+
+      await afterWrite(row.client_id, user.sub);
+      reply.send(updated);
+    },
+  });
+
+  /**
+   * Soft-delete a category. Platform-only.
+   *
+   * FAQ rows that reference it keep their `category` text untouched — removing
+   * a category from the picker must never rewrite content a client already
+   * wrote. Those FAQs simply stop matching an active category until reassigned
+   * (the same state a FAQ is in immediately after this route existed but before
+   * any category was ever created for it).
+   */
+  app.delete<{ Params: { id: string } }>('/knowledge/categories/:id', {
+    preHandler: requirePlatform('knowledge:write'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+
+      const { data: existing } = await supabase
+        .from('knowledge_categories')
+        .select('*')
+        .eq('id', request.params.id)
+        .maybeSingle();
+      if (!existing) return reply.code(404).send({ error: 'Not found' });
+
+      const row = existing as { id: string; client_id: string };
+      if (!assertClientAccess(user, row.client_id)) return reply.code(403).send({ error: 'Forbidden' });
+
+      try {
+        await withAudit<Record<string, unknown> | null>({
+          actor: { userId: user.sub, clientId: row.client_id, ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+          action: 'knowledge.category.deactivated',
+          entityType: 'knowledge_category',
+          entityId: row.id,
+          before: async () => existing as Record<string, unknown>,
+          mutate: async () => {
+            const { error } = await supabase
+              .from('knowledge_categories')
+              .update({ active: false, updated_at: new Date().toISOString() })
+              .eq('id', row.id);
+            if (error) throw new Error(error.message);
+            return { ...(existing as Record<string, unknown>), active: false };
+          },
+        });
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message });
+      }
+
+      await afterWrite(row.client_id, user.sub);
+      reply.code(204).send();
     },
   });
 
