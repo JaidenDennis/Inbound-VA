@@ -73,6 +73,10 @@ export default function UsersPage() {
     }
   };
 
+  // Derive whether we're editing ourselves. Computed at component level so both the
+  // role control visibility (JSX) and the request routing (saveEdit) read the same value.
+  const isSelfEdit = editing && !sessionLoading && editing.id === auth?.sub;
+
   const startEdit = (u: AppUser) => {
     setEditing(u);
     setEditEmail(u.email);
@@ -83,17 +87,19 @@ export default function UsersPage() {
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
+    // Explicit guard: do not allow submission until session is loaded. isSelfEdit
+    // depends on sessionLoading, so we must wait for it to be determined.
+    if (sessionLoading) return;
     setSavingEdit(true);
-    const isSelf = !sessionLoading && editing.id === auth?.sub;
     try {
       // Role is omitted for yourself: the API rejects a self-role change with
       // 403, and offering a control that always fails is worse than not
       // offering it. /me also only accepts { name?, email?, password? }.
       const payload: Record<string, unknown> = { email: editEmail };
       if (editPassword) payload.password = editPassword;
-      if (!isSelf) payload.role = editRole;
+      if (!isSelfEdit) payload.role = editRole;
 
-      await api.patch(isSelf ? '/me' : `/users/${editing.id}`, payload);
+      await api.patch(isSelfEdit ? '/me' : `/users/${editing.id}`, payload);
       toast.success('User updated');
       setEditing(null);
       load();
@@ -195,7 +201,7 @@ export default function UsersPage() {
             value={editPassword}
             onChange={(e) => setEditPassword(e.target.value)}
           />
-          {!sessionLoading && editing.id !== auth?.sub && (
+          {!isSelfEdit && (
             <div>
               <label htmlFor="edit-user-role" className="sr-only">Role</label>
               <select
