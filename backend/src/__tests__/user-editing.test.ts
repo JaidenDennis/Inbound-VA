@@ -15,6 +15,12 @@ vi.mock('../services/index.js', () => ({
 }));
 
 vi.mock('../middleware/index.js', () => ({
+  // requireAuth is a factory in the real module (see auth.middleware.ts), just
+  // like requirePermission below — it must be CALLED to produce the
+  // preHandler. Mocking it as a bare `vi.fn()` (or as the preHandler itself)
+  // would hand Fastify the wrong shape; a bare `vi.fn()` in particular reads
+  // as callback-style (arity 3) and hangs the request forever.
+  requireAuth: () => async (_req: unknown, _reply: unknown) => undefined,
   requirePermission: () => async (_req: unknown, _reply: unknown) => undefined,
   assertClientAccess: (actor: { clientId?: string | null }, clientId: string | null) =>
     !actor.clientId || actor.clientId === clientId,
@@ -143,5 +149,49 @@ describe('user editing', () => {
     });
 
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('self-service PATCH /me', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    svc.findByEmail.mockResolvedValue(null);
+    svc.update.mockImplementation(async (_id: string, patch: Record<string, unknown>) => ({
+      id: 'ca-1', email: 'me@example.com', role: 'client_admin', is_active: true, ...patch,
+    }));
+  });
+
+  it('updates the caller own email', async () => {
+    svc.findById.mockResolvedValue({ id: 'ca-1', client_id: 'client-a', role: 'client_admin', is_active: true });
+    const app = await build(CLIENT_ADMIN);
+
+    const res = await app.inject({ method: 'PATCH', url: '/me', payload: { email: 'me@example.com' } });
+
+    expect(res.statusCode).toBe(200);
+    expect(svc.update).toHaveBeenCalledWith('ca-1', expect.objectContaining({ email: 'me@example.com' }));
+  });
+
+  it('ignores a role smuggled into the body', async () => {
+    svc.findById.mockResolvedValue({ id: 'ca-1', client_id: 'client-a', role: 'client_admin', is_active: true });
+    const app = await build(CLIENT_ADMIN);
+
+    await app.inject({
+      method: 'PATCH', url: '/me',
+      payload: { email: 'me@example.com', role: 'super_admin', is_active: false },
+    });
+
+    const patch = svc.update.mock.calls[0][1];
+    expect(patch).not.toHaveProperty('role');
+    expect(patch).not.toHaveProperty('is_active');
+  });
+
+  it('rejects an email belonging to someone else', async () => {
+    svc.findById.mockResolvedValue({ id: 'ca-1', client_id: 'client-a', role: 'client_admin', is_active: true });
+    svc.findByEmail.mockResolvedValue({ id: 'someone-else' });
+    const app = await build(CLIENT_ADMIN);
+
+    const res = await app.inject({ method: 'PATCH', url: '/me', payload: { email: 'taken@example.com' } });
+
+    expect(res.statusCode).toBe(409);
   });
 });

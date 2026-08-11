@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { userService, writeAuditLog } from '../services/index.js';
-import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
+import { requireAuth, requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
 import { ALL_ROLES, CLIENT_ROLES, roleScope, type JwtPayload, type UserRole } from '../types/index.js';
 
 const roleEnum = z.enum(ALL_ROLES as unknown as [UserRole, ...UserRole[]]);
@@ -187,6 +187,65 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         // log like any other sensitive field.
         oldValue: { email: target.email, role: target.role, is_active: target.is_active },
         newValue: { email: updated.email, role: updated.role, is_active: updated.is_active },
+        ipAddress: request.ip,
+      });
+      reply.send(updated);
+    },
+  });
+
+  /**
+   * Self-service account edits.
+   *
+   * Separate from PATCH /users/:id because that route requires `users:write`,
+   * which client viewers do not have — and granting it so someone can change
+   * their own password would also let them edit teammates.
+   *
+   * The schema cannot express `role` or `is_active`, so privilege changes are
+   * impossible here by construction rather than by a guard someone can forget.
+   */
+  const selfUpdateSchema = z.object({
+    name: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    password: z.string().min(8).optional(),
+  });
+
+  app.patch('/me', {
+    // requireAuth is a factory (see middleware/auth.middleware.ts), matching
+    // requirePermission()/requirePlatform() elsewhere in this file — it must
+    // be called to produce the preHandler.
+    preHandler: requireAuth(),
+    handler: async (request, reply) => {
+      const actor = request.user as JwtPayload;
+      const body = selfUpdateSchema.parse(request.body);
+
+      const target = await userService.findById(actor.sub);
+      if (!target) return reply.code(404).send({ error: 'Not found' });
+
+      if (body.email) {
+        const clash = await userService.findByEmail(body.email);
+        if (clash && clash.id !== actor.sub) {
+          return reply.code(409).send({ error: 'That email is already in use' });
+        }
+      }
+
+      let updated;
+      try {
+        updated = await userService.update(actor.sub, body);
+      } catch (err) {
+        const message = (err as Error).message;
+        if (message === 'A user with that email already exists') {
+          return reply.code(409).send({ error: message });
+        }
+        throw err;
+      }
+      await writeAuditLog({
+        userId: actor.sub,
+        clientId: target.client_id ?? undefined,
+        action: 'user.self_updated',
+        entityType: 'user',
+        entityId: actor.sub,
+        oldValue: { email: target.email },
+        newValue: { email: updated.email },
         ipAddress: request.ip,
       });
       reply.send(updated);
