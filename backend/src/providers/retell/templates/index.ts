@@ -50,6 +50,8 @@ export function resolveVertical(industry: string): string {
       return 'law_firm_routing';
     case 'restaurant':
       return 'restaurant_routing';
+    case 'real_estate':
+      return 'apartment_routing';
     case 'beauty':
     case 'medical':
       return 'med_spa';

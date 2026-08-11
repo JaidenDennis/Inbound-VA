@@ -463,6 +463,7 @@ describe('vertical resolution from industry', () => {
     expect(resolveVertical('orthodontic')).toBe('orthodontic_routing');
     expect(resolveVertical('legal')).toBe('law_firm_routing');
     expect(resolveVertical('restaurant')).toBe('restaurant_routing');
+    expect(resolveVertical('real_estate')).toBe('apartment_routing');
   });
 
   it('leaves pre-existing industry resolution untouched', () => {
