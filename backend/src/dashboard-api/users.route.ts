@@ -16,6 +16,7 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
   role: roleEnum.optional(),
   is_active: z.boolean().optional(),
   password: z.string().min(8).optional(),
@@ -138,6 +139,25 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       // Prevent locking yourself out.
       if (body.is_active === false && target.id === actor.sub) {
         return reply.code(400).send({ error: 'You cannot deactivate your own account' });
+      }
+
+      // Nobody edits their own role — not staff, not a client admin.
+      //
+      // Without this a client_admin passes every check above when the target is
+      // themselves (same tenant, and client roles are assignable), so they can
+      // promote themselves to the top client role. Role changes are something
+      // done TO an account by another account.
+      if (body.role && target.id === actor.sub) {
+        return reply.code(403).send({ error: 'You cannot change your own role' });
+      }
+
+      // users.email is UNIQUE, so a collision would otherwise surface as a
+      // 500 from Postgres. Answer the question the caller actually asked.
+      if (body.email) {
+        const clash = await userService.findByEmail(body.email);
+        if (clash && clash.id !== target.id) {
+          return reply.code(409).send({ error: 'That email is already in use' });
+        }
       }
 
       const updated = await userService.update(request.params.id, body);

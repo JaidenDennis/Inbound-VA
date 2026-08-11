@@ -16,6 +16,7 @@ export interface CreateUserInput {
 
 export interface UpdateUserInput {
   name?: string;
+  email?: string;
   role?: UserRole;
   is_active?: boolean;
   password?: string;
@@ -36,6 +37,22 @@ export class UserService {
 
   async findById(id: string): Promise<User | null> {
     const { data } = await supabase.from('users').select(PUBLIC_COLUMNS).eq('id', id).maybeSingle();
+    return data as User | null;
+  }
+
+  /**
+   * Look up by email for the duplicate check on update.
+   *
+   * Lower-cased because create() stores addresses lower-cased; comparing raw
+   * input against stored values would miss "Sam@x.com" vs "sam@x.com" and let
+   * the insert fail at the constraint instead of at the check.
+   */
+  async findByEmail(email: string): Promise<User | null> {
+    const { data } = await supabase
+      .from('users')
+      .select(PUBLIC_COLUMNS)
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
     return data as User | null;
   }
 
@@ -65,6 +82,7 @@ export class UserService {
   async update(id: string, input: UpdateUserInput): Promise<User> {
     const patch: Record<string, unknown> = {};
     if (input.name !== undefined) patch.name = input.name;
+    if (input.email !== undefined) patch.email = input.email.toLowerCase();
     if (input.role !== undefined) patch.role = input.role;
     if (input.is_active !== undefined) patch.is_active = input.is_active;
     if (input.password) patch.password_hash = await bcrypt.hash(input.password, 10);
@@ -75,7 +93,10 @@ export class UserService {
       .eq('id', id)
       .select(PUBLIC_COLUMNS)
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (error.code === '23505') throw new Error('A user with that email already exists');
+      throw new Error(error.message);
+    }
     return data as User;
   }
 }

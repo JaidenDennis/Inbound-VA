@@ -1,0 +1,109 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const svc = vi.hoisted(() => ({
+  findById: vi.fn(),
+  update: vi.fn(),
+  findByEmail: vi.fn(),
+}));
+vi.mock('../services/index.js', () => ({
+  userService: svc,
+  withAudit: vi.fn(async (o: { mutate: () => Promise<unknown> }) => o.mutate()),
+  writeAuditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../middleware/index.js', () => ({
+  requirePermission: () => async (_req: unknown, _reply: unknown) => undefined,
+  assertClientAccess: (actor: { clientId?: string | null }, clientId: string | null) =>
+    !actor.clientId || actor.clientId === clientId,
+  isPlatformUser: (actor: { clientId?: string | null }) => !actor.clientId,
+}));
+
+import Fastify from 'fastify';
+import { userRoutes } from '../dashboard-api/users.route.js';
+
+const PLATFORM = { sub: 'staff-1', clientId: null, role: 'super_admin' };
+const CLIENT_ADMIN = { sub: 'ca-1', clientId: 'client-a', role: 'client_admin' };
+
+async function build(actor: Record<string, unknown>) {
+  const app = Fastify();
+  // @fastify/jwt's module augmentation types `request.user` as
+  // `string | object | Buffer` (no `FastifyJWT.user` override in this repo),
+  // which rejects `null` under strict mode even though it's exactly what a
+  // fresh decorator holds before the preHandler below overwrites it.
+  app.decorateRequest('user', null as any);
+  app.addHook('preHandler', async (req) => {
+    (req as unknown as { user: unknown }).user = actor;
+  });
+  await app.register(userRoutes);
+  return app;
+}
+
+describe('user editing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    svc.findByEmail.mockResolvedValue(null);
+    svc.update.mockImplementation(async (_id: string, patch: Record<string, unknown>) => ({
+      id: 'u-1', email: 'new@example.com', role: 'client_viewer', is_active: true, ...patch,
+    }));
+  });
+
+  it('lets platform staff change a user email', async () => {
+    svc.findById.mockResolvedValue({ id: 'u-1', client_id: 'client-a', role: 'client_viewer', is_active: true });
+    const app = await build(PLATFORM);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/users/u-1', payload: { email: 'new@example.com' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(svc.update).toHaveBeenCalledWith('u-1', expect.objectContaining({ email: 'new@example.com' }));
+  });
+
+  it('rejects an email already used by someone else with 409, not 500', async () => {
+    svc.findById.mockResolvedValue({ id: 'u-1', client_id: 'client-a', role: 'client_viewer', is_active: true });
+    svc.findByEmail.mockResolvedValue({ id: 'u-2' });
+    const app = await build(PLATFORM);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/users/u-1', payload: { email: 'taken@example.com' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(svc.update).not.toHaveBeenCalled();
+  });
+
+  it('allows re-saving a user with their own unchanged email', async () => {
+    svc.findById.mockResolvedValue({ id: 'u-1', client_id: 'client-a', role: 'client_viewer', is_active: true });
+    svc.findByEmail.mockResolvedValue({ id: 'u-1' }); // themselves
+    const app = await build(PLATFORM);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/users/u-1', payload: { email: 'same@example.com' },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('refuses to let anyone change their OWN role', async () => {
+    svc.findById.mockResolvedValue({ id: 'ca-1', client_id: 'client-a', role: 'client_viewer', is_active: true });
+    const app = await build(CLIENT_ADMIN);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/users/ca-1', payload: { role: 'client_admin' },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(svc.update).not.toHaveBeenCalled();
+  });
+
+  it('still lets a client admin change a teammate role', async () => {
+    svc.findById.mockResolvedValue({ id: 'u-9', client_id: 'client-a', role: 'client_viewer', is_active: true });
+    const app = await build(CLIENT_ADMIN);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/users/u-9', payload: { role: 'client_admin' },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
