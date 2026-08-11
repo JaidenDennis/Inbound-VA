@@ -81,6 +81,8 @@ const clientNav: NavGroup[] = [
       { href: '/dashboard/business', label: 'Business', icon: TrendingUp, permission: 'analytics:read' },
       { href: '/dashboard/queue', label: 'Work Queue', icon: Inbox, permission: 'flags:read' },
       { href: '/dashboard/reports', label: 'Reports', icon: BarChart2, permission: 'analytics:read' },
+      // Analytics (cross-company roll-up) is platform-only — see staffNav.
+      // A client's own numbers live on Business, above.
       { href: '/dashboard/agent', label: 'My Agent', icon: Bot, permission: 'knowledge:read' },
       { href: '/dashboard/knowledge', label: 'Knowledge', icon: BookOpen, permission: 'knowledge:read' },
       { href: '/dashboard/connections', label: 'Connections', icon: Plug, permission: 'crm:read' },

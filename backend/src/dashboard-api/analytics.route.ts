@@ -1,13 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { supabase } from '../db/index.js';
-import { requirePermission } from '../middleware/index.js';
+import { requirePlatform } from '../middleware/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { clientId?: string; from?: string; to?: string } }>(
     '/analytics/overview',
     {
-      preHandler: requirePermission('analytics:read'),
+      // This view aggregates across every tenant, so it is staff-only; a
+      // client's own numbers live on the Business tab instead.
+      preHandler: requirePlatform('analytics:read'),
       handler: async (request, reply) => {
         const { from, to } = request.query;
         const user = request.user as JwtPayload;
