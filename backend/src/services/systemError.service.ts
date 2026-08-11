@@ -3,7 +3,7 @@ import { supabase } from '../db/index.js';
 import { logger } from '../utils/index.js';
 import { redactContext, redactText } from '../utils/redact.js';
 
-export type ErrorSource = 'api' | 'worker' | 'webhook' | 'startup';
+export type ErrorSource = 'api' | 'worker' | 'webhook' | 'startup' | 'email';
 export type ErrorSeverity = 'warn' | 'error' | 'fatal';
 
 export interface RecordErrorInput {
