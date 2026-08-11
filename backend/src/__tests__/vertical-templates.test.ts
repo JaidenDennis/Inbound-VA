@@ -396,6 +396,15 @@ describe('apartment template specifics', () => {
     expect(p).toMatch(/leave_staff_message/);
     expect(p).toMatch(/Never promise a repair time, a technician's name, or that a charge will be waived/);
   });
+
+  it('carries exactly one life-safety script, ahead of every other rule', () => {
+    const p = cfg({});
+    expect(p).not.toMatch(/SAFETY — EMERGENCY HARD RULE/);
+    expect(p.match(/dial 9-1-1/g)).toHaveLength(1);
+    expect(p.indexOf('MAINTENANCE EMERGENCY — CHECK FIRST')).toBeLessThan(
+      p.indexOf('FAIR HOUSING — THIS OVERRIDES')
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
