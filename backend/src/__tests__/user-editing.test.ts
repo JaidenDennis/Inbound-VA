@@ -5,10 +5,13 @@ const svc = vi.hoisted(() => ({
   update: vi.fn(),
   findByEmail: vi.fn(),
 }));
+const audit = vi.hoisted(() => ({
+  writeAuditLog: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../services/index.js', () => ({
   userService: svc,
   withAudit: vi.fn(async (o: { mutate: () => Promise<unknown> }) => o.mutate()),
-  writeAuditLog: vi.fn().mockResolvedValue(undefined),
+  writeAuditLog: audit.writeAuditLog,
 }));
 
 vi.mock('../middleware/index.js', () => ({
@@ -70,6 +73,41 @@ describe('user editing', () => {
 
     expect(res.statusCode).toBe(409);
     expect(svc.update).not.toHaveBeenCalled();
+  });
+
+  it('maps a lost race on email uniqueness to 409, not 500', async () => {
+    // Pre-check passes (no clash seen yet), but the update itself loses a
+    // concurrent race and the DB constraint fires — this is what F1 covers:
+    // without a try/catch around userService.update, this thrown Error has
+    // no statusCode, so app.setErrorHandler falls through to a 500.
+    svc.findById.mockResolvedValue({
+      id: 'u-1', client_id: 'client-a', role: 'client_viewer', is_active: true, email: 'old@example.com',
+    });
+    svc.findByEmail.mockResolvedValue(null);
+    svc.update.mockRejectedValueOnce(new Error('A user with that email already exists'));
+    const app = await build(PLATFORM);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/users/u-1', payload: { email: 'race@example.com' },
+    });
+
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('records the email transition in the audit log', async () => {
+    svc.findById.mockResolvedValue({
+      id: 'u-1', client_id: 'client-a', role: 'client_viewer', is_active: true, email: 'old@example.com',
+    });
+    const app = await build(PLATFORM);
+
+    await app.inject({
+      method: 'PATCH', url: '/users/u-1', payload: { email: 'new@example.com' },
+    });
+
+    expect(audit.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      oldValue: expect.objectContaining({ email: 'old@example.com' }),
+      newValue: expect.objectContaining({ email: 'new@example.com' }),
+    }));
   });
 
   it('allows re-saving a user with their own unchanged email', async () => {

@@ -160,15 +160,33 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      const updated = await userService.update(request.params.id, body);
+      // The findByEmail pre-check above closes the common case, but a second
+      // request can still win a race between the check and this write — that
+      // shows up here as a thrown 23505 translation, not at the pre-check.
+      // Without a try/catch, that Error has no statusCode and falls through
+      // app.setErrorHandler to a bare 500, so the nicer message the service
+      // built is never actually seen by the caller.
+      let updated;
+      try {
+        updated = await userService.update(request.params.id, body);
+      } catch (err) {
+        const message = (err as Error).message;
+        if (message === 'A user with that email already exists') {
+          return reply.code(409).send({ error: message });
+        }
+        throw err;
+      }
       await writeAuditLog({
         userId: actor.sub,
         clientId: target.client_id ?? undefined,
         action: 'user.updated',
         entityType: 'user',
         entityId: target.id,
-        oldValue: { role: target.role, is_active: target.is_active },
-        newValue: { role: updated.role, is_active: updated.is_active },
+        // Email is included because changing it is account-takeover-adjacent
+        // (it retargets password resets) and must be traceable in the audit
+        // log like any other sensitive field.
+        oldValue: { email: target.email, role: target.role, is_active: target.is_active },
+        newValue: { email: updated.email, role: updated.role, is_active: updated.is_active },
         ipAddress: request.ip,
       });
       reply.send(updated);
