@@ -22,6 +22,11 @@ import { env } from '../config/index.js';
 const db = vi.hoisted(() => ({
   policies: [] as Array<Record<string, unknown>>,
   settings: [] as Array<Record<string, unknown>>,
+  // F1 coverage: when true, the NEXT insert into `client_policies` fails
+  // (and does not push any rows into the store), simulating a Supabase
+  // insert error mid-write so the "insert-first" ordering can be proven —
+  // the previous rows must survive that failure untouched.
+  failNextPolicyInsert: false,
 }));
 
 vi.mock('../db/index.js', () => {
@@ -35,16 +40,19 @@ vi.mock('../db/index.js', () => {
     const store = tableStore(table);
     const state: {
       filters: Record<string, unknown>;
+      inFilters: Record<string, unknown[]>;
       orders: string[];
       insertBody?: Record<string, unknown> | Record<string, unknown>[];
       updateBody?: Record<string, unknown>;
       isDelete?: boolean;
-    } = { filters: {}, orders: [] };
+    } = { filters: {}, inFilters: {}, orders: [] };
 
     function matchRows() {
       if (!store) return [];
-      return store.filter((row) =>
-        Object.entries(state.filters).every(([col, val]) => row[col] === val)
+      return store.filter(
+        (row) =>
+          Object.entries(state.filters).every(([col, val]) => row[col] === val) &&
+          Object.entries(state.inFilters).every(([col, vals]) => vals.includes(row[col]))
       );
     }
 
@@ -63,6 +71,10 @@ vi.mock('../db/index.js', () => {
 
     function resolveInsert() {
       if (!store) return { data: null, error: null };
+      if (table === 'client_policies' && db.failNextPolicyInsert) {
+        db.failNextPolicyInsert = false;
+        return { data: null, error: { message: 'simulated insert failure' } };
+      }
       const bodies = Array.isArray(state.insertBody)
         ? state.insertBody
         : state.insertBody
@@ -79,11 +91,15 @@ vi.mock('../db/index.js', () => {
       return { data: rows, error: null };
     }
 
+    // Returns the FULL set of matched/updated rows as `data` — real
+    // supabase-js does the same when `.select()` is chained after
+    // `.update()`. `.single()` below narrows to one row for callers that
+    // asked for that.
     function resolveUpdate() {
       if (!store) return { data: null, error: null };
       const rows = matchRows();
       for (const row of rows) Object.assign(row, state.updateBody);
-      return { data: rows[0] ?? null, error: null };
+      return { data: rows, error: null };
     }
 
     function resolveDelete() {
@@ -120,13 +136,19 @@ vi.mock('../db/index.js', () => {
         state.filters[col] = val;
         return chain;
       },
+      in: (col: string, vals: unknown[]) => {
+        state.inFilters[col] = vals;
+        return chain;
+      },
       order: (col: string) => {
         state.orders.push(col);
         return chain;
       },
       single: () => {
         const result = state.updateBody ? resolveUpdate() : resolveInsert();
-        return Promise.resolve({ ...result, data: clone(result.data) });
+        const rows = result.data as unknown;
+        const one = Array.isArray(rows) ? (rows[0] ?? null) : rows;
+        return Promise.resolve({ ...result, data: clone(one) });
       },
       maybeSingle: () => {
         const { data } = resolveSelect();
@@ -158,7 +180,16 @@ const { renderPolicies } = await import('../services/policyRender.service.js');
 
 const svc = vi.hoisted(() => ({
   writeAuditLog: vi.fn(async () => undefined),
-  withAudit: vi.fn(async (opts: { mutate: () => Promise<unknown> }) => opts.mutate()),
+  // Must run `before()` THEN `mutate()`, in that order, same as the real
+  // withAudit (audit.service.ts) — the PUT route's `mutate()` reads
+  // `previousIds`, which is only populated by `before()` via closure. A mock
+  // that skipped `before()` (as an earlier version of this file's mock did)
+  // would silently leave `previousIds` empty and hide the very delete-target
+  // bug F1's fix depends on.
+  withAudit: vi.fn(async (opts: { before: () => Promise<unknown>; mutate: () => Promise<unknown> }) => {
+    await opts.before();
+    return opts.mutate();
+  }),
   requestSync: vi.fn(async () => undefined),
 }));
 
@@ -206,6 +237,7 @@ function tokenFor(app: Awaited<ReturnType<typeof buildApp>>, role: string, clien
 beforeEach(() => {
   vi.clearAllMocks();
   db.policies = [];
+  db.failNextPolicyInsert = false;
   db.settings = [
     { client_id: CLIENT, business_policies: [] },
     { client_id: OTHER, business_policies: [] },
@@ -269,6 +301,18 @@ describe('renderPolicies()', () => {
     const rendered = await renderPolicies(CLIENT);
     expect(rendered).toEqual([]);
     expect(db.settings.find((s) => s.client_id === CLIENT)).toMatchObject({ business_policies: [] });
+  });
+
+  // F4: an update matched on client_id against a MISSING client_settings row
+  // succeeds with zero rows affected and no error — a silent no-op. Without a
+  // guard, renderPolicies would return normally as if it had rendered
+  // something, and the caller would have no way to know the agent's text was
+  // never actually updated.
+  it('F4: throws when the client_settings row is missing, instead of silently doing nothing', async () => {
+    db.policies = [{ id: 'p1', client_id: CLIENT, title: 'A', body: 'a', sort_order: 0, active: true }];
+    db.settings = db.settings.filter((s) => s.client_id !== CLIENT);
+
+    await expect(renderPolicies(CLIENT)).rejects.toThrow(/client_settings/i);
   });
 });
 
@@ -393,6 +437,109 @@ describe('PUT /knowledge/policies', () => {
       payload: { policies: [{ title: '', body: 'x' }] },
     });
     expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  // F3: z.string().min(1) alone accepts "   " — three spaces pass length
+  // validation, then render into the agent's prompt array as a blank
+  // heading. Trimming before the length check makes a whitespace-only title
+  // behave the same as an empty one.
+  it('F3: rejects a whitespace-only title (400) rather than storing a blank heading', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/knowledge/policies?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { policies: [{ title: '   ', body: 'x' }] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(db.policies).toEqual([]);
+    await app.close();
+  });
+
+  it('F3: trims surrounding whitespace off an otherwise-valid title before storing it', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/knowledge/policies?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { policies: [{ title: '  Deposits  ', body: 'x' }] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(db.policies.find((p) => p.client_id === CLIENT)).toMatchObject({ title: 'Deposits' });
+    await app.close();
+  });
+
+  // F1: the core regression test. A delete-then-insert would have already
+  // deleted the client's existing rows by the time the insert fails, leaving
+  // NOTHING — an unrecoverable loss, since a throwing mutate() also skips
+  // withAudit's own log write (audit.service.ts), so not even the `before`
+  // snapshot survives. The fix inserts first: proves that when the insert
+  // fails, the original row, and the business_policies text rendered from
+  // it, are both still exactly what they were before the request.
+  it('F1: an insert failure during PUT leaves the existing policies and business_policies completely intact', async () => {
+    db.policies = [
+      { id: 'keep-1', client_id: CLIENT, title: 'Original', body: 'Do not lose me.', sort_order: 0, active: true },
+    ];
+    db.settings = db.settings.map((s) =>
+      s.client_id === CLIENT ? { ...s, business_policies: ['Original: Do not lose me.'] } : s
+    );
+    db.failNextPolicyInsert = true;
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/knowledge/policies?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { policies: [{ title: 'New', body: 'Should never land.' }] },
+    });
+
+    expect(res.statusCode).toBe(400);
+
+    // The original row is untouched — insert-first means a failed insert
+    // never reaches the delete of the previous rows.
+    expect(db.policies).toEqual([
+      { id: 'keep-1', client_id: CLIENT, title: 'Original', body: 'Do not lose me.', sort_order: 0, active: true },
+    ]);
+    expect(db.policies.some((p) => p.title === 'New')).toBe(false);
+
+    // renderPolicies never ran (mutate threw first) — the agent-facing text
+    // is exactly what it was before the failed request, not empty.
+    expect(db.settings.find((s) => s.client_id === CLIENT)).toMatchObject({
+      business_policies: ['Original: Do not lose me.'],
+    });
+
+    await app.close();
+  });
+
+  // F2: if the write itself succeeds but renderPolicies then fails, the new
+  // rows are real and saved — the response must not read as a plain failure
+  // (a 400 here would wrongly suggest nothing happened), and it must not
+  // read as a plain success either (a bare 200 would hide that the agent is
+  // about to keep saying the old policies). Forcing this via a missing
+  // client_settings row also doubles as route-level coverage for F4's guard.
+  it('F2: a renderPolicies failure after a successful write responds 200 with an explicit warning, and the new rows are really saved', async () => {
+    db.policies = [];
+    db.settings = db.settings.filter((s) => s.client_id !== CLIENT); // no settings row → renderPolicies throws (F4 guard)
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/knowledge/policies?clientId=${CLIENT}`,
+      headers: { authorization: `Bearer ${tokenFor(app, 'client_owner', CLIENT)}` },
+      payload: { policies: [{ title: 'Fresh Policy', body: 'Just written.' }] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().warning).toBeTruthy();
+    expect(res.json().warning).toMatch(/refresh|stale|previous/i);
+
+    // The write really happened, even though rendering failed.
+    expect(db.policies.find((p) => p.client_id === CLIENT && p.title === 'Fresh Policy')).toBeTruthy();
+
+    // No sync was requested off the back of a text that was never refreshed.
+    expect(svc.requestSync).not.toHaveBeenCalled();
+
     await app.close();
   });
 

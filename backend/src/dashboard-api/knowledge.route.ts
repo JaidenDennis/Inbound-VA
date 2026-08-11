@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../db/index.js';
 import { requirePermission, requirePlatform, assertClientAccess } from '../middleware/index.js';
 import { agentSyncService, writeAuditLog, withAudit, renderPolicies } from '../services/index.js';
+import { logger } from '../utils/index.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -502,18 +503,26 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
       // Whole-list replace rather than per-item CRUD: policies are short, are
       // reordered as often as they are edited, and the payload carries no
       // stable id to patch against. sort_order follows array position.
+      // Titles are trimmed before the length check: a whitespace-only title
+      // would otherwise pass validation and render into the agent's prompt
+      // array as a blank heading.
       const body = z
         .object({
           policies: z
             .array(
               z.object({
-                title: z.string().min(1).max(200),
+                title: z.string().trim().min(1).max(200),
                 body: z.string().max(4000).default(''),
               })
             )
             .max(50),
         })
         .parse(request.body);
+
+      // Populated by `before()`, read by `mutate()` — the ids of the rows
+      // that existed BEFORE this write, so the delete step targets exactly
+      // those and never the rows the same call just inserted.
+      let previousIds: string[] = [];
 
       let saved: Array<Record<string, unknown>>;
       try {
@@ -525,22 +534,49 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
           before: async () => {
             const { data } = await supabase
               .from('client_policies')
-              .select('title, body, sort_order')
+              .select('id, title, body, sort_order')
               .eq('client_id', clientId)
               .eq('active', true)
               .order('sort_order');
-            return (data ?? []) as Record<string, unknown>[];
+            const rows = (data ?? []) as Array<Record<string, unknown>>;
+            previousIds = rows.map((r) => r.id as string);
+            return rows;
           },
           mutate: async () => {
-            // Delete-and-reinsert: simpler than diffing against existing rows,
-            // and the whole set must end up matching the payload exactly anyway.
-            const { error: deleteError } = await supabase
-              .from('client_policies')
-              .delete()
-              .eq('client_id', clientId);
-            if (deleteError) throw new Error(deleteError.message);
-
-            if (body.policies.length === 0) return [];
+            // Insert-first, delete-second — NOT delete-then-insert. A plain
+            // delete-then-insert leaves the client with ZERO policy rows for
+            // the entire window until the insert lands, and if the insert
+            // fails the client is left with nothing: `client_policies` is
+            // empty, `business_policies` still holds the old text (renderPolicies
+            // never runs because mutate() threw), and withAudit's own log write
+            // is skipped too — a throwing mutate() never reaches the
+            // writeAuditLog call (see withAudit in audit.service.ts), so even
+            // the `before` snapshot goes unrecorded. That combination is
+            // unrecoverable production data loss.
+            //
+            // Inserting first means an insert failure leaves the PREVIOUS rows
+            // (and business_policies, and the `before` snapshot already
+            // captured above) completely untouched — the write simply did not
+            // happen, and the 400 below is accurate. This codebase has no
+            // precedent for wrapping a multi-statement write in a transactional
+            // Postgres RPC (the existing `.rpc()` calls throughout the backend
+            // are all read-only reporting functions, e.g. `report_kpis`,
+            // `report_pulse`); reordering to insert-first gets the same safety
+            // property using the same delete/insert primitives already used
+            // everywhere else in this file, with no new migration required.
+            if (body.policies.length === 0) {
+              // Nothing new to protect — just remove what existed. If this
+              // delete fails, the previous rows simply remain (mutate throws,
+              // nothing was lost).
+              if (previousIds.length > 0) {
+                const { error: deleteError } = await supabase
+                  .from('client_policies')
+                  .delete()
+                  .in('id', previousIds);
+                if (deleteError) throw new Error(deleteError.message);
+              }
+              return [];
+            }
 
             const rows = body.policies.map((p, i) => ({
               client_id: clientId,
@@ -553,14 +589,47 @@ export async function knowledgeRoutes(app: FastifyInstance): Promise<void> {
               .insert(rows)
               .select();
             if (insertError) throw new Error(insertError.message);
+
+            // Only now remove the rows that predate this write, by id — never
+            // the ones just inserted. If THIS delete fails, the client ends up
+            // with both old and new rows visible at once (a duplicate an
+            // operator can spot and clean up), never with nothing.
+            if (previousIds.length > 0) {
+              const { error: deleteError } = await supabase
+                .from('client_policies')
+                .delete()
+                .in('id', previousIds);
+              if (deleteError) throw new Error(deleteError.message);
+            }
+
             return (data ?? []) as Record<string, unknown>[];
           },
         }) as Array<Record<string, unknown>>;
-
-        // Keep the agent-facing array true to what was just saved.
-        await renderPolicies(clientId);
       } catch (err) {
         return reply.code(400).send({ error: (err as Error).message });
+      }
+
+      // The rows above are already saved — a failure past this point must
+      // not read as "the save failed". renderPolicies keeps
+      // client_settings.business_policies (the agent's actual input) in sync
+      // with what was just written; if THAT fails, the new rows still exist
+      // but the agent keeps speaking the previous text until the next
+      // successful save or sync. That is logged loudly here (the same
+      // "succeeded but not fully recorded" precedent as the audit-write
+      // failure path in audit.service.ts) and reported to the caller as a
+      // 200 with an explicit warning — not folded into the 400 above, which
+      // would wrongly imply nothing was saved.
+      try {
+        await renderPolicies(clientId);
+      } catch (err) {
+        logger.error(
+          { err, clientId, userId: user.sub },
+          'renderPolicies failed after a client_policies write — business_policies is stale'
+        );
+        return reply.code(200).send({
+          data: saved,
+          warning: `Policies were saved, but the live agent's text could not be refreshed (${(err as Error).message}). It will keep saying the previous policies until this is retried or a sync runs.`,
+        });
       }
 
       await afterWrite(clientId, user.sub);

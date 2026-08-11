@@ -39,11 +39,23 @@ export async function renderPolicies(clientId: string): Promise<string[]> {
     return body ? `${title}: ${body}` : title;
   });
 
-  const { error: writeError } = await supabase
+  // `.select('client_id')` so the response tells us whether a row was
+  // actually matched. Without it a bad `clientId` (or a client whose
+  // `client_settings` row is somehow missing — `client.service.ts:65`
+  // creates one at client creation, so this should not happen in practice,
+  // but "should not happen" is exactly the case a guard is for) updates zero
+  // rows, returns no error, and this function would silently return the
+  // rendered strings while nothing downstream ever saw them — the agent
+  // stays on stale text with no signal anything went wrong.
+  const { data: updated, error: writeError } = await supabase
     .from('client_settings')
     .update({ business_policies: rendered })
-    .eq('client_id', clientId);
+    .eq('client_id', clientId)
+    .select('client_id');
   if (writeError) throw new Error(writeError.message);
+  if (!updated || updated.length === 0) {
+    throw new Error(`renderPolicies: no client_settings row for client ${clientId} — nothing was rendered`);
+  }
 
   return rendered;
 }
