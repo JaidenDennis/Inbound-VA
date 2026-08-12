@@ -125,7 +125,7 @@ function SupportPageInner() {
   };
 
   const inputCls =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+    'w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
 
   const breached = tickets.filter((t) => t.sla_breached_at && !t.first_response_at).length;
 
@@ -142,7 +142,7 @@ function SupportPageInner() {
           !isPlatform && !sessionLoading ? (
             <button
               onClick={() => setShowForm((s) => !s)}
-              className="cursor-pointer rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              className="cursor-pointer bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
               {showForm ? 'Cancel' : 'Submit a ticket'}
             </button>
@@ -151,7 +151,7 @@ function SupportPageInner() {
       />
 
       {isPlatform && breached > 0 && (
-        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div role="alert" className="mb-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {breached} ticket{breached > 1 ? 's have' : ' has'} passed the first-response target without a reply.
         </div>
       )}
@@ -167,7 +167,7 @@ function SupportPageInner() {
       )}
 
       {showForm && !isPlatform && (
-        <form onSubmit={submit} className="mb-6 space-y-4 rounded-xl border border-gray-200 bg-white p-6">
+        <form onSubmit={submit} className="mb-6 space-y-4 border border-gray-200 bg-surface-raised p-6">
           <div>
             <label htmlFor="subject" className="mb-1 block text-sm font-medium text-gray-700">Subject</label>
             <input id="subject" required maxLength={200} value={subject}
@@ -187,7 +187,7 @@ function SupportPageInner() {
           </div>
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <button type="submit" disabled={submitting || !subject.trim()}
-            className="cursor-pointer rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50">
+            className="cursor-pointer bg-primary-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50">
             {submitting ? 'Submitting…' : 'Submit ticket'}
           </button>
         </form>
@@ -196,20 +196,20 @@ function SupportPageInner() {
       {isPlatform && <FilterBar filters={staffFilters} />}
 
       {loading ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-hidden border border-gray-200 bg-surface-raised">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-14 animate-pulse border-b border-gray-100 bg-gray-50 last:border-0" />
           ))}
         </div>
       ) : tickets.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
+        <div className="border border-gray-200 bg-surface-raised p-10 text-center">
           <p className="text-gray-500">No tickets</p>
           <p className="mt-1 text-sm text-gray-400">
             {isPlatform ? 'Nothing matched these filters.' : 'You have not raised any tickets yet.'}
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-hidden border border-gray-200 bg-surface-raised">
           <div className="overflow-x-auto">
             <table className="w-full">
               <caption className="sr-only">{count} support tickets</caption>
@@ -284,7 +284,7 @@ function SupportPageInner() {
 
 export default function SupportPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-gray-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100" />}>
       <SupportPageInner />
     </Suspense>
   );

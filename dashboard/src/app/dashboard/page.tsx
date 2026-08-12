@@ -50,8 +50,8 @@ function sinceLabel(ms: number): string {
   return `${Math.floor(s / 3600)}h ago`;
 }
 
-function timeAgo(iso: string): string {
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+function timeAgo(iso: string, now: number): string {
+  const seconds = Math.floor((now - new Date(iso).getTime()) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -77,7 +77,16 @@ function LampField({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
-  const age = updatedAt ? Date.now() - updatedAt : null;
+  // The clock is state, not a render-time read. Reading Date.now() during
+  // render is impure and leaves the age label frozen until the next
+  // unrelated re-render.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const age = updatedAt ? now - updatedAt : null;
   const stale = age !== null && age > STALE_MS;
 
   const cells: Array<{ level: LampLevel; count: number; label: string; hint: string; href: string }> = [
@@ -114,12 +123,10 @@ function LampField({
     <section aria-labelledby="health-heading" className="mb-7">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex items-baseline gap-3">
-          <h2 id="health-heading" className="font-heading text-sm font-semibold text-ink-900">
-            System state
-          </h2>
+          <h2 id="health-heading" className="label-instrument">System state</h2>
           {/* A reading is only as good as its age, so the age is never hidden. */}
           <span
-            className={stale ? 'text-2xs font-medium text-lamp-fair-ink' : 'text-2xs text-panel-500'}
+            className={stale ? 'font-mono text-2xs uppercase tracking-[0.16em] text-lamp-fair-ink' : 'font-mono text-2xs uppercase tracking-[0.16em] text-text-muted'}
           >
             {age === null ? 'not yet read' : stale ? `stale · read ${sinceLabel(age)}` : `read ${sinceLabel(age)}`}
           </span>
@@ -130,7 +137,7 @@ function LampField({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-2xs font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-60"
+            className="flex cursor-pointer items-center gap-1.5 border border-rule px-2.5 py-1.5 font-mono text-2xs uppercase tracking-[0.16em] text-text transition-colors duration-150 hover:border-action hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:opacity-60"
           >
             <RefreshCw
               className={refreshing ? 'h-3 w-3 animate-spin' : 'h-3 w-3'}
@@ -145,15 +152,15 @@ function LampField({
         {`System state: ${verdict}. ${health.fatal} fatal, ${health.error} errors, ${health.warn} warnings.`}
       </p>
 
-      <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-panel-200 bg-white sm:grid-cols-3">
+      <div className="grid grid-cols-1 border border-edge bg-surface-raised sm:grid-cols-3">
         {cells.map((cell, i) => (
           <Link
             key={cell.label}
             href={cell.href}
             className={[
-              'group flex items-center gap-4 px-5 py-4 transition-colors duration-150 ease-out hover:bg-panel-25',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal-600',
-              i > 0 ? 'border-t border-panel-200 sm:border-l sm:border-t-0' : '',
+              'group flex items-center gap-4 px-5 py-4 transition-colors duration-120 ease-out hover:bg-action-50',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action',
+              i > 0 ? 'border-t border-hairline sm:border-l sm:border-t-0' : '',
             ].join(' ')}
           >
             <StatusLamp
@@ -166,18 +173,18 @@ function LampField({
               <span className="flex items-baseline gap-2">
                 <span
                   data-numeric
-                  className="font-heading text-2xl font-semibold tracking-[-0.02em] text-ink-900"
+                  className="font-heading text-2xl font-medium tracking-[-0.02em] text-text"
                 >
                   {cell.count}
                 </span>
-                <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
+                <span className="font-mono text-2xs uppercase tracking-[0.16em] text-text-muted">
                   {cell.label}
                 </span>
               </span>
-              <span className="mt-0.5 block truncate text-xs text-panel-500">{cell.hint}</span>
+              <span className="mt-0.5 block truncate text-xs text-text-muted">{cell.hint}</span>
             </span>
             <ArrowRight
-              className="h-4 w-4 flex-shrink-0 text-panel-300 transition-all duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-panel-500"
+              className="h-4 w-4 flex-shrink-0 text-text-faint transition-all duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-text-muted"
               aria-hidden
             />
           </Link>
@@ -187,36 +194,34 @@ function LampField({
   );
 }
 
-function WorstFirst({ rows }: { rows: GroupedRow[] }) {
+function WorstFirst({ rows, now }: { rows: GroupedRow[]; now: number }) {
   return (
     <section aria-labelledby="worst-heading">
       <div className="mb-3 flex items-baseline justify-between gap-4">
-        <h2 id="worst-heading" className="font-heading text-sm font-semibold text-ink-900">
-          Worst first
-        </h2>
+        <h2 id="worst-heading" className="label-instrument">Worst first</h2>
         <Link
           href="/dashboard/system"
-          className="text-xs font-medium text-signal-700 underline decoration-signal-300 underline-offset-2 transition-colors hover:text-signal-800 hover:decoration-signal-600"
+          className="font-mono text-2xs uppercase tracking-[0.16em] text-action underline decoration-action/40 underline-offset-2 transition-colors hover:decoration-action"
         >
           Open System Health
         </Link>
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-panel-200 bg-white px-6 py-10 text-center">
+        <div className="border border-hairline bg-surface-raised px-6 py-10 text-center">
           <StatusLamp level="good" size="lg" className="mx-auto mb-3" label="Good" />
-          <p className="text-sm font-medium text-ink-800">Nothing is failing</p>
-          <p className="mt-1 text-xs text-panel-500">
+          <p className="text-sm font-medium text-text">Nothing is failing</p>
+          <p className="mt-1 text-xs text-text-muted">
             No grouped errors in the current window.
           </p>
         </div>
       ) : (
-        <ul className="overflow-hidden rounded-xl border border-panel-200 bg-white">
+        <ul className="border border-hairline bg-surface-raised">
           {rows.map((row, i) => (
-            <li key={row.fingerprint} className={i > 0 ? 'border-t border-panel-100' : ''}>
+            <li key={row.fingerprint} className={i > 0 ? 'border-t border-hairline' : ''}>
               <Link
                 href="/dashboard/system"
-                className="group flex items-start gap-4 px-5 py-3.5 transition-colors duration-150 ease-out hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal-600"
+                className="group flex items-start gap-3 px-4 py-2.5 transition-colors duration-120 ease-out hover:bg-action-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action"
               >
                 <span className="mt-1.5">
                   <StatusLamp
@@ -227,26 +232,26 @@ function WorstFirst({ rows }: { rows: GroupedRow[] }) {
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink-900">
+                  <span className="block truncate text-sm font-medium text-text">
                     {row.errorName}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs text-panel-500">
+                  <span className="mt-0.5 block truncate text-xs text-text-muted">
                     {row.message}
                   </span>
                 </span>
                 {row.route && (
-                  <span className="hidden flex-shrink-0 font-mono text-2xs text-panel-500 sm:block">
+                  <span className="hidden flex-shrink-0 font-mono text-2xs text-text-muted sm:block">
                     {row.route}
                   </span>
                 )}
                 <span
                   data-numeric
-                  className="flex-shrink-0 rounded-full bg-panel-100 px-2 py-0.5 text-2xs font-semibold text-panel-700"
+                  className="flex-shrink-0 border border-hairline px-1.5 py-0.5 font-mono text-2xs text-text-secondary"
                 >
                   &times;{row.count}
                 </span>
-                <span className="hidden flex-shrink-0 text-2xs text-panel-500 md:block">
-                  {timeAgo(row.lastSeen)}
+                <span className="hidden flex-shrink-0 text-2xs text-text-muted md:block">
+                  {timeAgo(row.lastSeen, now)}
                 </span>
               </Link>
             </li>
@@ -260,14 +265,14 @@ function WorstFirst({ rows }: { rows: GroupedRow[] }) {
 function Skeleton() {
   return (
     <div aria-hidden>
-      <div className="mb-6 h-8 w-56 animate-pulse rounded bg-panel-200" />
-      <div className="mb-7 h-[5.5rem] animate-pulse rounded-xl bg-panel-200" />
-      <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-6 h-8 w-56 animate-pulse bg-panel-200" />
+      <div className="mb-7 h-[5.5rem] animate-pulse bg-panel-200" />
+      <div className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-28 animate-pulse rounded-xl bg-panel-200" />
+          <div key={i} className="h-24 animate-pulse bg-panel-200" />
         ))}
       </div>
-      <div className="h-56 animate-pulse rounded-xl bg-panel-200" />
+      <div className="h-56 animate-pulse bg-panel-200" />
     </div>
   );
 }
@@ -314,24 +319,24 @@ function ClientSignposts({ can }: { can: (permission: Permission) => boolean }) 
 
   return (
     <section aria-labelledby="signpost-heading" className="mb-7">
-      <h2 id="signpost-heading" className="mb-3 font-heading text-sm font-semibold text-ink-900">
-        Your account
-      </h2>
+      <h2 id="signpost-heading" className="label-instrument mb-3">Your account</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className="group flex items-start justify-between gap-3 rounded-xl border border-panel-200 bg-white px-5 py-4 transition-colors hover:border-panel-300 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="lift group block border border-hairline bg-surface-raised px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
           >
-            <span>
-              <span className="block font-heading text-sm font-semibold text-ink-900">{l.label}</span>
-              <span className="mt-1 block text-xs leading-relaxed text-panel-500">{l.blurb}</span>
+            <span className="flex items-start justify-between gap-3">
+              <span>
+                <span className="block font-heading text-base font-medium text-text">{l.label}</span>
+                <span className="mt-1 block text-xs text-text-muted">{l.blurb}</span>
+              </span>
+              <ArrowRight
+                className="mt-0.5 h-4 w-4 flex-shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5"
+                aria-hidden
+              />
             </span>
-            <ArrowRight
-              className="mt-0.5 h-4 w-4 flex-shrink-0 text-panel-400 transition-transform group-hover:translate-x-0.5"
-              aria-hidden
-            />
           </Link>
         ))}
       </div>
@@ -347,7 +352,9 @@ export default function DashboardPage() {
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const [, setClockTick] = useState(0);
+  // Drives WorstFirst's relative timestamps ("2m ago"). Reading Date.now()
+  // during render is impure, so the clock lives in state instead.
+  const [now, setNow] = useState(() => Date.now());
   const aliveRef = useRef(true);
 
   const canSeeSystem = can('system:read');
@@ -449,7 +456,7 @@ export default function DashboardPage() {
 
   // Re-render the staleness clock without refetching, so "2m ago" stays true.
   useEffect(() => {
-    const t = window.setInterval(() => setClockTick((n) => n + 1), 15_000);
+    const t = window.setInterval(() => setNow(Date.now()), 15_000);
     return () => window.clearInterval(t);
   }, []);
 
@@ -461,6 +468,7 @@ export default function DashboardPage() {
   return (
     <div className="animate-rise">
       <PageHeader
+        eyebrow="Platform console"
         title="Overview"
         description={
           isPlatform
@@ -481,7 +489,7 @@ export default function DashboardPage() {
       {failed ? (
         <div
           role="alert"
-          className="rounded-xl border border-lamp-bad-rim bg-lamp-bad-wash px-5 py-4 text-sm text-lamp-bad-ink"
+          className="border border-lamp-bad-rim bg-lamp-bad-wash px-5 py-4 text-sm text-lamp-bad-ink"
         >
           <p className="font-semibold">Performance figures did not load.</p>
           <p className="mt-1 text-xs leading-relaxed">
@@ -491,9 +499,7 @@ export default function DashboardPage() {
         </div>
       ) : overview ? (
         <section aria-labelledby="perf-heading" className="mb-7">
-          <h2 id="perf-heading" className="mb-3 font-heading text-sm font-semibold text-ink-900">
-            Last 30 days
-          </h2>
+          <h2 id="perf-heading" className="label-instrument mb-3">Last 30 days</h2>
           {/* No trend deltas: the analytics endpoint returns no prior-period
               figures, and inventing them would put fabricated numbers in front
               of an operator making real decisions. */}
@@ -513,7 +519,7 @@ export default function DashboardPage() {
           permission the sidebar uses, so nothing appears that would 403. */}
       {!isPlatform && <ClientSignposts can={can} />}
 
-      {health && <WorstFirst rows={health.worst} />}
+      {health && <WorstFirst rows={health.worst} now={now} />}
     </div>
   );
 }

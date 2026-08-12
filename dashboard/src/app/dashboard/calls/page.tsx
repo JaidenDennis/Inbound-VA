@@ -90,7 +90,7 @@ function CallsPageInner() {
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Calls' }]}
       />
 
-      <div className="mb-4 rounded-xl border border-panel-200 bg-white p-4">
+      <div className="mb-4 border border-panel-200 bg-surface-raised p-4">
         <label htmlFor="call-search" className="mb-1.5 block text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
           Search
         </label>
@@ -102,13 +102,13 @@ function CallsPageInner() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Phone number or status"
-            className="w-full rounded-md border border-panel-300 bg-white py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+            className="w-full border border-panel-300 bg-surface-raised py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
           />
         </div>
       </div>
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
@@ -124,7 +124,7 @@ function CallsPageInner() {
                 <tr key={i}>
                   {Array.from({ length: 6 }).map((__, j) => (
                     <td key={j} className="px-5 py-4">
-                      <div className="h-3.5 w-3/5 animate-pulse rounded bg-panel-200" />
+                      <div className="h-3.5 w-3/5 animate-pulse bg-panel-200" />
                     </td>
                   ))}
                 </tr>
@@ -182,7 +182,7 @@ function CallsPageInner() {
                     <TD align="right">
                       <Link
                         href={`/dashboard/calls/${c.id}`}
-                        className="rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                        className="px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                       >
                         View
                       </Link>
@@ -205,7 +205,7 @@ function CallsPageInner() {
 
 export default function CallsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <CallsPageInner />
     </Suspense>
   );

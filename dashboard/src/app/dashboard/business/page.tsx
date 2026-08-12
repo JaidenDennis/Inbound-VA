@@ -64,7 +64,7 @@ function Readiness({ data }: { data: ReadinessData }) {
   const complete = data.done === data.total;
 
   return (
-    <section className="mb-6 rounded-xl border border-panel-200 bg-panel-25 px-5 py-4">
+    <section className="mb-6 border border-panel-200 bg-panel-25 px-5 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-heading text-sm font-semibold text-ink-900">
           {complete ? 'Setup complete' : 'Finish setting up'}
@@ -162,16 +162,16 @@ function BusinessInner() {
         title="Business"
         description="What your agent is worth, where it struggles, and what your callers are asking for."
         action={
-          <div className="flex gap-1 rounded-lg border border-panel-200 bg-white p-1">
+          <div className="flex gap-1 border border-panel-200 bg-surface-raised p-1">
             {RANGES.map((r) => (
               <button
                 key={r.key}
                 type="button"
                 onClick={() => setRange(r.key)}
                 aria-pressed={range === r.key}
-                className={`cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 ${
-                  range === r.key ? 'bg-panel-100 text-ink-900' : 'text-panel-600 hover:bg-panel-50'
-                }`}
+                className={`cursor-pointer px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 ${
+ range === r.key ? 'bg-panel-100 text-ink-900' : 'text-panel-600 hover:bg-panel-50'
+ }`}
               >
                 {r.label}
               </button>
@@ -183,19 +183,19 @@ function BusinessInner() {
       <ClientPicker label="Figures for" />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
 
       {!ready ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : needsChoice || !clientId ? (
         <ChooseClientPrompt what="Business figures" />
       ) : loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-28 animate-pulse rounded-xl bg-panel-100" />
+            <div key={i} className="h-28 animate-pulse bg-panel-100" />
           ))}
         </div>
       ) : (
@@ -229,7 +229,7 @@ function BusinessInner() {
 
 export default function BusinessPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <BusinessInner />
     </Suspense>
   );

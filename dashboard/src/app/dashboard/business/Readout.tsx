@@ -35,7 +35,7 @@ export function Readout({
   const measured = value !== null && value !== undefined;
 
   return (
-    <div className="rounded-xl border border-panel-200 bg-white px-5 py-4">
+    <div className="border border-panel-200 bg-surface-raised px-5 py-4">
       <p className="truncate text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
         {label}
       </p>
@@ -132,7 +132,7 @@ export function Cluster({
 /** An empty state that explains itself rather than showing an empty box. */
 export function NothingYet({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-panel-300 bg-panel-25 px-5 py-8 text-center text-sm leading-relaxed text-panel-500">
+    <div className="border border-dashed border-panel-300 bg-panel-25 px-5 py-8 text-center text-sm leading-relaxed text-panel-500">
       {children}
     </div>
   );

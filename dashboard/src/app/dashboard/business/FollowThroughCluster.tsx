@@ -40,7 +40,7 @@ function Stage({ label, value, of, note }: { label: string; value: number; of: n
   const percent = of > 0 ? Math.round((value / of) * 1000) / 10 : null;
 
   return (
-    <div className="rounded-xl border border-panel-200 bg-white px-5 py-4">
+    <div className="border border-panel-200 bg-surface-raised px-5 py-4">
       <p className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">{label}</p>
       <p data-numeric className="mt-2.5 font-heading text-3xl font-semibold tracking-[-0.022em] text-ink-900">
         {value}

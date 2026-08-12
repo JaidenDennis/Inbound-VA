@@ -2,21 +2,180 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   THE TOKEN LAYER — the only place raw hex may appear.
+   Values are from gravvia-site/assets/site.css.
+
+   Solid colours are RGB triplets so Tailwind's `<alpha-value>`
+   opacity modifiers keep working. Alpha-composited rgba() is
+   used only where no opacity modifier is ever applied.
+   ============================================================ */
+:root {
+  color-scheme: light;
+
+  /* Brand constants — identical in both themes */
+  --bone-rgb:      240 240 238;
+  --ink-rgb:         3   3   3;
+  --cobalt-rgb:     29  79 216;
+  --cobalt-lt-rgb: 138 164 255;
+
+  /* Neutral ramp: bone → ink. Inverted in the dark block. */
+  --n-25-rgb:  250 250 249;
+  --n-50-rgb:  244 244 242;
+  --n-100-rgb: 233 233 230;
+  --n-200-rgb: 216 216 212;
+  --n-300-rgb: 188 188 184;
+  --n-400-rgb: 147 147 143;
+  --n-500-rgb: 110 110 106;
+  --n-600-rgb:  84  84  81;
+  --n-700-rgb:  65  65  62;
+  --n-800-rgb:  43  43  41;
+  --n-900-rgb:  26  26  25;
+  --n-950-rgb:  14  14  13;
+
+  /* Surfaces */
+  --surface-rgb:            var(--bone-rgb);
+  --surface-raised-rgb:     251 251 250;
+  --surface-inset-rgb:      232 232 229;
+  /* The dark panel. Deliberately dark in BOTH themes — bone body
+     beside a #030303 panel is the site's actual composition. */
+  --surface-dark-rgb:         3   3   3;
+  --surface-dark-inset-rgb:  12  12  12;
+
+  /* Text */
+  --text-rgb:            var(--ink-rgb);
+  --text-secondary: rgba(3, 3, 3, .70);
+  --text-muted:     rgba(3, 3, 3, .55);
+  --text-faint:     rgba(3, 3, 3, .40);
+  /* On the dark panel, in both themes */
+  --text-on-dark:           rgba(240, 240, 238, 1);
+  --text-on-dark-secondary: rgba(240, 240, 238, .60);
+  --text-on-dark-muted:     rgba(240, 240, 238, .55);
+
+  /* Rules */
+  --hairline: rgba(3, 3, 3, .12);
+  --rule:     rgba(3, 3, 3, .22);
+  --edge-rgb: var(--ink-rgb);
+
+  /* A light tint on a surface that is dark in BOTH themes (the nav rail).
+     Identical in both blocks on purpose — see [data-theme='dark']. */
+  --tint-on-dark-rgb: 255 255 255;
+
+  /* Action */
+  --action-rgb:          var(--cobalt-rgb);
+  --action-hover-rgb:    23  67 184;
+  --action-contrast-rgb: var(--bone-rgb);
+  --action-wash:   rgba(29, 79, 216, .06);
+  --action-wash-2: rgba(29, 79, 216, .10);
+  --action-rim:    rgba(29, 79, 216, .35);
+  /* A permanently-light cobalt for surfaces that are dark in BOTH themes
+     (the nav rail). Same value in both blocks, following --tint-on-dark-rgb. */
+  --action-on-dark-rgb: var(--cobalt-lt-rgb);
+
+  /* Scrim behind floating layers */
+  --scrim: rgba(3, 3, 3, .55);
+
+  /* Lamps. Cores are lit lenses and never change between themes. */
+  --lamp-good-rgb: 31 163  95;
+  --lamp-fair-rgb: 224 146  26;
+  --lamp-bad-rgb:  220  59  48;
+  --lamp-good-ink-rgb: 14 112  66;
+  --lamp-fair-ink-rgb: 138  86   0;
+  --lamp-bad-ink-rgb:  168  30  23;
+  --lamp-good-wash: #E6F5EC;
+  --lamp-fair-wash: #FCF2E0;
+  --lamp-bad-wash:  #FCEBEA;
+  --lamp-good-rim:  #B4DFC6;
+  --lamp-fair-rim:  #EFD5A6;
+  --lamp-bad-rim:   #F0BDB8;
+  --lamp-off-rgb:      194 200 200;
+  --lamp-off-ink-rgb:  147 157 157;
+  --lamp-glow: 0.32;
+
+  /* A permanently-light red for text on a surface that is dark in BOTH
+     themes (the nav rail). Same value in both blocks. */
+  --lamp-bad-on-dark-rgb: 240 121 111;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Neutral ramp inverted: 25 is now the darkest. */
+  --n-25-rgb:   10  10  10;
+  --n-50-rgb:   14  14  13;
+  --n-100-rgb:  26  26  25;
+  --n-200-rgb:  43  43  41;
+  --n-300-rgb:  65  65  62;
+  --n-400-rgb: 110 110 106;
+  --n-500-rgb: 147 147 143;
+  --n-600-rgb: 188 188 184;
+  --n-700-rgb: 216 216 212;
+  --n-800-rgb: 233 233 230;
+  --n-900-rgb: 244 244 242;
+  --n-950-rgb: var(--bone-rgb);
+
+  --surface-rgb:            var(--ink-rgb);
+  --surface-raised-rgb:      20  20  20;
+  --surface-inset-rgb:        0   0   0;
+  --surface-dark-rgb:        12  12  12;
+  --surface-dark-inset-rgb:  28  28  28;
+
+  --text-rgb:       var(--bone-rgb);
+  --text-secondary: rgba(240, 240, 238, .75);
+  --text-muted:     rgba(240, 240, 238, .60);
+  --text-faint:     rgba(240, 240, 238, .40);
+
+  --hairline: rgba(240, 240, 238, .12);
+  --rule:     rgba(240, 240, 238, .22);
+  --edge-rgb: 240 240 238;
+
+  /* Same value as :root — the rail stays dark in both themes. */
+  --tint-on-dark-rgb: 255 255 255;
+
+  --action-rgb:          var(--cobalt-lt-rgb);
+  --action-hover-rgb:   168 188 255;
+  --action-contrast-rgb: var(--ink-rgb);
+  --action-wash:   rgba(138, 164, 255, .08);
+  --action-wash-2: rgba(138, 164, 255, .14);
+  --action-rim:    rgba(138, 164, 255, .35);
+  /* Same value as :root — the rail stays dark in both themes. */
+  --action-on-dark-rgb: var(--cobalt-lt-rgb);
+
+  --scrim: rgba(0, 0, 0, .72);
+
+  /* Lamp cores hold. The text weights lighten so they clear 4.5:1
+     on #030303, and the washes become dark tints instead of glowing. */
+  --lamp-good-ink-rgb:  86 209 142;
+  --lamp-fair-ink-rgb: 240 182  87;
+  --lamp-bad-ink-rgb:  240 121 111;
+  --lamp-good-wash: rgba(31, 163, 95, .12);
+  --lamp-fair-wash: rgba(224, 146, 26, .12);
+  --lamp-bad-wash:  rgba(220, 59, 48, .12);
+  --lamp-good-rim:  rgba(31, 163, 95, .32);
+  --lamp-fair-rim:  rgba(224, 146, 26, .32);
+  --lamp-bad-rim:   rgba(220, 59, 48, .32);
+  --lamp-off-rgb:      58  58  56;
+  --lamp-off-ink-rgb: 110 110 106;
+  --lamp-glow: 0.55;
+
+  /* Same value as :root — the rail stays dark in both themes. */
+  --lamp-bad-on-dark-rgb: 240 121 111;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
   }
 
+  body { @apply bg-surface text-text; }
   body {
-    @apply bg-panel-50 text-ink-800;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  * {
-    @apply border-panel-200;
-  }
+  /* the blanket border default */
+  * { border-color: var(--hairline); }
 
   /* Headings set face and weight but deliberately NOT colour. A blanket
      heading colour here silently overrides the inherited colour on every dark
@@ -39,69 +198,66 @@
      The parts we did not draw still carry the design. Left at their defaults
      these belong to no design system and quietly cheapen the whole panel. */
 
-  ::selection {
-    background-color: theme('colors.signal.200');
-    color: theme('colors.signal.900');
-  }
+  ::selection { background-color: var(--action-wash-2); color: rgb(var(--text-rgb)); }
 
-  :root {
-    caret-color: theme('colors.signal.600');
-    accent-color: theme('colors.signal.600');
-    color-scheme: light;
-  }
+  :root { caret-color: rgb(var(--action-rgb)); accent-color: rgb(var(--action-rgb)); }
+  /* NOTE: `color-scheme` is now set per-theme in the token blocks —
+     remove it from here so the dark block can win. */
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: theme('colors.panel.300') transparent;
+    scrollbar-color: rgb(var(--n-300-rgb)) transparent;
   }
   *::-webkit-scrollbar { width: 11px; height: 11px; }
   *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb {
-    background-color: theme('colors.panel.300');
+    background-color: rgb(var(--n-300-rgb));
     border-radius: 9999px;
     border: 3px solid transparent;
     background-clip: content-box;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background-color: theme('colors.panel.400');
+    background-color: rgb(var(--n-400-rgb));
     background-clip: content-box;
   }
 
   :focus-visible {
-    outline: 2px solid theme('colors.signal.600');
+    outline: 2px solid rgb(var(--action-rgb));
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 0;            /* was 4px */
   }
 
   a { text-underline-offset: 0.18em; text-decoration-thickness: from-font; }
 
   /* Placeholder must clear 4.5:1 on white, which panel-400 does and the
      browser default grey does not. */
-  ::placeholder { color: theme('colors.panel.500'); opacity: 1; }
+  ::placeholder { color: var(--text-muted); opacity: 1; }
 }
 
 @layer components {
-  /* Elevation is declared once. Cards are hairline-bordered surfaces with no
-     shadow; the 1px-border-under-soft-shadow "ghost card" is not used here.
-     Shadow is reserved for layers that genuinely float (drawer, toast, menu). */
+  /* Elevation is declared once: hairline OR hard offset, never both,
+     and never a blurred shadow. */
   .card {
-    @apply rounded-xl border border-panel-200 bg-white;
+    @apply border bg-surface-raised;
+    border-color: var(--hairline);
   }
 
-  /* A machined surface: the faint top highlight a lit panel face catches. */
-  .card-seated {
-    @apply rounded-xl border border-panel-200 bg-white;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  /* The outermost container edge — the site's `.device` treatment. */
+  .card-edge {
+    @apply border bg-surface-raised;
+    border-color: rgb(var(--edge-rgb));
   }
 
-  /* Small instrument label. Used for column heads and field labels only —
-     never as an eyebrow above a page heading. */
+  /* Small instrument label. Mono, per the transplant — this now IS
+     used as an eyebrow above page headings, reversing the previous
+     rule. See spec section 2. */
   .label-instrument {
-    @apply text-2xs font-semibold uppercase text-panel-500;
-    letter-spacing: 0.07em;
+    @apply font-mono text-2xs uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text-muted);
   }
 
-  .hairline { @apply border-panel-200; }
+  .hairline { border-color: var(--hairline); }
 }
 
 @layer utilities {
@@ -111,6 +267,21 @@
   @keyframes rise {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* The physical press the hard shadow implies. Hover lifts the card
+     and the cobalt offset appears beneath it; press collapses it. */
+  .lift {
+    transition: transform 150ms cubic-bezier(.16, 1, .3, 1),
+                box-shadow 150ms cubic-bezier(.16, 1, .3, 1);
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 0 0 rgb(var(--action-rgb));
+  }
+  .lift:active {
+    transform: translateY(0);
+    box-shadow: 2px 2px 0 0 rgb(var(--action-rgb));
   }
 
   /* Reduced motion removes travel and looping, NOT feedback.
@@ -125,6 +296,7 @@
     .animate-sweep {
       animation: none !important;
     }
+    .lift:hover, .lift:active { transform: none; }
     *, *::before, *::after {
       scroll-behavior: auto !important;
     }
@@ -138,36 +310,25 @@
 }
 
 /* ============================================================
-   Data-visualisation tokens
-   ------------------------------------------------------------
-   Charts read colour by role, never raw hex, so the surface can
-   swap in one place.
+   Data-visualisation tokens.
 
-   Series hues were re-picked for the supervisory-panel world:
-   the previous blue/orange pair put a series colour inside the
-   amber lamp's hue range, which let a chart line read as a
-   status. Teal and mulberry sit far from all three lamp hues and
-   separate on the blue-yellow axis, so they hold under
-   deuteranopia and protanopia.
-
-   NOTE: these two slots have NOT been re-run through the
-   numeric CVD/contrast gate that validated the previous pair.
-   They are reasoned, not measured. Re-validate before adding a
-   third categorical slot.
+   Series identity is cobalt + ink at stepped opacity, separated
+   by fill texture, not by a second hue. The site is a
+   cobalt-and-ink binary and has no third colour; inventing one
+   risks landing near a lamp. This is also CVD-safe by
+   construction — luminance and texture carry identity — which
+   retires the numeric CVD gate the previous teal/mulberry pair
+   was never run through.
    ============================================================ */
 .viz-root {
-  color-scheme: light;
-  --surface-1: #ffffff;
-  --text-secondary: #545D5D;
-  --text-muted: #939D9D;
-  --gridline: #E9ECEC;
-  --baseline: #BCC4C4;
-  --series-1: #1E7A90;
-  --series-2: #9B4D93;
+  --surface-1:      rgb(var(--surface-raised-rgb));
+  --gridline:       var(--hairline);
+  --baseline:       var(--rule);
+  --series-1:       rgb(var(--action-rgb));
+  --series-2:       var(--text-muted);
 }
 
-/* Recharts suppresses the default focus ring on its SVG surface. */
 .viz-root .recharts-surface:focus-visible {
-  outline: 2px solid var(--series-1);
+  outline: 2px solid rgb(var(--action-rgb));
   outline-offset: 2px;
 }

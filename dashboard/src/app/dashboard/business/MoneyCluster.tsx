@@ -90,7 +90,7 @@ export function MoneyCluster({ data }: { data: MoneyData | null }) {
           revenue and averaging over-reports it; showing the count is what gets
           the service names fixed. */}
       {data.unmatchedAppointments > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm leading-relaxed text-lamp-fair-ink">
+        <div className="flex items-start gap-2 border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm leading-relaxed text-lamp-fair-ink">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
           <p>
             <span data-numeric className="font-semibold">{data.unmatchedAppointments}</span>{' '}

@@ -18,7 +18,7 @@ interface Pipeline { id: string; name: string; stages: Array<{ id: string; name:
 interface Calendar { id: string; name: string }
 
 const selectCls =
-  'mt-1 w-full cursor-pointer rounded-md border border-panel-300 bg-white px-2.5 py-2 text-sm text-ink-900 ' +
+  'mt-1 w-full cursor-pointer border border-panel-300 bg-surface-raised px-2.5 py-2 text-sm text-ink-900 ' +
   'transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 ' +
   'focus:ring-signal-600/25 disabled:cursor-not-allowed disabled:bg-panel-50 disabled:text-panel-400';
 
@@ -76,7 +76,7 @@ export function GhlSettingsPanel({ clientId, canWrite }: { clientId: string; can
 
   const stages = pipelines.find((p) => p.id === pipelineId)?.stages ?? [];
 
-  if (loading) return <div className="mt-4 h-24 animate-pulse rounded-lg bg-panel-100" />;
+  if (loading) return <div className="mt-4 h-24 animate-pulse bg-panel-100" />;
 
   return (
     <div className="mt-4 border-t border-panel-200 pt-4">
@@ -132,7 +132,7 @@ export function GhlSettingsPanel({ clientId, canWrite }: { clientId: string; can
             type="button"
             onClick={save}
             disabled={saving}
-            className="cursor-pointer rounded-md bg-ink-800 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="cursor-pointer bg-action px-3.5 py-2 text-xs font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save settings'}
           </button>

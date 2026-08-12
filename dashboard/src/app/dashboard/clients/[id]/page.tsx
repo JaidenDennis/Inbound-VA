@@ -45,7 +45,7 @@ interface ClientDetail {
 const STATUSES = ['active', 'inactive', 'suspended'] as const;
 
 const inputCls =
-  'w-full rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 ' +
+  'w-full border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 ' +
   'placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 ' +
   'focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 ' +
   'disabled:cursor-not-allowed disabled:bg-panel-50 disabled:text-panel-500';
@@ -77,7 +77,7 @@ function JumpCard({ href, icon: Icon, title, body }: { href: string; icon: typeo
   return (
     <Link
       href={href}
-      className="group flex items-start gap-3 rounded-xl border border-panel-200 bg-white p-4 transition-colors duration-150 hover:border-panel-300 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+      className="group flex items-start gap-3 border border-panel-200 bg-surface-raised p-4 transition-colors duration-150 hover:border-panel-300 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
     >
       <Icon className="mt-0.5 h-5 w-5 flex-shrink-0 text-panel-500 transition-colors group-hover:text-ink-700" aria-hidden strokeWidth={1.75} />
       <div className="min-w-0">
@@ -158,18 +158,18 @@ export default function ClientDetailPage() {
     }
   };
 
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-64 animate-pulse bg-panel-100" />;
   if (!client) {
     return (
-      <div role="alert" className="rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+      <div role="alert" className="border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
         That client could not be found.
       </div>
     );
   }
 
   const saveButtonCls =
-    'flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white ' +
-    'transition-colors duration-150 hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 ' +
+    'flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] ' +
+    'transition-colors duration-150 hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 ' +
     'focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
@@ -216,7 +216,7 @@ export default function ClientDetailPage() {
         />
       </div>
 
-      <section className="mb-6 rounded-xl border border-panel-200 bg-white">
+      <section className="mb-6 border border-panel-200 bg-surface-raised">
         <h2 className="border-b border-panel-200 px-6 py-4 font-heading text-sm font-semibold text-ink-900">
           Business
         </h2>
@@ -248,7 +248,7 @@ export default function ClientDetailPage() {
             </select>
           </Field>
           {status !== 'active' && (
-            <p className="rounded-lg border border-lamp-fair-rim bg-lamp-fair-wash px-3 py-2 text-xs text-lamp-fair-ink">
+            <p className="border border-lamp-fair-rim bg-lamp-fair-wash px-3 py-2 text-xs text-lamp-fair-ink">
               A non-active client is not matched to inbound calls. Callers reach no agent.
             </p>
           )}
@@ -262,7 +262,7 @@ export default function ClientDetailPage() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-panel-200 bg-white">
+      <section className="border border-panel-200 bg-surface-raised">
         <h2 className="border-b border-panel-200 px-6 py-4 font-heading text-sm font-semibold text-ink-900">
           Operations
         </h2>
@@ -274,7 +274,7 @@ export default function ClientDetailPage() {
               disabled={!canWrite}
               checked={bookingEnabled}
               onChange={(e) => setBookingEnabled(e.target.checked)}
-              className="mt-0.5 h-4 w-4 cursor-pointer rounded border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
+              className="mt-0.5 h-4 w-4 cursor-pointer border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
             />
             <label htmlFor="booking_enabled" className="cursor-pointer">
               <span className="block text-sm font-medium text-ink-800">Booking enabled</span>

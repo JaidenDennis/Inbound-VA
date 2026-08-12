@@ -60,9 +60,9 @@ export function Hint({
         aria-label={`What does ${term} mean?`}
         className={clsx(
           'inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full',
-          'text-panel-400 transition-colors duration-150 hover:text-ink-700',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600',
-          open && 'text-ink-800'
+          'text-text-faint transition-colors duration-150 hover:text-text-secondary',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
+          open && 'text-text'
         )}
       >
         <HelpCircle className="h-3.5 w-3.5" aria-hidden strokeWidth={1.75} />
@@ -76,8 +76,8 @@ export function Hint({
         className={clsx(
           open
             ? [
-                'absolute top-6 z-30 w-64 rounded-xl border border-panel-200 bg-white p-3',
-                'text-xs font-normal normal-case leading-relaxed tracking-normal text-panel-700 shadow-lg',
+                'absolute top-6 z-30 w-64 border border-hairline bg-surface-raised p-3',
+                'text-xs font-normal normal-case leading-relaxed tracking-normal text-text shadow-lg',
                 align === 'right' ? 'right-0' : 'left-0',
               ]
             : 'sr-only'

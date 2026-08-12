@@ -72,7 +72,7 @@ export default function StaffOnboardingDetail() {
     }
   };
 
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-64 animate-pulse bg-panel-100" />;
 
   const done = milestones.filter((m) => m.status === 'complete').length;
 
@@ -87,7 +87,7 @@ export default function StaffOnboardingDetail() {
         ]}
       />
 
-      <section className="mb-8 rounded-xl border border-panel-200 bg-white">
+      <section className="mb-8 border border-panel-200 bg-surface-raised">
         <h2 className="border-b border-panel-200 px-5 py-3.5 font-heading text-sm font-semibold text-ink-900">
           Launch stages
         </h2>
@@ -97,8 +97,8 @@ export default function StaffOnboardingDetail() {
               <div className="flex min-w-0 items-center gap-3">
                 <span
                   className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${
-                    m.status === 'complete' ? 'bg-lamp-good' : m.status === 'in_progress' ? 'bg-ink-700' : 'bg-panel-300'
-                  }`}
+ m.status === 'complete' ? 'bg-lamp-good' : m.status === 'in_progress' ? 'bg-ink-700' : 'bg-panel-300'
+ }`}
                   aria-hidden
                 >
                   {m.status === 'complete' && <Check className="h-3 w-3 text-white" />}
@@ -112,7 +112,7 @@ export default function StaffOnboardingDetail() {
                   <select
                     value={m.status}
                     onChange={(e) => setStage(m.stage_key, e.target.value as OnboardingStatus)}
-                    className="cursor-pointer rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-xs text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+                    className="cursor-pointer border border-panel-300 bg-surface-raised px-2.5 py-1.5 text-xs text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
                   >
                     {ONBOARDING_STATUSES.map((s) => (
                       <option key={s} value={s}>{STATUS_LABEL[s]}</option>
@@ -130,7 +130,7 @@ export default function StaffOnboardingDetail() {
         </ul>
       </section>
 
-      <section className="rounded-xl border border-panel-200 bg-white">
+      <section className="border border-panel-200 bg-surface-raised">
         <h2 className="border-b border-panel-200 px-5 py-3.5 font-heading text-sm font-semibold text-ink-900">
           Waiting on the client
         </h2>
@@ -167,13 +167,13 @@ export default function StaffOnboardingDetail() {
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }}
               placeholder="Something the client needs to send or decide"
-              className="flex-1 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+              className="flex-1 border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
             />
             <button
               type="button"
               onClick={addItem}
               disabled={adding || !newTitle.trim()}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-ink-800 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex cursor-pointer items-center gap-1.5 bg-action px-3.5 py-2 text-sm font-medium text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus className="h-4 w-4" aria-hidden /> Add
             </button>

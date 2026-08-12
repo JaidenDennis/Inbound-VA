@@ -95,7 +95,7 @@ export default function SettingsPage() {
                       onClick={() => retryJob(job)}
                       disabled={retrying === job.id}
                       aria-label={`Retry ${job.queue_name} job`}
-                      className="cursor-pointer whitespace-nowrap rounded px-1.5 py-1 text-xs font-medium text-signal-700 underline decoration-signal-300 underline-offset-2 transition-colors hover:text-signal-800 hover:decoration-signal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="cursor-pointer whitespace-nowrap px-1.5 py-1 text-xs font-medium text-signal-700 underline decoration-signal-300 underline-offset-2 transition-colors hover:text-signal-800 hover:decoration-signal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {retrying === job.id ? 'Retrying…' : 'Retry'}
                     </button>

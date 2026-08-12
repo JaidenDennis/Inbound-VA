@@ -31,7 +31,7 @@ export function ChartCard({
   const [showTable, setShowTable] = useState(false);
 
   return (
-    <section className="viz-root rounded-xl border border-gray-200 bg-white p-5">
+    <section className="viz-root border border-gray-200 bg-surface-raised p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="font-heading text-base font-semibold text-gray-900">{title}</h2>
@@ -44,7 +44,7 @@ export function ChartCard({
               type="button"
               onClick={() => setShowTable((s) => !s)}
               aria-pressed={showTable}
-              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex cursor-pointer items-center gap-1.5 border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <Table2 className="h-3.5 w-3.5" aria-hidden />
               {showTable ? 'Show chart' : 'Show data'}

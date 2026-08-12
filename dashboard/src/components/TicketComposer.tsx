@@ -76,21 +76,21 @@ export function TicketComposer({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+        className="mb-4 flex cursor-pointer items-center gap-2 border border-rule bg-surface-raised px-3.5 py-2 text-sm font-medium text-text transition-colors hover:border-action hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
       >
-        <Sparkles className="h-4 w-4 text-panel-500" aria-hidden />
+        <Sparkles className="h-4 w-4 text-text-muted" aria-hidden />
         Describe it and I&apos;ll write the ticket
       </button>
     );
   }
 
   return (
-    <section className="mb-4 rounded-xl border border-panel-200 bg-white">
-      <div className="border-b border-panel-200 px-5 py-3.5">
-        <h2 className="flex items-center gap-2 font-heading text-sm font-semibold text-ink-900">
-          <Sparkles className="h-4 w-4 text-panel-500" aria-hidden /> Describe the problem
+    <section className="mb-4 border border-hairline bg-surface-raised">
+      <div className="border-b border-hairline px-5 py-3.5">
+        <h2 className="flex items-center gap-2 font-heading text-sm font-semibold text-text">
+          <Sparkles className="h-4 w-4 text-text-muted" aria-hidden /> Describe the problem
         </h2>
-        <p className="mt-0.5 text-xs text-panel-500">
+        <p className="mt-0.5 text-xs text-text-muted">
           Say what you noticed in your own words. I&apos;ll add the technical detail from your
           account.
         </p>
@@ -104,7 +104,7 @@ export function TicketComposer({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="e.g. People say they call and it just rings, but the dashboard shows my agent is live"
-          className="w-full resize-y rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+          className="w-full resize-y border border-rule bg-surface-raised px-3 py-2 text-sm text-text placeholder:text-text-faint transition-colors hover:border-action focus:border-action focus:outline-none focus:ring-2 focus:ring-action/25"
         />
 
         <div className="flex flex-wrap gap-2">
@@ -112,14 +112,14 @@ export function TicketComposer({
             type="button"
             onClick={generate}
             disabled={loading}
-            className="cursor-pointer rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="cursor-pointer border border-action bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors duration-150 hover:bg-transparent hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {loading ? 'Writing it up…' : 'Draft the ticket'}
           </button>
           <button
             type="button"
             onClick={() => { setOpen(false); setDraft(null); setError(''); }}
-            className="cursor-pointer rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="cursor-pointer border border-rule bg-surface-raised px-3.5 py-2 text-sm font-medium text-text transition-colors hover:border-action hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
           >
             Cancel
           </button>
@@ -128,11 +128,11 @@ export function TicketComposer({
         {error && <p role="alert" className="text-sm text-lamp-bad-ink">{error}</p>}
 
         {draft && (
-          <div className="space-y-3 rounded-lg border border-panel-200 bg-panel-25 p-4">
+          <div className="space-y-3 border border-hairline bg-surface-inset p-4">
             {/* Surfaced above the draft: if they can fix it in 30 seconds, they
                 should not be waiting on a support queue at all. */}
             {draft.self_serve_fix && (
-              <div className="flex items-start gap-2 rounded-lg border border-lamp-good-rim bg-lamp-good-wash px-3 py-2.5">
+              <div className="flex items-start gap-2 border border-lamp-good-rim bg-lamp-good-wash px-3 py-2.5">
                 <Lightbulb className="mt-0.5 h-4 w-4 flex-shrink-0 text-lamp-good-ink" aria-hidden />
                 <div>
                   <p className="text-xs font-semibold text-lamp-good-ink">You might be able to fix this yourself</p>
@@ -142,31 +142,31 @@ export function TicketComposer({
             )}
 
             <div>
-              <p className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">Subject</p>
-              <p className="mt-0.5 text-sm font-medium text-ink-900">{draft.subject}</p>
+              <p className="font-mono text-2xs uppercase tracking-[0.16em] text-text-muted">Subject</p>
+              <p className="mt-0.5 text-sm font-medium text-text">{draft.subject}</p>
             </div>
             <div>
-              <p className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">Details</p>
-              <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-ink-800">{draft.body}</p>
+              <p className="font-mono text-2xs uppercase tracking-[0.16em] text-text-muted">Details</p>
+              <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-text">{draft.body}</p>
             </div>
-            <div className="flex flex-wrap gap-4 text-xs text-panel-600">
-              <span>Priority: <strong className="text-ink-800">{draft.priority}</strong></span>
-              <span>Category: <strong className="text-ink-800">{draft.category.replace(/_/g, ' ')}</strong></span>
+            <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
+              <span>Priority: <strong className="text-text">{draft.priority}</strong></span>
+              <span>Category: <strong className="text-text">{draft.category.replace(/_/g, ' ')}</strong></span>
             </div>
             {draft.likely_cause && (
-              <p className="text-xs leading-relaxed text-panel-600">
-                <span className="font-medium text-panel-700">Likely cause:</span> {draft.likely_cause}
+              <p className="text-xs leading-relaxed text-text-secondary">
+                <span className="font-medium text-text">Likely cause:</span> {draft.likely_cause}
               </p>
             )}
 
             <button
               type="button"
               onClick={use}
-              className="cursor-pointer rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2"
+              className="cursor-pointer border border-action bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors duration-150 hover:bg-transparent hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2"
             >
               Use this draft
             </button>
-            <p className="text-2xs text-panel-500">
+            <p className="text-2xs text-text-muted">
               Fills the form below. Edit anything that isn&apos;t right before you send it.
             </p>
           </div>

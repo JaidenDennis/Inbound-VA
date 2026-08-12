@@ -11,9 +11,11 @@ import { severityTerm, REVIEW_STATE } from '@/lib/vocabulary';
 /**
  * The supervisory lamp.
  *
- * Green is good, amber is fair, red is bad — the whole product's chroma budget,
- * spent here and nowhere else. Because interactive affordance is achromatic, a
- * lit lamp on this surface always means state and never means "clickable".
+ * Green is good, amber is fair, red is bad. Cobalt is the other half of the
+ * product's chroma: it means "you can act on this" and never appears here —
+ * a lamp is state, not an affordance, and the two hues never cross. That
+ * boundary, not an achromatic UI, is what keeps a lit lamp from ever reading
+ * as "clickable".
  *
  * Colour is reinforcement, never the carrier. A lamp that appears without a
  * visible word carries an `sr-only` one, so the meaning survives greyscale
@@ -24,11 +26,36 @@ import { severityTerm, REVIEW_STATE } from '@/lib/vocabulary';
 
 export type LampLevel = 'good' | 'fair' | 'bad' | 'off';
 
+/**
+ * The lens reads from tokens so it follows the theme. Cores hold across
+ * both themes — a lit lamp is a lit lamp — while the glow alpha lifts in
+ * dark mode, where a 30% halo on near-black is invisible.
+ */
 const LENS: Record<LampLevel, { core: string; rim: string; glow: string; word: string }> = {
-  good: { core: '#1FA35F', rim: '#0E7042', glow: 'rgba(31, 163, 95, 0.30)', word: 'Good' },
-  fair: { core: '#E0921A', rim: '#8A5600', glow: 'rgba(224, 146, 26, 0.32)', word: 'Fair' },
-  bad:  { core: '#DC3B30', rim: '#A81E17', glow: 'rgba(220, 59, 48, 0.34)',  word: 'Bad'  },
-  off:  { core: '#C2C8C8', rim: '#939D9D', glow: 'rgba(0, 0, 0, 0)',          word: 'No signal' },
+  good: {
+    core: 'rgb(var(--lamp-good-rgb))',
+    rim: 'rgb(var(--lamp-good-ink-rgb))',
+    glow: 'rgb(var(--lamp-good-rgb) / var(--lamp-glow))',
+    word: 'Good',
+  },
+  fair: {
+    core: 'rgb(var(--lamp-fair-rgb))',
+    rim: 'rgb(var(--lamp-fair-ink-rgb))',
+    glow: 'rgb(var(--lamp-fair-rgb) / var(--lamp-glow))',
+    word: 'Fair',
+  },
+  bad: {
+    core: 'rgb(var(--lamp-bad-rgb))',
+    rim: 'rgb(var(--lamp-bad-ink-rgb))',
+    glow: 'rgb(var(--lamp-bad-rgb) / var(--lamp-glow))',
+    word: 'Bad',
+  },
+  off: {
+    core: 'rgb(var(--lamp-off-rgb))',
+    rim: 'rgb(var(--lamp-off-ink-rgb))',
+    glow: 'transparent',
+    word: 'No signal',
+  },
 };
 
 const SIZES = { sm: 8, md: 11, lg: 16 } as const;
@@ -79,7 +106,7 @@ export function StatusLamp({
           width: px,
           height: px,
           background: unlit
-            ? `radial-gradient(circle at 32% 28%, #EDEFEF 0%, ${lens.core} 62%)`
+            ? `radial-gradient(circle at 32% 28%, rgb(var(--n-100-rgb)) 0%, ${lens.core} 62%)`
             : `radial-gradient(circle at 32% 28%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.28) 22%, ${lens.core} 58%)`,
           boxShadow: `inset 0 0 0 1px ${lens.rim}`,
         }}
@@ -104,7 +131,7 @@ const SEATED: Record<LampLevel, string> = {
   good: 'bg-lamp-good-wash border-lamp-good-rim',
   fair: 'bg-lamp-fair-wash border-lamp-fair-rim',
   bad: 'bg-lamp-bad-wash border-lamp-bad-rim',
-  off: 'bg-panel-100 border-panel-200',
+  off: 'bg-panel-100 border-hairline',
 };
 
 export function LampStatus({
@@ -126,9 +153,9 @@ export function LampStatus({
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium',
+        'inline-flex items-center gap-2 whitespace-nowrap font-mono text-2xs uppercase tracking-[0.14em]',
         TEXT[level],
-        seated && ['rounded-full border px-2.5 py-1', SEATED[level]],
+        seated && ['border px-2.5 py-1', SEATED[level]],
         className
       )}
     >

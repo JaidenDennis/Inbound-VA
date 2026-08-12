@@ -55,7 +55,7 @@ export function Insights({ clientId, from, to }: { clientId: string; from: strin
 
   useEffect(load, [load]);
 
-  if (loading) return <div className="h-24 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-24 animate-pulse bg-panel-100" />;
   if (!data) return null;
 
   return (
@@ -73,11 +73,11 @@ export function Insights({ clientId, from, to }: { clientId: string; from: strin
       ) : (
         <ul className="space-y-2">
           {data.insights.map((insight, i) => (
-            <li key={i} className="rounded-xl border border-panel-200 bg-white px-4 py-3">
+            <li key={i} className="border border-panel-200 bg-surface-raised px-4 py-3">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-sm font-medium text-ink-900">{insight.headline}</span>
                 {insight.severity === 'act' && (
-                  <span className="rounded border border-lamp-fair-rim bg-lamp-fair-wash px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-lamp-fair-ink">
+                  <span className="border border-lamp-fair-rim bg-lamp-fair-wash px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-lamp-fair-ink">
                     Needs a decision
                   </span>
                 )}
@@ -92,7 +92,7 @@ export function Insights({ clientId, from, to }: { clientId: string; from: strin
                   <Link
                     key={id}
                     href={`/dashboard/reports?call=${id}`}
-                    className="rounded text-signal-600 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                    className="text-signal-600 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                   >
                     call {n + 1}
                   </Link>
@@ -160,7 +160,7 @@ export function ExportBar({ clientId, from, to }: { clientId: string; from: stri
             type="button"
             onClick={() => download(e.kind, e.label)}
             disabled={busy !== null}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Download className="h-3.5 w-3.5" aria-hidden />
             {busy === e.kind ? 'Preparing…' : e.label}

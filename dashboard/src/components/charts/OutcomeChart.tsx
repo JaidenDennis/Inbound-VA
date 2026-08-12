@@ -55,14 +55,14 @@ export function OutcomeChart({ data }: { data: OutcomePoint[] }) {
         <XAxis
           type="number"
           allowDecimals={false}
-          tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+          tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }}
           tickLine={false}
           axisLine={{ stroke: 'var(--baseline)' }}
         />
         <YAxis
           type="category"
           dataKey="label"
-          tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+          tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontFamily: 'var(--font-mono)' }}
           tickLine={false}
           axisLine={false}
           width={150}
@@ -72,15 +72,16 @@ export function OutcomeChart({ data }: { data: OutcomePoint[] }) {
           cursor={{ fill: 'var(--gridline)', fillOpacity: 0.4 }}
           contentStyle={{
             background: 'var(--surface-1)',
-            border: '1px solid var(--gridline)',
-            borderRadius: 8,
+            border: '1px solid var(--baseline)',
+            borderRadius: 0,
             fontSize: 12,
+            color: 'rgb(var(--text-rgb))',
           }}
           formatter={(value: number) => [value, 'Calls']}
         />
 
-        {/* 4px rounded data-end, square at the baseline; ≤24px thick. */}
-        <Bar dataKey="count" fill="var(--series-1)" barSize={20} radius={[0, 4, 4, 0]}>
+        {/* Square at both ends — bars are square in this world; no radius. */}
+        <Bar dataKey="count" fill="var(--series-1)" barSize={20}>
           {/* Value at the tip — six bars is few enough that every value fits
               outside the bar without collision, and it saves a second lookup. */}
           <LabelList

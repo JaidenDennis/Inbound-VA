@@ -1,84 +1,71 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * GRAVVIA ENGAGE — supervisory panel token layer.
+ * GRAVVIA ENGAGE — token bindings.
  *
- * The world is a precision instrument read in daylight, not a dark AI console.
- * Two rules govern every value below:
+ * This file contains NO colour values. Every colour resolves to a CSS
+ * custom property defined in src/app/globals.css, which is the single
+ * home for raw hex. That indirection is what makes dark mode one
+ * attribute on <html> instead of a `dark:` variant in 69 files.
  *
- *  1. CHROMA IS RESERVED FOR STATE. Green, amber, and red mean good, fair, and
- *     bad — nothing else on the surface is allowed to use them. Interactive
- *     affordance is therefore achromatic (ink), so a primary button can never
- *     be mistaken for a healthy row.
- *  2. NAMES ARE PRESERVED, VALUES ARE REPLACED. Legacy ramps (primary, navy,
- *     secondary, accent, brand, gray) keep their names so routes that were not
- *     hand-revised inherit the new world instead of rendering unstyled.
+ * Two rules carried forward from the 2026-08-07 revamp:
+ *  1. NAMES ARE PRESERVED, VALUES ARE REPLACED. Legacy ramps keep
+ *     their names so the ~20 routes never hand-revised inherit the new
+ *     world instead of rendering unstyled.
+ *  2. Elevation is declared once: hairline border OR hard offset,
+ *     never both, and never a blurred shadow.
  *
- * Elevation is declared once: hairline border OR shadow, never both. Shadows
- * belong only to genuinely floating layers (drawer, toast, menu).
+ * The rule that CHANGED: chroma is no longer reserved for state.
+ * Cobalt means "you can act on this"; green/amber/red mean state.
+ * Neither hue ever crosses into the other's job.
  */
 
-// Panel grey — cool, faintly green-shifted so it reads as instrument housing
-// rather than the default blue-slate every dashboard ships.
-const panel = {
-  25: '#FAFBFB',
-  50: '#F4F6F6',
-  100: '#E9ECEC',
-  200: '#D8DDDD',
-  300: '#BCC4C4',
-  400: '#939D9D',
-  500: '#6E7878',
-  600: '#545D5D',
-  700: '#414949',
-  800: '#2B3131',
-  900: '#1A1E1E',
-  950: '#0E1111',
+/** Solid token → `rgb(var(--x) / <alpha-value>)`, so `bg-action/50` works. */
+const c = (v: string) => `rgb(var(${v}) / <alpha-value>)`;
+
+const neutral = {
+  25: c('--n-25-rgb'),   50: c('--n-50-rgb'),   100: c('--n-100-rgb'),
+  200: c('--n-200-rgb'), 300: c('--n-300-rgb'), 400: c('--n-400-rgb'),
+  500: c('--n-500-rgb'), 600: c('--n-600-rgb'), 700: c('--n-700-rgb'),
+  800: c('--n-800-rgb'), 900: c('--n-900-rgb'), 950: c('--n-950-rgb'),
 };
 
-// Ink — the achromatic interactive ramp. Primary actions, active nav, controls.
+// The interactive/text ramp. Same inverted neutral ends — `ink-900` is
+// the strongest text colour in either theme.
 const ink = {
-  50: '#F5F6F6',
-  100: '#E4E6E6',
-  200: '#C6CACA',
-  300: '#9BA1A1',
-  400: '#6B7373',
-  500: '#4A5152',
-  600: '#363C3D',
-  700: '#262B2C',
-  800: '#1A1E1F',
-  900: '#101314',
+  50: c('--n-50-rgb'),   100: c('--n-100-rgb'), 200: c('--n-200-rgb'),
+  300: c('--n-300-rgb'), 400: c('--n-400-rgb'), 500: c('--n-500-rgb'),
+  600: c('--n-600-rgb'), 700: c('--n-700-rgb'), 800: c('--n-800-rgb'),
+  900: c('--n-950-rgb'),
 };
 
-// Signal — a cool teal that is emphatically not a lamp hue. Focus rings, links,
-// selection, and the one accent allowed to sit next to status without competing.
-const signal = {
-  50: '#EFF7F9',
-  100: '#D6EBF0',
-  200: '#A9D6E0',
-  300: '#6FB6C7',
-  400: '#3D93A8',
-  500: '#1E7A90',
-  600: '#0B6E7F',
-  700: '#095868',
-  800: '#0A4553',
-  900: '#0A3844',
+// Cobalt, exposed as a ramp so the 199 existing `signal-*` references
+// land on the brand colour in place.
+const action = {
+  50: 'var(--action-wash)',   100: 'var(--action-wash-2)',
+  200: 'var(--action-rim)',   300: 'var(--action-rim)',
+  400: c('--action-rgb'),     500: c('--action-rgb'),
+  600: c('--action-rgb'),     700: c('--action-rgb'),
+  800: c('--action-hover-rgb'), 900: c('--action-hover-rgb'),
+  DEFAULT: c('--action-rgb'),
 };
 
-// Lamps — jewel status hues. `core` is the lit lens, `ink` is the text weight
-// that clears 4.5:1 on panel-25/50, `wash` is the seated background.
 const lamp = {
-  good: '#1FA35F',
-  'good-ink': '#0E7042',
-  'good-wash': '#E6F5EC',
-  'good-rim': '#B4DFC6',
-  fair: '#E0921A',
-  'fair-ink': '#8A5600',
-  'fair-wash': '#FCF2E0',
-  'fair-rim': '#EFD5A6',
-  bad: '#DC3B30',
-  'bad-ink': '#A81E17',
-  'bad-wash': '#FCEBEA',
-  'bad-rim': '#F0BDB8',
+  good: c('--lamp-good-rgb'),
+  'good-ink': c('--lamp-good-ink-rgb'),
+  'good-wash': 'var(--lamp-good-wash)',
+  'good-rim': 'var(--lamp-good-rim)',
+  fair: c('--lamp-fair-rgb'),
+  'fair-ink': c('--lamp-fair-ink-rgb'),
+  'fair-wash': 'var(--lamp-fair-wash)',
+  'fair-rim': 'var(--lamp-fair-rim)',
+  bad: c('--lamp-bad-rgb'),
+  'bad-ink': c('--lamp-bad-ink-rgb'),
+  'bad-wash': 'var(--lamp-bad-wash)',
+  'bad-rim': 'var(--lamp-bad-rim)',
+  'bad-on-dark': c('--lamp-bad-on-dark-rgb'),
+  off: c('--lamp-off-rgb'),
+  'off-ink': c('--lamp-off-ink-rgb'),
 };
 
 const config: Config = {
@@ -86,124 +73,138 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        panel,
-        ink,
-        signal,
+        // ---- Semantic surface tokens (new; prefer these) ----
+        surface: {
+          DEFAULT: c('--surface-rgb'),
+          raised: c('--surface-raised-rgb'),
+          inset: c('--surface-inset-rgb'),
+          dark: c('--surface-dark-rgb'),
+          'dark-inset': c('--surface-dark-inset-rgb'),
+        },
+        text: {
+          DEFAULT: c('--text-rgb'),
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
+          faint: 'var(--text-faint)',
+          'on-dark': 'var(--text-on-dark)',
+          'on-dark-secondary': 'var(--text-on-dark-secondary)',
+          'on-dark-muted': 'var(--text-on-dark-muted)',
+        },
+        action: action,
+        hairline: 'var(--hairline)',
+        rule: 'var(--rule)',
+        edge: c('--edge-rgb'),
+        'tint-on-dark': c('--tint-on-dark-rgb'),
+        'action-on-dark': c('--action-on-dark-rgb'),
+        scrim: 'var(--scrim)',
         lamp,
 
-        // ---- Legacy names, remapped so untouched routes inherit the world ----
-
-        // Was enterprise blue. Now the achromatic interactive ramp, so every
-        // existing `bg-primary-600` CTA becomes graphite rather than blue.
-        primary: ink,
-        // Was deep corporate navy (surfaces + dark panels). Now panel housing.
-        navy: panel,
-        // Was sky blue. Now the teal signal accent.
-        secondary: signal,
-        // Was amber CTA. Collapsed onto the fair lamp so it can never read as a
-        // call-to-action competing with real status.
+        // ---- Legacy names preserved, values replaced ----
+        panel: neutral,
+        ink,
+        signal: action,      // was teal; cobalt takes the role
+        primary: action,     // was graphite; the brand colour now leads
+        navy: neutral,
+        gray: neutral,
+        secondary: action,
+        blue: action,        // finally true — blue IS the brand
         accent: {
-          50: lamp['fair-wash'],
-          100: lamp['fair-wash'],
-          200: lamp['fair-rim'],
-          500: lamp.fair,
-          600: lamp['fair-ink'],
+          50: 'var(--lamp-fair-wash)', 100: 'var(--lamp-fair-wash)',
+          200: 'var(--lamp-fair-rim)',
+          500: c('--lamp-fair-rgb'), 600: c('--lamp-fair-ink-rgb'),
         },
         brand: {
-          50: ink[50],
-          500: ink[600],
-          600: ink[700],
-          700: ink[800],
+          50: 'var(--action-wash)', 500: c('--action-rgb'),
+          600: c('--action-rgb'), 700: c('--action-hover-rgb'),
         },
-
-        // Tailwind's default neutral is blue-slate; override it so the whole app
-        // sits in one grey family instead of two competing ones.
-        gray: panel,
-
-        // Status families remapped to the jewel lamps so every pre-existing
-        // `text-red-700` / `bg-emerald-50` lands on the same three states.
         emerald: {
-          50: lamp['good-wash'], 100: lamp['good-wash'], 200: lamp['good-rim'],
-          300: lamp['good-rim'], 500: lamp.good, 600: lamp['good-ink'],
-          700: lamp['good-ink'], 800: '#0A5532', 900: '#0A5532',
+          50: 'var(--lamp-good-wash)', 100: 'var(--lamp-good-wash)',
+          200: 'var(--lamp-good-rim)', 300: 'var(--lamp-good-rim)',
+          500: c('--lamp-good-rgb'), 600: c('--lamp-good-ink-rgb'),
+          700: c('--lamp-good-ink-rgb'), 800: c('--lamp-good-ink-rgb'),
+          900: c('--lamp-good-ink-rgb'),
         },
         green: {
-          50: lamp['good-wash'], 100: lamp['good-wash'], 200: lamp['good-rim'],
-          300: lamp['good-rim'], 500: lamp.good, 600: lamp['good-ink'],
-          700: lamp['good-ink'], 800: '#0A5532', 900: '#0A5532',
+          50: 'var(--lamp-good-wash)', 100: 'var(--lamp-good-wash)',
+          200: 'var(--lamp-good-rim)', 300: 'var(--lamp-good-rim)',
+          500: c('--lamp-good-rgb'), 600: c('--lamp-good-ink-rgb'),
+          700: c('--lamp-good-ink-rgb'), 800: c('--lamp-good-ink-rgb'),
+          900: c('--lamp-good-ink-rgb'),
         },
         amber: {
-          50: lamp['fair-wash'], 100: lamp['fair-wash'], 200: lamp['fair-rim'],
-          300: lamp['fair-rim'], 500: lamp.fair, 600: lamp['fair-ink'],
-          700: lamp['fair-ink'], 800: '#6E4400', 900: '#6E4400',
+          50: 'var(--lamp-fair-wash)', 100: 'var(--lamp-fair-wash)',
+          200: 'var(--lamp-fair-rim)', 300: 'var(--lamp-fair-rim)',
+          500: c('--lamp-fair-rgb'), 600: c('--lamp-fair-ink-rgb'),
+          700: c('--lamp-fair-ink-rgb'), 800: c('--lamp-fair-ink-rgb'),
+          900: c('--lamp-fair-ink-rgb'),
         },
         yellow: {
-          50: lamp['fair-wash'], 100: lamp['fair-wash'], 200: lamp['fair-rim'],
-          500: lamp.fair, 600: lamp['fair-ink'], 700: lamp['fair-ink'],
-          800: '#6E4400', 900: '#6E4400',
+          50: 'var(--lamp-fair-wash)', 100: 'var(--lamp-fair-wash)',
+          200: 'var(--lamp-fair-rim)',
+          500: c('--lamp-fair-rgb'), 600: c('--lamp-fair-ink-rgb'),
+          700: c('--lamp-fair-ink-rgb'), 800: c('--lamp-fair-ink-rgb'),
+          900: c('--lamp-fair-ink-rgb'),
         },
         red: {
-          50: lamp['bad-wash'], 100: lamp['bad-wash'], 200: lamp['bad-rim'],
-          300: lamp['bad-rim'], 500: lamp.bad, 600: lamp['bad-ink'],
-          700: lamp['bad-ink'], 800: '#821510', 900: '#821510',
+          50: 'var(--lamp-bad-wash)', 100: 'var(--lamp-bad-wash)',
+          200: 'var(--lamp-bad-rim)', 300: 'var(--lamp-bad-rim)',
+          500: c('--lamp-bad-rgb'), 600: c('--lamp-bad-ink-rgb'),
+          700: c('--lamp-bad-ink-rgb'), 800: c('--lamp-bad-ink-rgb'),
+          900: c('--lamp-bad-ink-rgb'),
         },
-        blue: signal,
       },
+
+      ringOffsetColor: { DEFAULT: c('--surface-rgb') },
 
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         heading: ['var(--font-sans)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        // Mono is for measurement — counts, durations, ids, routes, stacks.
-        // It is never used as a costume for "technical".
         mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
 
+      // Kept — this scale is tuned for console density. Tracking retuned
+      // for DM Sans, whose default fit is looser than Archivo's.
       fontSize: {
-        // Instrument labels run small and tight; data runs at comfortable size.
         '2xs': ['11px', { lineHeight: '14px', letterSpacing: '0.02em' }],
         xs: ['12px', { lineHeight: '16px' }],
         sm: ['13px', { lineHeight: '19px' }],
         base: ['15px', { lineHeight: '23px' }],
         lg: ['17px', { lineHeight: '26px' }],
-        xl: ['20px', { lineHeight: '28px' }],
-        '2xl': ['25px', { lineHeight: '32px', letterSpacing: '-0.018em' }],
-        '3xl': ['31px', { lineHeight: '38px', letterSpacing: '-0.022em' }],
-        '4xl': ['39px', { lineHeight: '44px', letterSpacing: '-0.028em' }],
-        '5xl': ['49px', { lineHeight: '54px', letterSpacing: '-0.032em' }],
+        xl: ['20px', { lineHeight: '28px', letterSpacing: '-0.012em' }],
+        '2xl': ['25px', { lineHeight: '31px', letterSpacing: '-0.02em' }],
+        '3xl': ['31px', { lineHeight: '36px', letterSpacing: '-0.022em' }],
+        '4xl': ['39px', { lineHeight: '42px', letterSpacing: '-0.026em' }],
+        '5xl': ['49px', { lineHeight: '52px', letterSpacing: '-0.03em' }],
       },
 
-      // Shadows are for floating layers only. Every one carries a real offset
-      // and a soft blur — no zero-offset halos.
+      // HARD OFFSETS ONLY. No blur, no zero-offset halos. `xs`..`xl` keep
+      // their names so untouched routes inherit the new world; they all
+      // resolve to the ink offset, because a floating layer is the only
+      // thing in this system that may cast one.
       boxShadow: {
-        xs: '0 1px 1px 0 rgba(14, 17, 17, 0.04)',
-        sm: '0 1px 2px 0 rgba(14, 17, 17, 0.06)',
-        md: '0 4px 10px -2px rgba(14, 17, 17, 0.10), 0 2px 4px -2px rgba(14, 17, 17, 0.06)',
-        lg: '0 12px 28px -6px rgba(14, 17, 17, 0.16), 0 4px 10px -4px rgba(14, 17, 17, 0.08)',
-        xl: '0 24px 56px -12px rgba(14, 17, 17, 0.22), 0 8px 20px -8px rgba(14, 17, 17, 0.10)',
-        // Seated control: the panel-inset look, used on the nav rail's active row.
-        seat: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.55), inset 0 -1px 0 0 rgba(14, 17, 17, 0.05)',
+        none: 'none',
+        xs: '2px 2px 0 0 rgb(var(--edge-rgb) / 0.10)',
+        sm: '3px 3px 0 0 rgb(var(--edge-rgb) / 0.12)',
+        md: '4px 4px 0 0 rgb(var(--edge-rgb) / 0.16)',
+        lg: '6px 6px 0 0 rgb(var(--edge-rgb) / 0.20)',
+        xl: '8px 8px 0 0 rgb(var(--edge-rgb) / 0.24)',
+        cobalt: '6px 6px 0 0 rgb(var(--action-rgb))',
+        'cobalt-sm': '3px 3px 0 0 rgb(var(--action-rgb))',
+        seat: 'none',   // the old inset-highlight look has no place in a flat world
       },
 
-      // One documented radius rule: cards 12, controls 6, chips full-pill.
+      // Radius 0 on every named step. All 335 existing `rounded-*` classes
+      // go square with zero file edits; `rounded-full` keeps the dots round.
       borderRadius: {
-        none: '0',
-        sm: '4px',
-        DEFAULT: '6px',
-        md: '6px',
-        lg: '8px',
-        xl: '12px',
-        '2xl': '14px',
+        none: '0', sm: '0', DEFAULT: '0', md: '0',
+        lg: '0', xl: '0', '2xl': '0', '3xl': '0',
+        full: '9999px',
       },
 
-      transitionTimingFunction: {
-        // Exponential ease-out, per the craft floor.
-        out: 'cubic-bezier(0.16, 1, 0.3, 1)',
-      },
-      transitionDuration: { 150: '150ms', 200: '200ms', 300: '300ms' },
+      transitionTimingFunction: { out: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+      transitionDuration: { 120: '120ms', 150: '150ms', 200: '200ms', 300: '300ms' },
 
       keyframes: {
-        // The lamp's live breath. Applied only to the single lamp that is
-        // actively reporting a bad state, never to every lamp on the page.
         pulse_lamp: {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },
           '50%': { opacity: '0.55', transform: 'scale(0.88)' },

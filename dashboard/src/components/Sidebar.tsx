@@ -13,6 +13,7 @@ import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useSession } from '@/lib/SessionProvider';
 import { clearSession, roleLabel, type Permission } from '@/lib/session';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface NavItem {
   href: string;
@@ -127,15 +128,15 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
     href === '/dashboard' ? pathname === href : pathname === href || pathname.startsWith(href + '/');
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-ink-900 text-panel-300">
+    <div className="flex h-full min-h-0 w-full flex-col bg-surface-dark text-text-on-dark-secondary">
       {/* Identity */}
-      <div className="flex items-center gap-3 border-b border-white/[0.07] px-5 py-5">
+      <div className="flex items-center gap-3 border-b border-tint-on-dark/[0.07] px-5 py-5">
         <Mark className="h-8 w-8 flex-shrink-0 text-white" />
         <div className="min-w-0 leading-tight">
           <p className="truncate font-heading text-sm font-semibold text-white">Gravvia Engage</p>
-          {/* panel-400 is the floor that clears 4.5:1 on ink-900; anything
-              darker looked right in isolation and failed on the panel. */}
-          <p className="truncate text-2xs uppercase tracking-[0.09em] text-panel-400">
+          {/* on-dark-muted is the floor that clears 4.5:1 on the rail;
+              anything darker looked right in isolation and failed on the panel. */}
+          <p className="truncate text-2xs uppercase tracking-[0.09em] text-text-on-dark-muted">
             {isPlatform ? 'Platform console' : 'Client console'}
           </p>
         </div>
@@ -148,14 +149,14 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
           // when permissions land.
           <ul className="space-y-1 px-3" aria-hidden>
             {Array.from({ length: 8 }).map((_, i) => (
-              <li key={i} className="mx-1 my-1.5 h-9 animate-pulse rounded-md bg-white/[0.05]" />
+              <li key={i} className="mx-1 my-1.5 h-9 animate-pulse bg-tint-on-dark/[0.05]" />
             ))}
           </ul>
         ) : (
           groups.map((group) => (
             <div key={group.label ?? 'main'} className="mb-5 last:mb-0">
               {group.label && (
-                <p className="px-5 pb-2 text-2xs font-semibold uppercase tracking-[0.09em] text-panel-400">
+                <p className="px-5 pb-2 font-mono text-2xs font-semibold uppercase tracking-[0.16em] text-text-on-dark-muted">
                   {group.label}
                 </p>
               )}
@@ -171,20 +172,26 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
                         className={clsx(
                           // py-3 keeps the row at a >=44px touch target without
                           // costing a visible line of nav on a 13-item rail.
-                          'group flex cursor-pointer items-center gap-3 rounded-md px-3 py-3 text-sm',
+                          // pl-[10px] below (from the active/inactive branch)
+                          // overrides px-3's left padding so the 2px border
+                          // does not shift the row.
+                          'group flex cursor-pointer items-center gap-3 px-3 py-3 text-sm',
                           'transition-colors duration-150 ease-out',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark focus-visible:ring-offset-2 focus-visible:ring-offset-surface-dark',
                           active
-                            // A depressed key: seated, lit, and legible — not a
-                            // coloured stripe bolted to the edge.
-                            ? 'bg-white/[0.10] font-semibold text-white shadow-seat'
-                            : 'font-medium text-panel-400 hover:bg-white/[0.05] hover:text-panel-100'
+                            // A lit cobalt edge: the rail's one piece of chroma,
+                            // and it means "you are here", which is an action
+                            // relationship, not a status. action-on-dark (not
+                            // action) because the rail is dark in BOTH themes and
+                            // plain action drops to 3.11:1 in light theme.
+                            ? 'border-l-2 border-action bg-action-100 pl-[10px] font-medium text-action-on-dark'
+                            : 'border-l-2 border-transparent pl-[10px] font-normal text-text-on-dark-muted hover:bg-tint-on-dark/[0.05] hover:text-text-on-dark'
                         )}
                       >
                         <Icon
                           className={clsx(
                             'h-[18px] w-[18px] flex-shrink-0 transition-colors duration-150',
-                            active ? 'text-white' : 'text-panel-400 group-hover:text-panel-200'
+                            active ? 'text-action-on-dark' : 'text-text-on-dark-muted group-hover:text-text-on-dark'
                           )}
                           aria-hidden
                           strokeWidth={1.75}
@@ -201,22 +208,25 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       {/* Operator */}
-      <div className="border-t border-white/[0.07] p-3">
+      <div className="border-t border-tint-on-dark/[0.07] p-3">
         {auth && (
           <div className="mb-1 px-3 py-2">
-            <p className="truncate text-sm font-medium text-panel-100">{auth.name || auth.email}</p>
-            <p className="truncate text-2xs uppercase tracking-[0.07em] text-panel-400">
+            <p className="truncate text-sm font-medium text-text-on-dark">{auth.name || auth.email}</p>
+            <p className="truncate text-2xs uppercase tracking-[0.07em] text-text-on-dark-muted">
               {roleLabel(auth.role)}
             </p>
           </div>
         )}
+        <ThemeToggle />
         <button
           onClick={handleLogout}
           className={clsx(
-            'flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium',
-            'text-panel-400 transition-colors duration-150 ease-out',
-            'hover:bg-lamp-bad/[0.14] hover:text-lamp-bad-rim',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900'
+            'flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-sm font-medium',
+            'text-text-on-dark-muted transition-colors duration-150 ease-out',
+            // lamp-bad-on-dark (not lamp-bad-rim): rim tokens are border alphas,
+            // 32%-alpha in dark theme, ~1.37:1 as text on the rail. This is text.
+            'hover:bg-lamp-bad/[0.14] hover:text-lamp-bad-on-dark',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark focus-visible:ring-offset-2 focus-visible:ring-offset-surface-dark'
           )}
         >
           <LogOut className="h-[18px] w-[18px] flex-shrink-0" aria-hidden strokeWidth={1.75} />
@@ -257,13 +267,13 @@ export default function Sidebar() {
       </nav>
 
       {/* Mobile bar */}
-      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-white/[0.07] bg-ink-900 px-4 lg:hidden">
+      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-tint-on-dark/[0.07] bg-surface-dark px-4 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open navigation"
           aria-expanded={open}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-panel-300 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center text-text-on-dark-secondary transition-colors hover:bg-tint-on-dark/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark"
         >
           <Menu className="h-5 w-5" aria-hidden strokeWidth={1.75} />
         </button>
@@ -278,7 +288,7 @@ export default function Sidebar() {
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 cursor-default bg-ink-900/60"
+            className="absolute inset-0 cursor-default bg-scrim"
           />
           <nav
             aria-label="Main"
@@ -288,7 +298,7 @@ export default function Sidebar() {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close navigation"
-              className="absolute right-3 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-panel-400 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+              className="absolute right-3 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center text-text-on-dark-muted transition-colors hover:bg-tint-on-dark/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark"
             >
               <X className="h-5 w-5" aria-hidden strokeWidth={1.75} />
             </button>

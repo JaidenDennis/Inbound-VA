@@ -159,20 +159,20 @@ export default function UsersPage() {
     else void applyToggle(u);
   };
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
+  const inputCls = 'w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Users</h1>
         <button onClick={() => setShowForm((s) => !s)}
-          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-4 py-2 transition">
           <Plus className="w-4 h-4" /> New User
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={createUser} className="bg-white rounded-xl border border-gray-200 p-5 mb-6 grid grid-cols-2 gap-3">
+        <form onSubmit={createUser} className="bg-surface-raised border border-gray-200 p-5 mb-6 grid grid-cols-2 gap-3">
           <div className="col-span-2 flex items-center gap-2 text-gray-700 font-medium"><UserPlus className="w-4 h-4" /> Invite a user</div>
           <input className={inputCls} placeholder="Name" required value={name} onChange={(e) => setName(e.target.value)} />
           <input className={inputCls} type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -191,7 +191,7 @@ export default function UsersPage() {
           {error && <p role="alert" className="col-span-2 text-sm text-red-600">{error}</p>}
           <div className="col-span-2">
             <button type="submit" disabled={saving}
-              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">
+              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 transition disabled:opacity-50">
               {saving ? 'Creating...' : 'Create User'}
             </button>
           </div>
@@ -199,7 +199,7 @@ export default function UsersPage() {
       )}
 
       {editing && (
-        <form onSubmit={saveEdit} className="bg-white rounded-xl border border-gray-200 p-5 mb-6 grid grid-cols-2 gap-3">
+        <form onSubmit={saveEdit} className="bg-surface-raised border border-gray-200 p-5 mb-6 grid grid-cols-2 gap-3">
           <div className="col-span-2 text-gray-700 font-medium">Edit {editing.name || editing.email}</div>
           <input
             className={inputCls}
@@ -232,11 +232,11 @@ export default function UsersPage() {
           )}
           <div className="col-span-2 flex gap-2">
             <button type="submit" disabled={savingEdit || sessionLoading}
-              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">
+              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 transition disabled:opacity-50">
               {savingEdit ? 'Saving...' : 'Save'}
             </button>
             <button type="button" onClick={() => setEditing(null)}
-              className="border border-gray-300 text-sm font-semibold px-5 py-2 rounded-lg transition hover:bg-gray-50">
+              className="border border-gray-300 text-sm font-semibold px-5 py-2 transition hover:bg-gray-50">
               Cancel
             </button>
           </div>
@@ -248,7 +248,7 @@ export default function UsersPage() {
           <div aria-hidden className="divide-y divide-panel-100">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="px-5 py-4">
-                <div className="h-3.5 w-1/2 animate-pulse rounded bg-panel-200" />
+                <div className="h-3.5 w-1/2 animate-pulse bg-panel-200" />
               </div>
             ))}
           </div>
@@ -287,13 +287,13 @@ export default function UsersPage() {
                   <TD align="right">
                     <button
                       onClick={() => startEdit(u)}
-                      className="cursor-pointer whitespace-nowrap rounded px-1.5 py-1 text-xs font-medium text-ink-800 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-900 hover:decoration-panel-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                      className="cursor-pointer whitespace-nowrap px-1.5 py-1 text-xs font-medium text-ink-800 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-900 hover:decoration-panel-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => toggleActive(u)}
-                      className="ml-3 cursor-pointer whitespace-nowrap rounded px-1.5 py-1 text-xs font-medium text-ink-800 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-900 hover:decoration-panel-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                      className="ml-3 cursor-pointer whitespace-nowrap px-1.5 py-1 text-xs font-medium text-ink-800 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-900 hover:decoration-panel-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       {u.is_active ? 'Disable' : 'Enable'}
                     </button>

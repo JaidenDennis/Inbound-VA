@@ -101,7 +101,7 @@ export default function ClientsPage() {
           canWrite && (
             <Link
               href="/dashboard/clients/new"
-              className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2"
+              className="inline-flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors duration-150 hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2"
             >
               <Plus className="h-4 w-4" aria-hidden />
               Add client
@@ -110,7 +110,7 @@ export default function ClientsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-panel-200 bg-white p-4">
+      <div className="mb-4 flex flex-wrap items-end gap-4 border border-panel-200 bg-surface-raised p-4">
         <div className="flex min-w-[16rem] flex-1 flex-col gap-1.5">
           <label htmlFor="client-search" className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
             Search
@@ -123,7 +123,7 @@ export default function ClientsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Name, industry, or phone"
-              className="w-full rounded-md border border-panel-300 bg-white py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+              className="w-full border border-panel-300 bg-surface-raised py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
             />
           </div>
         </div>
@@ -133,20 +133,20 @@ export default function ClientsPage() {
             type="checkbox"
             checked={showArchived}
             onChange={(e) => { setLoading(true); setShowArchived(e.target.checked); }}
-            className="h-4 w-4 cursor-pointer rounded border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
+            className="h-4 w-4 cursor-pointer border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
           />
           Show archived
         </label>
       </div>
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : filtered.length === 0 ? (
         <TableEmpty
           icon={<Building2 className="h-8 w-8 text-panel-300" aria-hidden />}
@@ -198,7 +198,7 @@ export default function ClientsPage() {
                               <button
                                 type="button"
                                 onClick={() => restore(c)}
-                                className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                                className="flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                               >
                                 <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                                 Restore
@@ -208,7 +208,7 @@ export default function ClientsPage() {
                                 <Link
                                   href={`/dashboard/clients/${c.id}`}
                                   aria-label={`Edit ${c.name}`}
-                                  className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-panel-600 transition-colors hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                                  className="flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs font-medium text-panel-600 transition-colors hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                                 >
                                   <Pencil className="h-3.5 w-3.5" aria-hidden />
                                   Edit
@@ -217,7 +217,7 @@ export default function ClientsPage() {
                                   type="button"
                                   onClick={() => setPendingArchive(c)}
                                   aria-label={`Archive ${c.name}`}
-                                  className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-panel-600 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
+                                  className="flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs font-medium text-panel-600 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
                                 >
                                   <Archive className="h-3.5 w-3.5" aria-hidden />
                                   Archive

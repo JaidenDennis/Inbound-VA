@@ -61,7 +61,7 @@ function CrmPageInner() {
             <button
               type="button"
               onClick={load}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+              className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
             >
               <RefreshCw className="h-4 w-4" aria-hidden /> Refresh
             </button>
@@ -72,17 +72,17 @@ function CrmPageInner() {
       <ClientPicker label="Sync log for" />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
 
       {!ready ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : needsChoice || !clientId ? (
         <ChooseClientPrompt what="CRM sync history" />
       ) : loading ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : logs.length === 0 ? (
         <TableEmpty
           icon={<Database className="h-8 w-8 text-panel-300" aria-hidden />}
@@ -94,7 +94,7 @@ function CrmPageInner() {
           {failures > 0 && (
             <div
               role="alert"
-              className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink"
+              className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink"
             >
               {failures} record{failures === 1 ? '' : 's'} did not reach the CRM. Each row below shows
               why and how many attempts were made.
@@ -153,7 +153,7 @@ function CrmPageInner() {
 
 export default function CrmPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <CrmPageInner />
     </Suspense>
   );

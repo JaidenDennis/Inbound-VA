@@ -68,7 +68,7 @@ export function CallIntelligence({ callId }: { callId: string }) {
   };
 
   return (
-    <section className="mb-4 rounded-xl border border-panel-200 bg-white">
+    <section className="mb-4 border border-panel-200 bg-surface-raised">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-panel-200 px-5 py-3.5">
         <div>
           <h2 className="flex items-center gap-2 font-heading text-sm font-semibold text-ink-900">
@@ -83,7 +83,7 @@ export function CallIntelligence({ callId }: { callId: string }) {
             type="button"
             onClick={run}
             disabled={loading}
-            className="flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="flex cursor-pointer items-center gap-2 bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             <Sparkles className="h-4 w-4" aria-hidden />
             {loading ? 'Reading the transcript…' : 'Review this call'}
@@ -98,7 +98,7 @@ export function CallIntelligence({ callId }: { callId: string }) {
       {loading && !analysis && (
         <div className="space-y-2 p-5">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-3.5 animate-pulse rounded bg-panel-100" style={{ width: `${90 - i * 15}%` }} />
+            <div key={i} className="h-3.5 animate-pulse bg-panel-100" style={{ width: `${90 - i * 15}%` }} />
           ))}
         </div>
       )}
@@ -163,7 +163,7 @@ export function CallIntelligence({ callId }: { callId: string }) {
                   const route = FIX_ROUTES[fix.where] ?? FIX_ROUTES.none;
                   const Icon = route.icon;
                   return (
-                    <li key={i} className="rounded-lg border border-panel-200 bg-panel-25 p-3">
+                    <li key={i} className="border border-panel-200 bg-panel-25 p-3">
                       <p className="text-sm text-ink-800">{fix.fix}</p>
                       <p className="mt-1 flex items-center gap-1.5 text-2xs text-panel-500">
                         <Icon className="h-3 w-3" aria-hidden /> {route.label}

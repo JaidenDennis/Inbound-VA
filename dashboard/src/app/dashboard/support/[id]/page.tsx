@@ -47,7 +47,7 @@ interface TicketDetail {
 }
 
 const inputCls =
-  'rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+  'border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
 
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -139,7 +139,7 @@ export default function TicketDetailPage() {
     }
   };
 
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-gray-100" />;
+  if (loading) return <div className="h-64 animate-pulse bg-gray-100" />;
   if (!ticket) return <div className="text-gray-500">Ticket not found</div>;
 
   return (
@@ -161,13 +161,13 @@ export default function TicketDetailPage() {
       </div>
 
       {ticket.description && (
-        <p className="mb-6 whitespace-pre-wrap rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+        <p className="mb-6 whitespace-pre-wrap border border-gray-200 bg-surface-raised p-4 text-sm text-gray-700">
           {ticket.description}
         </p>
       )}
 
       {isPlatform && (
-        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-white p-4">
+        <div className="mb-6 flex flex-wrap items-center gap-4 border border-gray-200 bg-surface-raised p-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">First response</p>
             <div className="mt-1">
@@ -199,7 +199,7 @@ export default function TicketDetailPage() {
       )}
 
       {canTriage && (
-        <div className="mb-6 space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+        <div className="mb-6 space-y-3 border border-gray-200 bg-surface-raised p-4">
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label htmlFor="status" className="mb-1 block text-xs font-medium text-gray-500">Status</label>
@@ -224,7 +224,7 @@ export default function TicketDetailPage() {
             <button
               onClick={applyTriage}
               disabled={updating || (newStatus === ticket.status && newPriority === ticket.priority && !note)}
-              className="cursor-pointer rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
+              className="cursor-pointer bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
             >
               Update
             </button>
@@ -277,7 +277,7 @@ export default function TicketDetailPage() {
                 <div key={m.id} className={clsx('flex', mine && !isInternal && 'justify-end')}>
                   <div
                     className={clsx(
-                      'max-w-md rounded-xl px-4 py-2 text-sm',
+                      'max-w-md px-4 py-2 text-sm',
                       // Internal notes get a distinct, deliberately un-chatlike
                       // treatment plus an explicit label — nobody should be able
                       // to mistake one for something the client can read.
@@ -291,7 +291,7 @@ export default function TicketDetailPage() {
                     <div
                       className={clsx(
                         'mb-1 flex items-center gap-1.5 text-xs',
-                        isInternal ? 'font-medium text-amber-700' : mine ? 'text-primary-100' : 'text-gray-400'
+                        isInternal ? 'font-medium text-amber-700' : mine ? 'text-[rgb(var(--action-contrast-rgb))]' : 'text-gray-400'
                       )}
                     >
                       {isInternal && <Lock className="h-3 w-3" aria-hidden />}
@@ -317,7 +317,7 @@ export default function TicketDetailPage() {
                 maxLength={5000}
                 placeholder={internal ? 'Internal note — staff only…' : 'Write a reply…'}
                 className={clsx(
-                  'flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2',
+                  'flex-1 border px-3 py-2 text-sm focus:outline-none focus:ring-2',
                   internal
                     ? 'border-amber-300 bg-amber-50 focus:border-amber-400 focus:ring-amber-400'
                     : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
@@ -326,7 +326,7 @@ export default function TicketDetailPage() {
               <button
                 type="submit"
                 disabled={sending || !reply.trim()}
-                className="cursor-pointer rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
+                className="cursor-pointer bg-primary-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
               >
                 {sending ? 'Sending…' : 'Send'}
               </button>
@@ -339,7 +339,7 @@ export default function TicketDetailPage() {
                   type="checkbox"
                   checked={internal}
                   onChange={(e) => setInternal(e.target.checked)}
-                  className="h-4 w-4 cursor-pointer rounded border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500"
+                  className="h-4 w-4 cursor-pointer border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500"
                 />
                 <label htmlFor="internal" className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
                   <Lock className="h-3.5 w-3.5" aria-hidden />
@@ -350,7 +350,7 @@ export default function TicketDetailPage() {
           </form>
         </div>
       ) : (
-        <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+        <div className="divide-y divide-gray-100 border border-gray-200 bg-surface-raised">
           {ticket.history.map((h) => (
             <div key={h.id} className="px-4 py-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">

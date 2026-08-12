@@ -48,12 +48,12 @@ export function DataTable<T extends Record<string, any>>({
               </TH>
             ))}
           </THead>
-          <tbody aria-hidden className="divide-y divide-panel-100">
+          <tbody aria-hidden className="divide-y divide-hairline">
             {[...Array(5)].map((_, i) => (
               <tr key={i}>
                 {columns.map((col) => (
                   <td key={String(col.key)} className="px-5 py-4">
-                    <div className="h-3.5 animate-pulse rounded bg-panel-200" style={{ width: '62%' }} />
+                    <div className="h-3.5 animate-pulse bg-panel-200" style={{ width: '62%' }} />
                   </td>
                 ))}
               </tr>
@@ -70,7 +70,7 @@ export function DataTable<T extends Record<string, any>>({
   if (!data || data.length === 0) {
     if (emptyState) {
       return (
-        <div className="rounded-xl border border-panel-200 bg-white px-6 py-14 text-center">
+        <div className="border border-hairline bg-surface-raised px-6 py-14 text-center">
           {emptyState}
         </div>
       );

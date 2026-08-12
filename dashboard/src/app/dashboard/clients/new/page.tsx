@@ -54,7 +54,7 @@ export default function NewClientPage() {
     }
   };
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
+  const inputCls = 'w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   return (
     <div className="max-w-2xl">
@@ -63,7 +63,7 @@ export default function NewClientPage() {
       </Link>
       <h1 className="text-2xl font-bold mb-6">New Client</h1>
 
-      <form onSubmit={submit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <form onSubmit={submit} className="bg-surface-raised border border-gray-200 p-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
           <input className={inputCls} required value={name}
@@ -100,7 +100,7 @@ export default function NewClientPage() {
 
         <div className="flex gap-3 pt-2">
           <button type="submit" disabled={saving}
-            className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50">
+            className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 transition disabled:opacity-50">
             {saving ? 'Creating...' : 'Create Client'}
           </button>
           <Link href="/dashboard/clients" className="text-sm text-gray-500 px-4 py-2">Cancel</Link>

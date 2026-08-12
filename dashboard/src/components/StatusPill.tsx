@@ -54,8 +54,8 @@ export function StatusPill({
     return (
       <span
         className={clsx(
-          'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border',
-          'border-panel-200 bg-panel-100 px-2.5 py-1 text-xs font-medium text-panel-600',
+          'inline-flex items-center gap-1.5 whitespace-nowrap border',
+          'border-panel-200 bg-panel-100 px-2.5 py-1 font-mono text-2xs uppercase tracking-[0.14em] text-panel-600',
           className
         )}
       >

@@ -83,7 +83,7 @@ function Pulse({ rows }: { rows: PulseRow[] }) {
         const Arrow = flat ? Minus : up ? ArrowUp : ArrowDown;
 
         return (
-          <div key={row.metric} className="rounded-xl border border-panel-200 bg-white px-5 py-4">
+          <div key={row.metric} className="border border-panel-200 bg-surface-raised px-5 py-4">
             <p className="truncate text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
               {humanise(row.metric)}
             </p>
@@ -185,7 +185,7 @@ function QueueInner() {
           <button
             type="button"
             onClick={load}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
           >
             <RefreshCw className="h-4 w-4" aria-hidden /> Refresh
           </button>
@@ -195,13 +195,13 @@ function QueueInner() {
       <ClientPicker label="Queue for" />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
 
       {!ready ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : (
         <>
           <Pulse rows={pulse} />
@@ -212,8 +212,8 @@ function QueueInner() {
               onClick={() => setKind(null)}
               aria-pressed={kind === null}
               className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 ${
-                kind === null ? 'border-ink-800 bg-ink-800 text-white' : 'border-panel-300 bg-white text-panel-600 hover:border-panel-400'
-              }`}
+ kind === null ? 'border-action bg-action text-[rgb(var(--action-contrast-rgb))]' : 'border-panel-300 bg-surface-raised text-panel-600 hover:border-panel-400'
+ }`}
             >
               All <span data-numeric className="ml-1">{total}</span>
             </button>
@@ -224,8 +224,8 @@ function QueueInner() {
                 onClick={() => setKind(kind === key ? null : key)}
                 aria-pressed={kind === key}
                 className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 ${
-                  kind === key ? 'border-ink-800 bg-ink-800 text-white' : 'border-panel-300 bg-white text-panel-600 hover:border-panel-400'
-                }`}
+ kind === key ? 'border-action bg-action text-[rgb(var(--action-contrast-rgb))]' : 'border-panel-300 bg-surface-raised text-panel-600 hover:border-panel-400'
+ }`}
               >
                 {label} <span data-numeric className="ml-1">{counts[key] ?? 0}</span>
               </button>
@@ -235,11 +235,11 @@ function QueueInner() {
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-20 animate-pulse rounded-xl bg-panel-100" />
+                <div key={i} className="h-20 animate-pulse bg-panel-100" />
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-panel-300 bg-panel-25 px-5 py-12 text-center">
+            <div className="border border-dashed border-panel-300 bg-panel-25 px-5 py-12 text-center">
               <p className="font-heading text-base font-semibold text-ink-900">Nothing waiting</p>
               <p className="mt-1 text-sm text-panel-600">
                 {kind
@@ -256,7 +256,7 @@ function QueueInner() {
                 return (
                   <li
                     key={`${item.kind}:${item.id}`}
-                    className="rounded-xl border border-panel-200 bg-white px-4 py-3"
+                    className="border border-panel-200 bg-surface-raised px-4 py-3"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
@@ -286,7 +286,7 @@ function QueueInner() {
                                 type="button"
                                 disabled={busy}
                                 onClick={() => close(item, 'completed')}
-                                className="flex cursor-pointer items-center gap-1.5 rounded-md bg-ink-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex cursor-pointer items-center gap-1.5 bg-action px-3 py-1.5 text-xs font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 <Check className="h-3.5 w-3.5" aria-hidden /> Called back
                               </button>
@@ -294,7 +294,7 @@ function QueueInner() {
                                 type="button"
                                 disabled={busy}
                                 onClick={() => close(item, 'cancelled')}
-                                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 px-3 py-1.5 text-xs font-medium text-panel-600 transition-colors hover:border-panel-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex cursor-pointer items-center gap-1.5 border border-panel-300 px-3 py-1.5 text-xs font-medium text-panel-600 transition-colors hover:border-panel-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 <X className="h-3.5 w-3.5" aria-hidden /> No longer needed
                               </button>
@@ -304,7 +304,7 @@ function QueueInner() {
                               type="button"
                               disabled={busy}
                               onClick={() => close(item)}
-                              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="flex cursor-pointer items-center gap-1.5 border border-panel-300 px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               <Check className="h-3.5 w-3.5" aria-hidden />
                               {busy ? 'Closing…' : DERIVED_KINDS.has(item.kind) ? 'Dismiss' : 'Mark done'}
@@ -326,7 +326,7 @@ function QueueInner() {
 
 export default function QueuePage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <QueueInner />
     </Suspense>
   );
