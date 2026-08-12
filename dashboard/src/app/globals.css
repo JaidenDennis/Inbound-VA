@@ -57,6 +57,10 @@
   --rule:     rgba(3, 3, 3, .22);
   --edge-rgb: var(--ink-rgb);
 
+  /* A light tint on a surface that is dark in BOTH themes (the nav rail).
+     Identical in both blocks on purpose — see [data-theme='dark']. */
+  --tint-on-dark-rgb: 255 255 255;
+
   /* Action */
   --action-rgb:          var(--cobalt-rgb);
   --action-hover-rgb:    23  67 184;
@@ -116,6 +120,9 @@
   --hairline: rgba(240, 240, 238, .12);
   --rule:     rgba(240, 240, 238, .22);
   --edge-rgb: 240 240 238;
+
+  /* Same value as :root — the rail stays dark in both themes. */
+  --tint-on-dark-rgb: 255 255 255;
 
   --action-rgb:          var(--cobalt-lt-rgb);
   --action-hover-rgb:   168 188 255;

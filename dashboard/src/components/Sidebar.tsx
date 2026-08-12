@@ -148,7 +148,7 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
           // when permissions land.
           <ul className="space-y-1 px-3" aria-hidden>
             {Array.from({ length: 8 }).map((_, i) => (
-              <li key={i} className="mx-1 my-1.5 h-9 animate-pulse bg-surface-raised/[0.05]" />
+              <li key={i} className="mx-1 my-1.5 h-9 animate-pulse bg-tint-on-dark/[0.05]" />
             ))}
           </ul>
         ) : (
@@ -177,8 +177,8 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
                           active
                             // A depressed key: seated, lit, and legible — not a
                             // coloured stripe bolted to the edge.
-                            ? 'bg-surface-raised/[0.10] font-semibold text-white shadow-seat'
-                            : 'font-medium text-panel-400 hover:bg-surface-raised/[0.05] hover:text-panel-100'
+                            ? 'bg-tint-on-dark/[0.10] font-semibold text-white shadow-seat'
+                            : 'font-medium text-panel-400 hover:bg-tint-on-dark/[0.05] hover:text-panel-100'
                         )}
                       >
                         <Icon
@@ -263,7 +263,7 @@ export default function Sidebar() {
           onClick={() => setOpen(true)}
           aria-label="Open navigation"
           aria-expanded={open}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center text-panel-300 transition-colors hover:bg-surface-raised/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center text-panel-300 transition-colors hover:bg-tint-on-dark/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
         >
           <Menu className="h-5 w-5" aria-hidden strokeWidth={1.75} />
         </button>
@@ -288,7 +288,7 @@ export default function Sidebar() {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close navigation"
-              className="absolute right-3 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center text-panel-400 transition-colors hover:bg-surface-raised/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+              className="absolute right-3 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center text-panel-400 transition-colors hover:bg-tint-on-dark/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
             >
               <X className="h-5 w-5" aria-hidden strokeWidth={1.75} />
             </button>

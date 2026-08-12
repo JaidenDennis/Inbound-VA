@@ -93,6 +93,7 @@ const config: Config = {
         hairline: 'var(--hairline)',
         rule: 'var(--rule)',
         edge: c('--edge-rgb'),
+        'tint-on-dark': c('--tint-on-dark-rgb'),
         scrim: 'var(--scrim)',
         lamp,
 
