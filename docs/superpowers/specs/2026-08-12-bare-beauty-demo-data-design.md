@@ -8,8 +8,9 @@
 ## Goal
 
 Make the Bare Beauty tenant demo-ready across the dashboard and the connected
-GoHighLevel sub-account, and fix the two live CRM misconfigurations found while
-auditing it.
+GoHighLevel sub-account; fix the two live CRM misconfigurations found while
+auditing it; and close the one-way appointment sync so appointments created in
+GHL appear in the dashboard.
 
 ## Audit findings (verified 2026-08-11/12 against live Supabase + GHL)
 
@@ -175,12 +176,81 @@ Schema notes for the implementer:
   JSONB`, and `external_crm_id` (the GHL contact id belongs there).
 - `calls` has no `metadata` column — see the marker table above.
 
-### Part 5 — Verification
+### Part 5 — Inbound appointment sync (GHL → dashboard)
+
+Appointment sync is currently **one-way**. `workers/crm-sync.worker.ts` pushes
+Gravvia appointments into GHL and mirrors back only the event id. There is no
+GHL webhook route (`routes/webhooks/` holds Retell and Clay handlers only) and
+the GHL adapter has no method to read calendar events.
+
+Verified live on calendar `KREH27KlJTMihZJFYZlu`: **GHL holds 8 events, the
+dashboard holds 4 appointments.** The four "Marketing Call" events created
+directly in GHL (Jul 21–25) never reached the dashboard. All 8 are `confirmed`
+in GHL while all 4 local rows are still `pending` — unreconciled status drift.
+
+`GET /calendars/events` is readable with the existing Private Integration Token
+(confirmed by live call), so no new scopes or re-auth are required.
+
+**Mechanism: polling reconciler plus an on-demand trigger.**
+
+1. **Migration 033** — unify on the existing, currently-unused
+   `appointments.external_calendar_id` column:
+   - backfill it from `metadata.crm_event_id`
+   - add `CREATE UNIQUE INDEX … ON appointments(client_id, external_calendar_id)
+     WHERE external_calendar_id IS NOT NULL` so inbound upserts have a valid
+     `ON CONFLICT` target (the same class of defect migration 028 fixed)
+   - update `crm-sync.worker.ts:262` to write the column, still writing
+     `metadata.crm_event_id` for back-compat with `booking.service.ts`
+2. **Adapter capability** — add an *optional* `listCalendarEvents()` to the CRM
+   interface and implement it on the GoHighLevel adapter. Optional keeps other
+   adapters compiling untouched, per the "installable without modifying
+   existing code" rule in CLAUDE.md.
+3. **Reconciler worker** — BullMQ repeatable job over every client with an
+   active CRM connection and a configured `calendarId`. Rolling window −7d to
+   +60d. For each event: resolve the contact by `contacts.external_crm_id`
+   (creating one if absent, since `appointments.contact_id` is `NOT NULL`),
+   then upsert on `(client_id, external_calendar_id)`. Map GHL
+   `appointmentStatus` onto the local CHECK enum
+   (`pending`/`confirmed`/`cancelled`/`rescheduled`/`completed`/`no_show`).
+   Write outcomes to `crm_sync_logs` so the CRM page shows inbound activity.
+4. **On-demand trigger** — an endpoint plus a "Sync now" control on the bookings
+   page, so a GHL appointment can be pulled in immediately during a demo rather
+   than waiting for the next poll.
+
+### Part 6 — Dashboard tasks
+
+`client_action_items` (migration 008, the "Waiting on You" list rendered at
+`/dashboard/onboarding` via `GET /action-items`) has **0 rows** for Bare Beauty.
+Seed 8–10 realistic med spa front-desk items — confirming consults, following up
+no-shows, reviewing agent escalations — with a mix of `pending` and `done` so the
+list reads as lived-in. Status is constrained to those two values.
+
+### Ordering dependency
+
+Deleting the 33 GHL contacts also removes all 8 calendar events, because every
+event belongs to one of those contacts. The 4 local appointments would then
+reference deleted GHL events. Sequence therefore matters:
+
+1. Delete GHL contacts (events go with them)
+2. Seed the ~25 GHL patients **and their appointments** in GHL
+3. Run the new reconciler
+
+Step 3 populates the dashboard's bookings page *through the new sync path*,
+which both fixes the data and demonstrates the capability working end to end.
+Local appointment seeding (Part 4) is limited to rows that intentionally have no
+GHL counterpart, so the reconciler is the source of truth for the rest.
+
+### Part 7 — Verification
 
 Re-run the audit query and confirm no demo-relevant table is empty and no
 dashboard page renders a blank state. Spot-check a call detail page, the
-bookings page, and the analytics date range. Confirm `createLead` no longer
-throws by exercising the CRM sync path.
+bookings page, the tasks list, and the analytics date range. Confirm
+`createLead` no longer throws by exercising the CRM sync path.
+
+**End-to-end check for the inbound sync:** create an appointment by hand in the
+GHL UI, trigger "Sync now", and confirm it appears on the dashboard bookings
+page with the correct contact, time, and status. This is the acceptance test for
+Part 5 and should be run before the demo, not during it.
 
 ## Out of scope
 
@@ -188,6 +258,9 @@ throws by exercising the CRM sync path.
 - Renaming pipeline stages (not possible via API)
 - Backfilling transcripts for the other tenants' calls (2 calls exist outside
   Bare Beauty; same mechanism would work if wanted later)
+- Inbound sync of GHL contacts or opportunities — this covers appointments only
+- Real-time push (GHL webhook). The reconciler's on-demand trigger covers the
+  demo need; a webhook can be layered on later without changing the upsert path.
 
 ## Risks
 
