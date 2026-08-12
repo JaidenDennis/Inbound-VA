@@ -87,6 +87,7 @@
   --lamp-bad-rim:   #F0BDB8;
   --lamp-off-rgb:      194 200 200;
   --lamp-off-ink-rgb:  147 157 157;
+  --lamp-glow: 0.32;
 }
 
 [data-theme='dark'] {
@@ -146,6 +147,7 @@
   --lamp-bad-rim:   rgba(220, 59, 48, .32);
   --lamp-off-rgb:      58  58  56;
   --lamp-off-ink-rgb: 110 110 106;
+  --lamp-glow: 0.55;
 }
 
 @layer base {

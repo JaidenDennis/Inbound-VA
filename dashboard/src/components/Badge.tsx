@@ -29,14 +29,14 @@ const variantStyles: Record<NonNullable<BadgeProps['variant']>, string> = {
 
 const sizeStyles = {
   sm: 'px-2 py-0.5 text-2xs',
-  md: 'px-2.5 py-1 text-xs',
+  md: 'px-2.5 py-1 text-2xs',
 };
 
 export function Badge({ label, variant = 'gray', size = 'sm' }: BadgeProps) {
   return (
     <span
       className={clsx(
-        'inline-flex items-center whitespace-nowrap rounded-full border font-medium',
+        'inline-flex items-center whitespace-nowrap border font-mono uppercase tracking-[0.14em]',
         variantStyles[variant],
         sizeStyles[size]
       )}
