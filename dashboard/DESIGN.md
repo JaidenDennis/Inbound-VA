@@ -126,10 +126,17 @@ Inversion is only safe for fills that are *supposed* to flip with the theme.
 **A surface that must stay dark in both themes — the nav rail is the
 example — must use `surface-dark` (or `surface-dark-inset`), never
 `ink-900` or a numbered `panel-*`/`n-*` step.** `ink-900` and the `n-*` ramp
-are defined to invert; `surface-dark` (`--surface-dark-rgb`) is defined to
-hold `3 3 3` in *both* the `:root` and `[data-theme="dark"]` blocks, on
-purpose, because "a dark panel beside a bone body" is the marketing site's
-actual composition in both of its own themes.
+are defined to invert across their full range; `surface-dark`
+(`--surface-dark-rgb`) is defined to stay at the dark end of the range in
+*both* blocks instead of crossing to a light value — `3 3 3` in `:root`,
+`12 12 12` in `[data-theme="dark"]` (`globals.css:42` and `:113`) — which is
+what "purpose-built to stay dark" actually means here: the two values are
+different numbers, not an identical pinned constant, but neither one is ever
+light, because "a dark panel beside a bone body" is the marketing site's
+actual composition in both of its own themes. (A token that genuinely holds
+the *same* value in both blocks does exist — `--tint-on-dark-rgb`, `255 255
+255` in both `globals.css:62` and `:126` — see below; that is the one to
+reach for when the point is theme-identity, not merely "stays dark.")
 
 This is not a hypothetical. During Task 2's mechanical sweep converting the
 old palette to the new token names, a regex meant to catch `bg-white`
@@ -219,34 +226,36 @@ resolve (marked `TODO(phase-3-cleanup)`) are scheduled for deletion.
 
 Carried from `progress.md`, not resolved in this task:
 
-- **Duplicate `body {}` selector** in `globals.css`'s `@layer base` — a new
-  `@apply bg-surface text-text` rule sits beside the pre-existing
-  font-smoothing rule instead of being merged into it. Harmless (no cascade
-  conflict), but untidy. Triage whenever that file is next touched.
+- **Duplicate `body {}` selector** in `globals.css`'s `@layer base`
+  (`globals.css:159-160`) — a new `@apply bg-surface text-text` rule sits
+  beside the pre-existing font-smoothing rule instead of being merged into
+  it. Harmless (no cascade conflict), but untidy. Triage whenever that file
+  is next touched.
 - **~20 lines lost their leading indentation** inside multi-line template
   literals during the Task 2 mechanical sweep (queue, reports, onboarding
-  ×2, connections, `calls/[id]`, business, assistant pages). Inert —
-  behaviour and rendering are unaffected — but it is exactly the "reformat
-  unrelated code" outcome the original plan warned against.
+  ×2, connections, `calls/[id]`, business, assistant pages). Still present —
+  spot-checked at `assistant/page.tsx:157` and `queue/page.tsx:215,227`.
+  Inert — behaviour and rendering are unaffected — but it is exactly the
+  "reformat unrelated code" outcome the original plan warned against.
 - **3 ambiguous fills defaulted to `bg-surface-dark`** under the sweep's
   fallback rule (`assistant/page.tsx:157,182`; `calls/[id]/page.tsx:136` —
   chat bubbles/avatars). No visible change in light mode; low contrast in
   dark mode. These routes are Phase 2/3 territory anyway; revisit when they
   are composed.
-- **`Sidebar.tsx` `ring-offset-ink-900`** (two call sites) uses an inverting
-  token for a focus-ring offset against the permanently-dark rail — the same
-  class of hazard described above, on a lower-visibility property
-  (`ring-offset-color` rather than `background-color`). Flagged, not yet
-  fixed.
 - **8px lamp dots read as flat**, not structured (rim + specular highlight +
-  core), at the smallest size — a pre-existing property of the design at that
-  scale, not a Phase 1 regression, but worth revisiting if "lamps differ by
-  structure, not hue alone" is meant to hold at every size.
-- **8 display tables are still hand-rolled `<table>` markup** rather than
-  the shared `Table`/`DataTable` primitives: `agents`, `audit`, `calls`,
-  `clients`, `clients/[id]/agent`, `crm`, `reports`, `support`. They inherit
-  the palette through tokens but not the primitives' keyboard row activation
-  or empty/loading states.
+  core), at the smallest size (`StatusLamp.tsx:59`, `sm: 8`) — a pre-existing
+  property of the design at that scale, not a Phase 1 regression, but worth
+  revisiting if "lamps differ by structure, not hue alone" is meant to hold
+  at every size.
+- **5 display tables are still hand-rolled `<table>` markup** rather than
+  the shared `Table`/`TableShell` primitives: `agents/page.tsx:102`,
+  `audit/page.tsx:83`, `clients/[id]/agent/page.tsx:318`,
+  `reports/page.tsx:241`, `support/page.tsx:214`. They inherit the palette
+  through tokens but not the primitives' keyboard row activation or
+  empty/loading states. (`calls`, `clients`, and `crm` were converted to the
+  shared `Table` primitive since this list was first written and are no
+  longer in this gap — verified via their `from '@/components/Table'`
+  imports.)
 - **Authenticated routes were never visually verified during this phase.**
   Every component that lives behind the dashboard's login (the nav rail,
   `ThemeToggle` in its real location, both `Drawer` and `ConfirmDialog` in
