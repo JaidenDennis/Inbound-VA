@@ -12,6 +12,30 @@ import { useSearchParams } from 'next/navigation';
 import { Phone, Users, Calendar, TrendingUp } from 'lucide-react';
 import { KPICard } from '@/components/KPICard';
 import { Table, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
+import { VolumeChart, type VolumePoint } from '@/components/charts/VolumeChart';
+import { OutcomeChart, type OutcomePoint } from '@/components/charts/OutcomeChart';
+
+// Sample data for the two real chart components rendered below — this page
+// is unauthenticated, so it is the only place their rendered output (as
+// opposed to the plain colour swatches above) can be checked without a login.
+const SAMPLE_VOLUME: VolumePoint[] = [
+  { bucket: '2026-08-01', answered: 18, voicemail: 6, total: 24 },
+  { bucket: '2026-08-02', answered: 22, voicemail: 4, total: 26 },
+  { bucket: '2026-08-03', answered: 15, voicemail: 9, total: 24 },
+  { bucket: '2026-08-04', answered: 27, voicemail: 5, total: 32 },
+  { bucket: '2026-08-05', answered: 20, voicemail: 7, total: 27 },
+  { bucket: '2026-08-06', answered: 24, voicemail: 3, total: 27 },
+  { bucket: '2026-08-07', answered: 19, voicemail: 8, total: 27 },
+];
+
+const SAMPLE_OUTCOMES: OutcomePoint[] = [
+  { outcome: 'appointment_booked', count: 42 },
+  { outcome: 'lead_captured', count: 31 },
+  { outcome: 'transferred', count: 18 },
+  { outcome: 'question_answered', count: 54 },
+  { outcome: 'voicemail', count: 12 },
+  { outcome: 'abandoned', count: 6 },
+];
 
 // Tailwind scans source text, so interpolated class names are purged.
 // This literal array is never rendered; it exists to be scanned. The
@@ -198,6 +222,18 @@ function TokenSheetInner() {
             {[40, 55, 25].map((h, i) => (
               <div key={`b${i}`} className="flex-1" style={{ height: `${h}%`, background: 'var(--series-2)' }} />
             ))}
+          </div>
+        </Row>
+
+        <Row title="VolumeChart — stacked area, hatch on the second series">
+          <div className="viz-root w-full border border-hairline bg-surface-raised p-5">
+            <VolumeChart data={SAMPLE_VOLUME} bucket="day" />
+          </div>
+        </Row>
+
+        <Row title="OutcomeChart — single series, horizontal bars, square ends">
+          <div className="viz-root w-full border border-hairline bg-surface-raised p-5">
+            <OutcomeChart data={SAMPLE_OUTCOMES} />
           </div>
         </Row>
       </div>
