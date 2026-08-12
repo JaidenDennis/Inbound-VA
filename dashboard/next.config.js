@@ -20,6 +20,7 @@ const nextConfig = {
   // every `git add src/app/_tokens/page.tsx` the plan also hard-codes),
   // this rewrites the public URL to the routable shim at
   // `src/app/tokens-sheet/page.tsx`, which re-exports the real component.
+  // TODO(phase-3-cleanup): remove with src/app/_tokens and tokens-sheet
   async rewrites() {
     return [{ source: '/_tokens', destination: '/tokens-sheet' }];
   },

@@ -107,10 +107,10 @@
   --n-950-rgb: var(--bone-rgb);
 
   --surface-rgb:            var(--ink-rgb);
-  --surface-raised-rgb:      12  12  12;
+  --surface-raised-rgb:      20  20  20;
   --surface-inset-rgb:        0   0   0;
   --surface-dark-rgb:        12  12  12;
-  --surface-dark-inset-rgb:  20  20  20;
+  --surface-dark-inset-rgb:  28  28  28;
 
   --text-rgb:       var(--bone-rgb);
   --text-secondary: rgba(240, 240, 238, .75);
@@ -308,8 +308,6 @@
    ============================================================ */
 .viz-root {
   --surface-1:      rgb(var(--surface-raised-rgb));
-  --text-secondary: var(--text-secondary);
-  --text-muted:     var(--text-muted);
   --gridline:       var(--hairline);
   --baseline:       var(--rule);
   --series-1:       rgb(var(--action-rgb));
