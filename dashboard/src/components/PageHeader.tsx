@@ -8,9 +8,11 @@ interface PageHeaderProps {
   description?: string;
   action?: ReactNode;
   breadcrumbs?: Array<{ label: string; href?: string }>;
+  /** Mono micro-label above the title — the site's `.kicker`. */
+  eyebrow?: string;
 }
 
-export function PageHeader({ title, description, action, breadcrumbs }: PageHeaderProps) {
+export function PageHeader({ title, description, action, breadcrumbs, eyebrow }: PageHeaderProps) {
   return (
     <div className="mb-6">
       {breadcrumbs && breadcrumbs.length > 0 && (
@@ -21,15 +23,15 @@ export function PageHeader({ title, description, action, breadcrumbs }: PageHead
                 {crumb.href ? (
                   <a
                     href={crumb.href}
-                    className="text-panel-600 underline decoration-panel-300 underline-offset-2 transition-colors hover:text-ink-800 hover:decoration-panel-500"
+                    className="text-text-secondary underline decoration-hairline underline-offset-2 transition-colors hover:text-action"
                   >
                     {crumb.label}
                   </a>
                 ) : (
-                  <span className="text-panel-500" aria-current="page">{crumb.label}</span>
+                  <span className="text-text-secondary" aria-current="page">{crumb.label}</span>
                 )}
                 {i < breadcrumbs.length - 1 && (
-                  <ChevronRight className="h-3 w-3 text-panel-400" aria-hidden />
+                  <ChevronRight className="h-3 w-3 text-text-muted" aria-hidden />
                 )}
               </li>
             ))}
@@ -39,13 +41,14 @@ export function PageHeader({ title, description, action, breadcrumbs }: PageHead
 
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1">
+          {eyebrow && <p className="label-instrument mb-2">{eyebrow}</p>}
           {/* Scale carries hierarchy here, not shouting: the page title sits one
               clear step above section headings and no further. */}
-          <h1 className="font-heading text-2xl font-semibold tracking-[-0.02em] text-ink-900">
+          <h1 className="font-heading text-2xl font-medium tracking-[-0.02em] text-text">
             {title}
           </h1>
           {description && (
-            <p className="mt-1.5 max-w-[68ch] text-sm leading-relaxed text-panel-600">
+            <p className="mt-1.5 max-w-[68ch] text-sm leading-relaxed text-text-secondary">
               {description}
             </p>
           )}

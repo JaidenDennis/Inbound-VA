@@ -28,7 +28,7 @@ export function Tabs({ tabs, paramKey = 'tab' }: { tabs: TabSpec[]; paramKey?: s
   };
 
   return (
-    <div className="mb-6 border-b border-gray-200">
+    <div className="mb-6 border-b border-hairline">
       <div role="tablist" className="-mb-px flex flex-wrap gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const selected = tab.key === active;
@@ -40,11 +40,11 @@ export function Tabs({ tabs, paramKey = 'tab' }: { tabs: TabSpec[]; paramKey?: s
               aria-selected={selected}
               onClick={() => select(tab.key)}
               className={clsx(
-                'cursor-pointer whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
+                'cursor-pointer whitespace-nowrap px-4 py-3 transition-colors',
+                'focus:outline-none focus:ring-2 focus:ring-action focus:ring-offset-1',
                 selected
-                  ? 'border-primary-600 text-primary-700'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  ? 'border-b-2 border-action font-mono text-2xs uppercase tracking-[0.16em] text-action'
+                  : 'border-b-2 border-transparent font-mono text-2xs uppercase tracking-[0.16em] text-text-muted hover:border-rule hover:text-text'
               )}
             >
               {tab.label}
