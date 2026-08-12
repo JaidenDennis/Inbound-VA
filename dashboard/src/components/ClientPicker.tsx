@@ -71,9 +71,9 @@ export function ClientPicker({ label = 'Client' }: { label?: string }) {
   };
 
   return (
-    <div className="mb-4 flex flex-wrap items-end gap-3 border border-panel-200 bg-surface-raised p-4">
+    <div className="mb-4 flex flex-wrap items-end gap-3 border border-hairline bg-surface-raised p-4">
       <div className="flex min-w-[16rem] flex-col gap-1.5">
-        <label htmlFor="client-scope" className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
+        <label htmlFor="client-scope" className="font-mono text-2xs uppercase tracking-[0.16em] text-text-muted">
           {label}
         </label>
         <select
@@ -81,7 +81,7 @@ export function ClientPicker({ label = 'Client' }: { label?: string }) {
           value={selected}
           disabled={loading}
           onChange={(e) => choose(e.target.value)}
-          className="cursor-pointer border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:cursor-wait disabled:bg-panel-50"
+          className="cursor-pointer border border-rule bg-surface-raised px-3 py-2 text-sm text-text transition-colors duration-150 hover:border-action focus:border-action focus:outline-none focus:ring-2 focus:ring-action/25 disabled:cursor-wait disabled:bg-surface-inset"
         >
           <option value="">{loading ? 'Loading clients…' : 'Choose a client…'}</option>
           {clients.map((c) => (
@@ -96,9 +96,9 @@ export function ClientPicker({ label = 'Client' }: { label?: string }) {
 /** Shown in place of the page body while staff have not picked a client. */
 export function ChooseClientPrompt({ what }: { what: string }) {
   return (
-    <div className="border border-panel-200 bg-surface-raised px-6 py-14 text-center">
-      <p className="text-sm font-medium text-ink-800">Choose a client</p>
-      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-panel-500">
+    <div className="border border-hairline bg-surface-raised px-6 py-14 text-center">
+      <p className="text-sm font-medium text-text">Choose a client</p>
+      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-text-muted">
         {what} is configured per client. Pick one above to view or edit it.
       </p>
     </div>

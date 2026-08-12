@@ -77,22 +77,22 @@ export function CopilotFaqs({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mb-4 flex cursor-pointer items-center gap-2 border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+        className="mb-4 flex cursor-pointer items-center gap-2 border border-rule bg-surface-raised px-3.5 py-2 text-sm font-medium text-text transition-colors hover:border-action hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
       >
-        <Sparkles className="h-4 w-4 text-panel-500" aria-hidden />
+        <Sparkles className="h-4 w-4 text-text-muted" aria-hidden />
         Suggest FAQs
       </button>
     );
   }
 
   return (
-    <section className="mb-4 border border-panel-200 bg-surface-raised">
-      <div className="flex items-start justify-between gap-3 border-b border-panel-200 px-5 py-3.5">
+    <section className="mb-4 border border-hairline bg-surface-raised">
+      <div className="flex items-start justify-between gap-3 border-b border-hairline px-5 py-3.5">
         <div>
-          <h2 className="flex items-center gap-2 font-heading text-sm font-semibold text-ink-900">
-            <Sparkles className="h-4 w-4 text-panel-500" aria-hidden /> Suggested FAQs
+          <h2 className="flex items-center gap-2 font-heading text-sm font-semibold text-text">
+            <Sparkles className="h-4 w-4 text-text-muted" aria-hidden /> Suggested FAQs
           </h2>
-          <p className="mt-0.5 text-xs text-panel-500">
+          <p className="mt-0.5 text-xs text-text-muted">
             Based on your services and what your agent can already answer.
           </p>
         </div>
@@ -100,51 +100,51 @@ export function CopilotFaqs({
           type="button"
           onClick={() => setOpen(false)}
           aria-label="Close suggestions"
-          className="cursor-pointer p-1 text-panel-500 transition-colors hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+          className="cursor-pointer p-1 text-text-muted transition-colors hover:bg-surface-inset hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
         >
           <X className="h-4 w-4" aria-hidden />
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-panel-100 px-5 py-4">
+      <div className="flex flex-wrap gap-2 border-b border-hairline px-5 py-4">
         <label htmlFor="copilot-topic" className="sr-only">Topic to focus on</label>
         <input
           id="copilot-topic"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="Optional: focus on a topic, e.g. parking, insurance"
-          className="min-w-[16rem] flex-1 border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+          className="min-w-[16rem] flex-1 border border-rule bg-surface-raised px-3 py-2 text-sm text-text placeholder:text-text-faint transition-colors hover:border-action focus:border-action focus:outline-none focus:ring-2 focus:ring-action/25"
         />
         <button
           type="button"
           onClick={generate}
           disabled={loading}
-          className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+          className="cursor-pointer border border-action bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors duration-150 hover:bg-transparent hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 disabled:opacity-50"
         >
           {loading ? 'Thinking…' : drafts.length > 0 ? 'Suggest more' : 'Suggest'}
         </button>
       </div>
 
-      {error && <p className="px-5 py-4 text-sm text-panel-600">{error}</p>}
+      {error && <p className="px-5 py-4 text-sm text-text-secondary">{error}</p>}
 
       {loading && drafts.length === 0 && (
         <div className="space-y-3 p-5">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-16 animate-pulse bg-panel-100" />
+            <div key={i} className="h-16 animate-pulse bg-surface-inset" />
           ))}
         </div>
       )}
 
       {drafts.length > 0 && (
         <>
-          <ul className="divide-y divide-panel-100">
+          <ul className="divide-y divide-hairline">
             {drafts.map((draft, i) => (
               <li key={i} className="flex items-start justify-between gap-4 px-5 py-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink-900">{draft.question}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-panel-600">{draft.answer}</p>
+                  <p className="text-sm font-medium text-text">{draft.question}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-text-secondary">{draft.answer}</p>
                   {draft.category && (
-                    <p className="mt-1.5 text-2xs uppercase tracking-[0.07em] text-panel-400">
+                    <p className="mt-1.5 font-mono text-2xs uppercase tracking-[0.16em] text-text-faint">
                       {draft.category}
                     </p>
                   )}
@@ -153,7 +153,7 @@ export function CopilotFaqs({
                   type="button"
                   onClick={() => accept(draft, i)}
                   disabled={adding === i || added.has(i)}
-                  className="flex flex-shrink-0 cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex flex-shrink-0 cursor-pointer items-center gap-1.5 border border-rule bg-surface-raised px-3 py-1.5 text-xs font-medium text-text transition-colors hover:border-action hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="h-3.5 w-3.5" aria-hidden />
                   {added.has(i) ? 'Added' : adding === i ? 'Adding…' : 'Add'}
@@ -161,7 +161,7 @@ export function CopilotFaqs({
               </li>
             ))}
           </ul>
-          <p className="border-t border-panel-100 px-5 py-3 text-2xs text-panel-500">
+          <p className="border-t border-hairline px-5 py-3 text-2xs text-text-muted">
             Read each one before adding it. Anything in [square brackets] needs a real value from
             you — the assistant leaves specifics blank rather than guessing.
           </p>
