@@ -86,9 +86,9 @@ function ConnectionCard({
 
   return (
     <div
-      className={`rounded-xl border bg-white p-5 transition-colors ${
-        connection.available ? 'border-panel-200' : 'border-panel-200 opacity-70'
-      }`}
+      className={`border bg-surface-raised p-5 transition-colors ${
+ connection.available ? 'border-panel-200' : 'border-panel-200 opacity-70'
+ }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
@@ -115,7 +115,7 @@ function ConnectionCard({
           {!connection.available ? (
             <span
               title="The adapter is registered but its sync path is not built yet."
-              className="flex items-center gap-1.5 rounded-md border border-panel-200 bg-panel-50 px-3 py-2 text-xs font-medium text-panel-500"
+              className="flex items-center gap-1.5 border border-panel-200 bg-panel-50 px-3 py-2 text-xs font-medium text-panel-500"
             >
               <Lock className="h-3.5 w-3.5" aria-hidden /> Coming soon
             </span>
@@ -125,7 +125,7 @@ function ConnectionCard({
                 type="button"
                 onClick={connect}
                 disabled={busy}
-                className="flex cursor-pointer items-center gap-1.5 rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                className="flex cursor-pointer items-center gap-1.5 bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
               >
                 <Link2 className="h-4 w-4" aria-hidden /> {busy ? 'Opening…' : 'Connect'}
               </button>
@@ -138,7 +138,7 @@ function ConnectionCard({
                 type="button"
                 onClick={makeActive}
                 disabled={busy}
-                className="cursor-pointer rounded-md border border-panel-300 bg-white px-3 py-2 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
+                className="cursor-pointer border border-panel-300 bg-surface-raised px-3 py-2 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
               >
                 Make active
               </button>
@@ -150,7 +150,7 @@ function ConnectionCard({
       {connection.configuredWithoutCredential && (
         <div
           role="alert"
-          className="mt-4 flex items-start gap-2 rounded-lg border border-lamp-fair-rim bg-lamp-fair-wash px-3 py-2 text-xs text-lamp-fair-ink"
+          className="mt-4 flex items-start gap-2 border border-lamp-fair-rim bg-lamp-fair-wash px-3 py-2 text-xs text-lamp-fair-ink"
         >
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />
           <p>
@@ -204,7 +204,7 @@ function HealthStrip({ health }: { health: ChannelHealth[] }) {
         {health.map((c) => {
           const { level, live } = HEALTH_LEVEL[c.status];
           return (
-            <div key={c.id} className="rounded-xl border border-panel-200 bg-white p-4">
+            <div key={c.id} className="border border-panel-200 bg-surface-raised p-4">
               <LampStatus level={level} live={live} label={c.label} />
               <p className="mt-1.5 text-xs leading-relaxed text-panel-600">{c.note}</p>
               {c.lastSuccessAt && (
@@ -267,7 +267,7 @@ function ConnectionsInner() {
             <button
               type="button"
               onClick={load}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+              className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
             >
               <RefreshCw className="h-4 w-4" aria-hidden /> Refresh
             </button>
@@ -278,19 +278,19 @@ function ConnectionsInner() {
       <ClientPicker label="Connections for" />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
 
       {!ready ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : needsChoice || !clientId ? (
         <ChooseClientPrompt what="Connections" />
       ) : loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-panel-100" />
+            <div key={i} className="h-24 animate-pulse bg-panel-100" />
           ))}
         </div>
       ) : (
@@ -326,7 +326,7 @@ function ConnectionsInner() {
 
 export default function ConnectionsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <ConnectionsInner />
     </Suspense>
   );

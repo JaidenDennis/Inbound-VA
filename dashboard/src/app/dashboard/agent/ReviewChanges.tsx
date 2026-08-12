@@ -139,9 +139,9 @@ export function ReviewChanges({
       role="dialog"
       aria-modal="true"
       aria-label="Review changes"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/30 p-0 sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-scrim p-0 sm:items-center sm:p-6"
     >
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-xl border border-panel-200 bg-white shadow-xl sm:rounded-xl">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden border border-panel-200 bg-surface-raised shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-panel-200 px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-ink-900">Review changes</h2>
@@ -153,7 +153,7 @@ export function ReviewChanges({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="cursor-pointer rounded-md p-1.5 text-panel-500 transition-colors hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
@@ -161,7 +161,7 @@ export function ReviewChanges({
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {error && (
-            <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm text-lamp-fair-ink">
+            <div role="alert" className="mb-4 flex items-start gap-2 border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm text-lamp-fair-ink">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
               <p>{error}</p>
             </div>
@@ -174,7 +174,7 @@ export function ReviewChanges({
           )}
 
           {state && !state.fresh && (
-            <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm text-lamp-fair-ink">
+            <div role="alert" className="mb-4 flex items-start gap-2 border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm text-lamp-fair-ink">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
               <p>
                 Someone else changed this agent while you were editing. Close this, reload the
@@ -203,10 +203,10 @@ export function ReviewChanges({
 
               <ul className="space-y-3">
                 {state.diff.entries.map((entry) => (
-                  <li key={entry.path} className="rounded-lg border border-panel-200 p-4">
+                  <li key={entry.path} className="border border-panel-200 p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-ink-900">{entry.label}</span>
-                      <span className={`rounded border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.06em] ${KIND_CLS[entry.kind]}`}>
+                      <span className={`border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.06em] ${KIND_CLS[entry.kind]}`}>
                         {KIND_LABEL[entry.kind]}
                       </span>
                     </div>
@@ -232,7 +232,7 @@ export function ReviewChanges({
             type="button"
             onClick={publish}
             disabled={busy || !state?.diff.hasChanges || !state?.fresh}
-            className="flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Check className="h-4 w-4" aria-hidden /> {busy ? 'Publishing…' : 'Publish'}
           </button>
@@ -240,7 +240,7 @@ export function ReviewChanges({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="cursor-pointer rounded-md border border-panel-300 bg-white px-4 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed"
+            className="cursor-pointer border border-panel-300 bg-surface-raised px-4 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed"
           >
             Keep editing
           </button>
@@ -248,7 +248,7 @@ export function ReviewChanges({
             type="button"
             onClick={discard}
             disabled={busy}
-            className="ml-auto cursor-pointer rounded-md px-3 py-2 text-sm font-medium text-panel-600 transition-colors hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad disabled:cursor-not-allowed"
+            className="ml-auto cursor-pointer px-3 py-2 text-sm font-medium text-panel-600 transition-colors hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad disabled:cursor-not-allowed"
           >
             Discard changes
           </button>
@@ -282,7 +282,7 @@ export function ManagedByGravvia() {
   if (!boundary) return null;
 
   return (
-    <details className="mt-6 rounded-xl border border-panel-200 bg-panel-25 px-5 py-4">
+    <details className="mt-6 border border-panel-200 bg-panel-25 px-5 py-4">
       <summary className="cursor-pointer text-sm font-medium text-ink-800">
         What Gravvia manages for you
       </summary>

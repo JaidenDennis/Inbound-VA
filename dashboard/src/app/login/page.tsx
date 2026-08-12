@@ -60,9 +60,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-white">
+    <div className="flex min-h-[100dvh] bg-surface-raised">
       {/* ---- Mechanism panel ---- */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-ink-900 px-12 py-11 text-white lg:flex lg:w-[46%] xl:w-[48%]">
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-surface-dark px-12 py-11 text-white lg:flex lg:w-[46%] xl:w-[48%]">
         <div className="flex items-center gap-3">
           <Mark className="h-9 w-9 text-white" />
           <div className="leading-tight">
@@ -145,7 +145,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 aria-invalid={!!error}
                 aria-describedby={error ? 'signin-error' : undefined}
-                className="w-full rounded-md border border-panel-300 bg-white px-3 py-2.5 text-sm text-ink-900 transition-colors duration-150 placeholder:text-panel-400 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+                className="w-full border border-panel-300 bg-surface-raised px-3 py-2.5 text-sm text-ink-900 transition-colors duration-150 placeholder:text-panel-400 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
               />
             </div>
 
@@ -171,14 +171,14 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   aria-invalid={!!error}
                   aria-describedby={error ? 'signin-error' : undefined}
-                  className="w-full rounded-md border border-panel-300 bg-white py-2.5 pl-3 pr-11 text-sm text-ink-900 transition-colors duration-150 placeholder:text-panel-400 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+                  className="w-full border border-panel-300 bg-surface-raised py-2.5 pl-3 pr-11 text-sm text-ink-900 transition-colors duration-150 placeholder:text-panel-400 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   aria-pressed={showPassword}
-                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
                 </button>
@@ -189,7 +189,7 @@ export default function LoginPage() {
               <p
                 id="signin-error"
                 role="alert"
-                className="flex items-start gap-2 rounded-md border border-lamp-bad-rim bg-lamp-bad-wash px-3 py-2.5 text-xs leading-relaxed text-lamp-bad-ink"
+                className="flex items-start gap-2 border border-lamp-bad-rim bg-lamp-bad-wash px-3 py-2.5 text-xs leading-relaxed text-lamp-bad-ink"
               >
                 <AlertCircle className="mt-px h-4 w-4 flex-shrink-0" aria-hidden />
                 <span>
@@ -202,7 +202,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-ink-800 py-2.5 text-sm font-semibold text-white transition-all duration-150 ease-out hover:bg-ink-900 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-panel-400"
+              className="group flex w-full cursor-pointer items-center justify-center gap-2 bg-action py-2.5 text-sm font-semibold text-white transition-all duration-150 ease-out hover:bg-action-800 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-panel-400"
             >
               {loading ? (
                 <>

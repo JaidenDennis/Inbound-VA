@@ -56,7 +56,7 @@ export function GreetingSuggestions({
       <button
         type="button"
         onClick={() => { setOpen(true); generate(); }}
-        className="flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+        className="flex cursor-pointer items-center gap-2 border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
       >
         <Sparkles className="h-4 w-4 text-panel-500" aria-hidden />
         Suggest an opening line
@@ -65,7 +65,7 @@ export function GreetingSuggestions({
   }
 
   return (
-    <div className="rounded-lg border border-panel-200 bg-panel-25 p-4">
+    <div className="border border-panel-200 bg-panel-25 p-4">
       <p className="mb-3 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
         <Sparkles className="h-3.5 w-3.5" aria-hidden /> Suggested openings
       </p>
@@ -77,13 +77,13 @@ export function GreetingSuggestions({
           value={brief}
           onChange={(e) => setBrief(e.target.value)}
           placeholder="Optional: how should it feel? e.g. warm and unhurried"
-          className="min-w-[15rem] flex-1 rounded-md border border-panel-300 bg-white px-3 py-1.5 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+          className="min-w-[15rem] flex-1 border border-panel-300 bg-surface-raised px-3 py-1.5 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
         />
         <button
           type="button"
           onClick={generate}
           disabled={loading}
-          className="cursor-pointer rounded-md border border-panel-300 bg-white px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
+          className="cursor-pointer border border-panel-300 bg-surface-raised px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
         >
           {loading ? 'Thinking…' : 'Regenerate'}
         </button>
@@ -94,7 +94,7 @@ export function GreetingSuggestions({
       {loading && options.length === 0 && (
         <div className="space-y-2">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded-md bg-panel-100" />
+            <div key={i} className="h-12 animate-pulse bg-panel-100" />
           ))}
         </div>
       )}
@@ -105,7 +105,7 @@ export function GreetingSuggestions({
             <button
               type="button"
               onClick={() => onPick(option.text)}
-              className="w-full cursor-pointer rounded-md border border-panel-200 bg-white p-3 text-left transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+              className="w-full cursor-pointer border border-panel-200 bg-surface-raised p-3 text-left transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
             >
               <span className="block text-2xs uppercase tracking-[0.07em] text-panel-400">
                 {option.style}

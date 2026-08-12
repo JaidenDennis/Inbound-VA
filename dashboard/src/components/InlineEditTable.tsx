@@ -52,7 +52,7 @@ export function InlineEditTable<T extends { id: string }>({
   const [saving, setSaving] = useState(false);
 
   const inputCls =
-    'w-full rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25';
+    'w-full border border-panel-300 bg-surface-raised px-2.5 py-1.5 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25';
 
   const startEdit = (row: T) => {
     setCreating(false);
@@ -141,7 +141,7 @@ export function InlineEditTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-xl border border-panel-200 bg-white">
+      <div className="overflow-hidden border border-panel-200 bg-surface-raised">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-14 animate-pulse border-b border-panel-100 bg-panel-50 last:border-0" />
         ))}
@@ -151,7 +151,7 @@ export function InlineEditTable<T extends { id: string }>({
 
   return (
     <div>
-      <div className="overflow-hidden rounded-xl border border-panel-200 bg-white">
+      <div className="overflow-hidden border border-panel-200 bg-surface-raised">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-panel-50">
@@ -198,7 +198,7 @@ export function InlineEditTable<T extends { id: string }>({
                           type="button"
                           onClick={() => startEdit(row)}
                           aria-label="Edit row"
-                          className="cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                          className="cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                         >
                           <Pencil className="h-4 w-4" aria-hidden />
                         </button>
@@ -206,7 +206,7 @@ export function InlineEditTable<T extends { id: string }>({
                           type="button"
                           onClick={() => remove(row.id)}
                           aria-label="Remove row"
-                          className="ml-1 cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
+                          className="ml-1 cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden />
                         </button>
@@ -246,7 +246,7 @@ export function InlineEditTable<T extends { id: string }>({
         <button
           type="button"
           onClick={startCreate}
-          className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+          className="mt-3 flex cursor-pointer items-center gap-2 border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
         >
           <Plus className="h-4 w-4" aria-hidden /> Add
         </button>
@@ -263,7 +263,7 @@ function RowActions({ saving, onSave, onCancel }: { saving: boolean; onSave: () 
         onClick={onSave}
         disabled={saving}
         aria-label="Save row"
-        className="cursor-pointer rounded p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+        className="cursor-pointer p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
       >
         <Check className="h-4 w-4" aria-hidden />
       </button>
@@ -272,7 +272,7 @@ function RowActions({ saving, onSave, onCancel }: { saving: boolean; onSave: () 
         onClick={onCancel}
         disabled={saving}
         aria-label="Cancel editing"
-        className="ml-1 cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
+        className="ml-1 cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
       >
         <X className="h-4 w-4" aria-hidden />
       </button>

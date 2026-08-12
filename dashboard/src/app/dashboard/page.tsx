@@ -130,7 +130,7 @@ function LampField({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-2xs font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-60"
+            className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-2.5 py-1.5 text-2xs font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-60"
           >
             <RefreshCw
               className={refreshing ? 'h-3 w-3 animate-spin' : 'h-3 w-3'}
@@ -145,7 +145,7 @@ function LampField({
         {`System state: ${verdict}. ${health.fatal} fatal, ${health.error} errors, ${health.warn} warnings.`}
       </p>
 
-      <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-panel-200 bg-white sm:grid-cols-3">
+      <div className="grid grid-cols-1 overflow-hidden border border-panel-200 bg-surface-raised sm:grid-cols-3">
         {cells.map((cell, i) => (
           <Link
             key={cell.label}
@@ -203,7 +203,7 @@ function WorstFirst({ rows }: { rows: GroupedRow[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-panel-200 bg-white px-6 py-10 text-center">
+        <div className="border border-panel-200 bg-surface-raised px-6 py-10 text-center">
           <StatusLamp level="good" size="lg" className="mx-auto mb-3" label="Good" />
           <p className="text-sm font-medium text-ink-800">Nothing is failing</p>
           <p className="mt-1 text-xs text-panel-500">
@@ -211,7 +211,7 @@ function WorstFirst({ rows }: { rows: GroupedRow[] }) {
           </p>
         </div>
       ) : (
-        <ul className="overflow-hidden rounded-xl border border-panel-200 bg-white">
+        <ul className="overflow-hidden border border-panel-200 bg-surface-raised">
           {rows.map((row, i) => (
             <li key={row.fingerprint} className={i > 0 ? 'border-t border-panel-100' : ''}>
               <Link
@@ -260,14 +260,14 @@ function WorstFirst({ rows }: { rows: GroupedRow[] }) {
 function Skeleton() {
   return (
     <div aria-hidden>
-      <div className="mb-6 h-8 w-56 animate-pulse rounded bg-panel-200" />
-      <div className="mb-7 h-[5.5rem] animate-pulse rounded-xl bg-panel-200" />
+      <div className="mb-6 h-8 w-56 animate-pulse bg-panel-200" />
+      <div className="mb-7 h-[5.5rem] animate-pulse bg-panel-200" />
       <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-28 animate-pulse rounded-xl bg-panel-200" />
+          <div key={i} className="h-28 animate-pulse bg-panel-200" />
         ))}
       </div>
-      <div className="h-56 animate-pulse rounded-xl bg-panel-200" />
+      <div className="h-56 animate-pulse bg-panel-200" />
     </div>
   );
 }
@@ -322,7 +322,7 @@ function ClientSignposts({ can }: { can: (permission: Permission) => boolean }) 
           <Link
             key={l.href}
             href={l.href}
-            className="group flex items-start justify-between gap-3 rounded-xl border border-panel-200 bg-white px-5 py-4 transition-colors hover:border-panel-300 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="group flex items-start justify-between gap-3 border border-panel-200 bg-surface-raised px-5 py-4 transition-colors hover:border-panel-300 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
           >
             <span>
               <span className="block font-heading text-sm font-semibold text-ink-900">{l.label}</span>
@@ -481,7 +481,7 @@ export default function DashboardPage() {
       {failed ? (
         <div
           role="alert"
-          className="rounded-xl border border-lamp-bad-rim bg-lamp-bad-wash px-5 py-4 text-sm text-lamp-bad-ink"
+          className="border border-lamp-bad-rim bg-lamp-bad-wash px-5 py-4 text-sm text-lamp-bad-ink"
         >
           <p className="font-semibold">Performance figures did not load.</p>
           <p className="mt-1 text-xs leading-relaxed">

@@ -166,7 +166,7 @@ function KnowledgeTable({
   return (
     <>
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
@@ -255,14 +255,14 @@ function KnowledgePageInner() {
       <ClientPicker label="Editing knowledge for" />
 
       {!canWrite && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-panel-200 bg-panel-50 px-4 py-3 text-sm text-panel-700">
+        <div className="mb-4 flex items-start gap-2 border border-panel-200 bg-panel-50 px-4 py-3 text-sm text-panel-700">
           <Info className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
           <p>You have read-only access. Ask an account owner to make changes.</p>
         </div>
       )}
 
       {!ready ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : needsChoice || !clientId ? (
         <ChooseClientPrompt what="Knowledge" />
       ) : (
@@ -284,7 +284,7 @@ function KnowledgePageInner() {
 
 export default function KnowledgePage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <KnowledgePageInner />
     </Suspense>
   );

@@ -60,7 +60,7 @@ interface VersionRow {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+  'w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
 
 function Field({ label, id, children, hint }: { label: string; id: string; children: React.ReactNode; hint?: string }) {
   return (
@@ -173,8 +173,8 @@ function AgentEditorInner() {
     }
   };
 
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-gray-100" />;
-  if (error) return <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
+  if (loading) return <div className="h-64 animate-pulse bg-gray-100" />;
+  if (error) return <div role="alert" className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
 
   const set = (key: string, value: string | boolean) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -194,7 +194,7 @@ function AgentEditorInner() {
               <button
                 type="button"
                 onClick={syncNow}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex cursor-pointer items-center gap-2 border border-gray-200 bg-surface-raised px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <RefreshCw className="h-4 w-4" aria-hidden /> Publish now
               </button>
@@ -204,7 +204,7 @@ function AgentEditorInner() {
       />
 
       {client?.agent_sync_error && (
-        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div role="alert" className="mb-4 flex items-start gap-2 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
           <div>
             <p className="font-medium">Last publish failed</p>
@@ -216,7 +216,7 @@ function AgentEditorInner() {
       <Tabs tabs={TABS} />
 
       {(tab === 'identity' || tab === 'behavior' || tab === 'voice') && (
-        <div className="space-y-5 rounded-xl border border-gray-200 bg-white p-6">
+        <div className="space-y-5 border border-gray-200 bg-surface-raised p-6">
           {tab === 'identity' && (
             <>
               <Field label="Business name" id="business_name" hint="Spoken by the agent when it answers.">
@@ -250,7 +250,7 @@ function AgentEditorInner() {
               </Field>
               <div className="flex items-center gap-2">
                 <input id="booking_enabled" type="checkbox" disabled={!canWrite}
-                  className="h-4 w-4 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
+                  className="h-4 w-4 cursor-pointer border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
                   checked={!!form.booking_enabled} onChange={(e) => set('booking_enabled', e.target.checked)} />
                 <label htmlFor="booking_enabled" className="cursor-pointer text-sm font-medium text-gray-700">
                   Booking enabled
@@ -277,7 +277,7 @@ function AgentEditorInner() {
               type="button"
               onClick={save}
               disabled={saving}
-              className="flex cursor-pointer items-center gap-2 rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
+              className="flex cursor-pointer items-center gap-2 bg-primary-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
             >
               <Save className="h-4 w-4" aria-hidden /> {saving ? 'Saving…' : 'Save changes'}
             </button>
@@ -288,25 +288,25 @@ function AgentEditorInner() {
       {tab === 'prompt' && (
         <div className="space-y-4">
           {preview?.problems && preview.problems.length > 0 && (
-            <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div role="alert" className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <p className="mb-1 font-medium">This configuration would be rejected:</p>
               <ul className="list-inside list-disc">
                 {preview.problems.map((p) => <li key={p}>{p}</li>)}
               </ul>
             </div>
           )}
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <div className="border border-gray-200 bg-surface-raised p-6">
             <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
               <StatusPill tone="info" label={`template: ${preview?.vertical ?? '—'}`} />
               <StatusPill tone="neutral" label={`${preview?.tools.length ?? 0} tools`} />
               <StatusPill tone="neutral" label={`${preview?.prompt.length ?? 0} chars`} />
             </div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Opening line</p>
-            <p className="mb-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-800">{preview?.beginMessage ?? '—'}</p>
+            <p className="mb-5 bg-gray-50 p-3 text-sm text-gray-800">{preview?.beginMessage ?? '—'}</p>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
               Rendered prompt — exactly what Retell receives
             </p>
-            <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-gray-900 p-4 text-xs leading-relaxed text-gray-100">
+            <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap bg-surface-dark p-4 text-xs leading-relaxed text-gray-100">
               {preview?.prompt ?? 'Could not render this prompt.'}
             </pre>
           </div>
@@ -314,7 +314,7 @@ function AgentEditorInner() {
       )}
 
       {tab === 'versions' && (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-hidden border border-gray-200 bg-surface-raised">
           <table className="w-full">
             <caption className="sr-only">Published agent configuration versions</caption>
             <thead className="bg-gray-50">
@@ -338,7 +338,7 @@ function AgentEditorInner() {
                       <button
                         type="button"
                         onClick={() => restore(v.version)}
-                        className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="cursor-pointer px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
                       >
                         Restore
                       </button>
@@ -367,7 +367,7 @@ function AgentEditorInner() {
 
 export default function AgentEditorPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-gray-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100" />}>
       <AgentEditorInner />
     </Suspense>
   );

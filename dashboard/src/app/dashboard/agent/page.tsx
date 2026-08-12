@@ -68,7 +68,7 @@ interface Options {
 }
 
 const inputCls =
-  'w-full rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 ' +
+  'w-full border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 ' +
   'placeholder:text-panel-400 transition-colors duration-150 hover:border-panel-400 ' +
   'focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 ' +
   'disabled:cursor-not-allowed disabled:bg-panel-50 disabled:text-panel-500';
@@ -97,7 +97,7 @@ function Toggle({
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 cursor-pointer rounded border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600 disabled:cursor-not-allowed"
+        className="mt-0.5 h-4 w-4 cursor-pointer border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600 disabled:cursor-not-allowed"
       />
       <label htmlFor={id} className="cursor-pointer">
         <span className="block text-sm font-medium text-ink-800">{label}</span>
@@ -248,7 +248,7 @@ function AgentCustomiserInner() {
     }
   };
 
-  if (!ready) return <div className="h-64 animate-pulse rounded-xl bg-panel-100" />;
+  if (!ready) return <div className="h-64 animate-pulse bg-panel-100" />;
 
   return (
     <div className="max-w-3xl">
@@ -263,15 +263,15 @@ function AgentCustomiserInner() {
       {needsChoice || !clientId ? (
         <ChooseClientPrompt what="Agent customisation" />
       ) : loading ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : !agent || !options ? (
-        <div role="alert" className="rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           Could not load this agent.
         </div>
       ) : (
         <>
           {!canWrite && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-panel-200 bg-panel-50 px-4 py-3 text-sm text-panel-700">
+            <div className="mb-4 flex items-start gap-2 border border-panel-200 bg-panel-50 px-4 py-3 text-sm text-panel-700">
               <Info className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
               <p>You have read-only access. Ask an account owner to make changes.</p>
             </div>
@@ -279,7 +279,7 @@ function AgentCustomiserInner() {
 
           <Tabs tabs={TABS} />
 
-          <div className="space-y-6 rounded-xl border border-panel-200 bg-white p-6">
+          <div className="space-y-6 border border-panel-200 bg-surface-raised p-6">
             {tab === 'greeting' && (
               <>
                 <Field
@@ -306,7 +306,7 @@ function AgentCustomiserInner() {
                 )}
 
                 {preview && (
-                  <div className="rounded-lg border border-panel-200 bg-panel-25 p-4">
+                  <div className="border border-panel-200 bg-panel-25 p-4">
                     <p className="mb-2 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
                       <Volume2 className="h-3.5 w-3.5" aria-hidden /> What callers hear
                     </p>
@@ -315,7 +315,7 @@ function AgentCustomiserInner() {
                 )}
 
                 {preview && !preview.mentionsRecording && (
-                  <div role="alert" className="flex items-start gap-2 rounded-lg border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm text-lamp-fair-ink">
+                  <div role="alert" className="flex items-start gap-2 border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm text-lamp-fair-ink">
                     <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
                     <p>
                       This greeting doesn&apos;t mention that the call is recorded. Many states require
@@ -487,7 +487,7 @@ function AgentCustomiserInner() {
                       <button
                         type="button"
                         onClick={() => set('pronunciation_dictionary', agent.pronunciation_dictionary.filter((_, j) => j !== i))}
-                        className="cursor-pointer rounded-md border border-panel-300 px-3 py-2 text-xs font-medium text-panel-600 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
+                        className="cursor-pointer border border-panel-300 px-3 py-2 text-xs font-medium text-panel-600 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
                       >
                         Remove
                       </button>
@@ -498,7 +498,7 @@ function AgentCustomiserInner() {
                   <button
                     type="button"
                     onClick={() => set('pronunciation_dictionary', [...agent.pronunciation_dictionary, { word: '', alphabet: 'ipa' as const, phoneme: '' }])}
-                    className="cursor-pointer rounded-md border border-panel-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                    className="cursor-pointer border border-panel-300 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                   >
                     Add a word
                   </button>
@@ -516,7 +516,7 @@ function AgentCustomiserInner() {
                     type="button"
                     onClick={() => setReviewing(true)}
                     disabled={saving || !dirty}
-                    className="flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <ClipboardCheck className="h-4 w-4" aria-hidden /> Review changes
                   </button>
@@ -527,8 +527,8 @@ function AgentCustomiserInner() {
                   disabled={saving || !dirty}
                   className={
                     canReview
-                      ? 'flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-4 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40'
-                      : 'flex cursor-pointer items-center gap-2 rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40'
+                      ? 'flex cursor-pointer items-center gap-2 border border-panel-300 bg-surface-raised px-4 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40'
+                      : 'flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40'
                   }
                 >
                   <Save className="h-4 w-4" aria-hidden /> {saving ? 'Saving…' : canReview ? 'Save without reviewing' : 'Save changes'}
@@ -562,7 +562,7 @@ function AgentCustomiserInner() {
 
 export default function AgentCustomiserPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <AgentCustomiserInner />
     </Suspense>
   );

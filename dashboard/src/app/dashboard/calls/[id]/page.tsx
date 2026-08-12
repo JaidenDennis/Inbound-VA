@@ -37,7 +37,7 @@ function formatNumber(raw: unknown): string {
 
 function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-xl border border-panel-200 bg-white p-4">
+    <div className="border border-panel-200 bg-surface-raised p-4">
       <p className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">{label}</p>
       <p className={`mt-1 text-sm font-medium text-ink-900 ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
@@ -60,10 +60,10 @@ export default function CallDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-64 animate-pulse bg-panel-100" />;
   if (!detail) {
     return (
-      <div role="alert" className="rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+      <div role="alert" className="border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
         That call could not be found.
       </div>
     );
@@ -97,7 +97,7 @@ export default function CallDetailPage() {
       {canReadTranscript && <CallIntelligence callId={id} />}
 
       {summary && (
-        <section className="mb-4 rounded-xl border border-panel-200 bg-white">
+        <section className="mb-4 border border-panel-200 bg-surface-raised">
           <h2 className="border-b border-panel-200 px-5 py-3.5 font-heading text-sm font-semibold text-ink-900">
             Summary
           </h2>
@@ -118,7 +118,7 @@ export default function CallDetailPage() {
       )}
 
       {transcript && (
-        <section className="rounded-xl border border-panel-200 bg-white">
+        <section className="border border-panel-200 bg-surface-raised">
           <h2 className="border-b border-panel-200 px-5 py-3.5 font-heading text-sm font-semibold text-ink-900">
             Transcript
           </h2>
@@ -132,9 +132,9 @@ export default function CallDetailPage() {
                       {isAgent ? 'Agent' : 'Caller'}
                     </p>
                     <div
-                      className={`rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                        isAgent ? 'bg-ink-800 text-white' : 'bg-panel-100 text-ink-800'
-                      }`}
+                      className={`px-3.5 py-2.5 text-sm leading-relaxed ${
+ isAgent ? 'bg-surface-dark text-white' : 'bg-panel-100 text-ink-800'
+ }`}
                     >
                       {turn.content}
                     </div>

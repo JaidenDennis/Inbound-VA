@@ -127,7 +127,7 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
     href === '/dashboard' ? pathname === href : pathname === href || pathname.startsWith(href + '/');
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-ink-900 text-panel-300">
+    <div className="flex h-full min-h-0 w-full flex-col bg-surface-dark text-panel-300">
       {/* Identity */}
       <div className="flex items-center gap-3 border-b border-white/[0.07] px-5 py-5">
         <Mark className="h-8 w-8 flex-shrink-0 text-white" />
@@ -148,7 +148,7 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
           // when permissions land.
           <ul className="space-y-1 px-3" aria-hidden>
             {Array.from({ length: 8 }).map((_, i) => (
-              <li key={i} className="mx-1 my-1.5 h-9 animate-pulse rounded-md bg-white/[0.05]" />
+              <li key={i} className="mx-1 my-1.5 h-9 animate-pulse bg-surface-raised/[0.05]" />
             ))}
           </ul>
         ) : (
@@ -171,14 +171,14 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
                         className={clsx(
                           // py-3 keeps the row at a >=44px touch target without
                           // costing a visible line of nav on a 13-item rail.
-                          'group flex cursor-pointer items-center gap-3 rounded-md px-3 py-3 text-sm',
+                          'group flex cursor-pointer items-center gap-3 px-3 py-3 text-sm',
                           'transition-colors duration-150 ease-out',
                           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900',
                           active
                             // A depressed key: seated, lit, and legible — not a
                             // coloured stripe bolted to the edge.
-                            ? 'bg-white/[0.10] font-semibold text-white shadow-seat'
-                            : 'font-medium text-panel-400 hover:bg-white/[0.05] hover:text-panel-100'
+                            ? 'bg-surface-raised/[0.10] font-semibold text-white shadow-seat'
+                            : 'font-medium text-panel-400 hover:bg-surface-raised/[0.05] hover:text-panel-100'
                         )}
                       >
                         <Icon
@@ -213,7 +213,7 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
         <button
           onClick={handleLogout}
           className={clsx(
-            'flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium',
+            'flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-sm font-medium',
             'text-panel-400 transition-colors duration-150 ease-out',
             'hover:bg-lamp-bad/[0.14] hover:text-lamp-bad-rim',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900'
@@ -257,13 +257,13 @@ export default function Sidebar() {
       </nav>
 
       {/* Mobile bar */}
-      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-white/[0.07] bg-ink-900 px-4 lg:hidden">
+      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-white/[0.07] bg-surface-dark px-4 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open navigation"
           aria-expanded={open}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-panel-300 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center text-panel-300 transition-colors hover:bg-surface-raised/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
         >
           <Menu className="h-5 w-5" aria-hidden strokeWidth={1.75} />
         </button>
@@ -278,7 +278,7 @@ export default function Sidebar() {
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 cursor-default bg-ink-900/60"
+            className="absolute inset-0 cursor-default bg-scrim"
           />
           <nav
             aria-label="Main"
@@ -288,7 +288,7 @@ export default function Sidebar() {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close navigation"
-              className="absolute right-3 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-panel-400 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+              className="absolute right-3 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center text-panel-400 transition-colors hover:bg-surface-raised/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
             >
               <X className="h-5 w-5" aria-hidden strokeWidth={1.75} />
             </button>

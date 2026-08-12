@@ -31,7 +31,7 @@ export function KPICard({ label, value, icon: Icon, trend, trendLabel, subtitle 
   const Arrow = rising ? ArrowUpRight : ArrowDownRight;
 
   return (
-    <div className="group relative rounded-xl border border-panel-200 bg-white px-5 py-4 transition-colors duration-150 ease-out hover:border-panel-300">
+    <div className="group relative border border-panel-200 bg-surface-raised px-5 py-4 transition-colors duration-150 ease-out hover:border-panel-300">
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 flex-shrink-0 text-panel-500" aria-hidden strokeWidth={1.75} />
         <p className="truncate text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">

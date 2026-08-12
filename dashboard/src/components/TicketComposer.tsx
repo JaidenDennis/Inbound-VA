@@ -76,7 +76,7 @@ export function TicketComposer({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+        className="mb-4 flex cursor-pointer items-center gap-2 border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
       >
         <Sparkles className="h-4 w-4 text-panel-500" aria-hidden />
         Describe it and I&apos;ll write the ticket
@@ -85,7 +85,7 @@ export function TicketComposer({
   }
 
   return (
-    <section className="mb-4 rounded-xl border border-panel-200 bg-white">
+    <section className="mb-4 border border-panel-200 bg-surface-raised">
       <div className="border-b border-panel-200 px-5 py-3.5">
         <h2 className="flex items-center gap-2 font-heading text-sm font-semibold text-ink-900">
           <Sparkles className="h-4 w-4 text-panel-500" aria-hidden /> Describe the problem
@@ -104,7 +104,7 @@ export function TicketComposer({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="e.g. People say they call and it just rings, but the dashboard shows my agent is live"
-          className="w-full resize-y rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+          className="w-full resize-y border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
         />
 
         <div className="flex flex-wrap gap-2">
@@ -112,14 +112,14 @@ export function TicketComposer({
             type="button"
             onClick={generate}
             disabled={loading}
-            className="cursor-pointer rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {loading ? 'Writing it up…' : 'Draft the ticket'}
           </button>
           <button
             type="button"
             onClick={() => { setOpen(false); setDraft(null); setError(''); }}
-            className="cursor-pointer rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="cursor-pointer border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
           >
             Cancel
           </button>
@@ -128,11 +128,11 @@ export function TicketComposer({
         {error && <p role="alert" className="text-sm text-lamp-bad-ink">{error}</p>}
 
         {draft && (
-          <div className="space-y-3 rounded-lg border border-panel-200 bg-panel-25 p-4">
+          <div className="space-y-3 border border-panel-200 bg-panel-25 p-4">
             {/* Surfaced above the draft: if they can fix it in 30 seconds, they
                 should not be waiting on a support queue at all. */}
             {draft.self_serve_fix && (
-              <div className="flex items-start gap-2 rounded-lg border border-lamp-good-rim bg-lamp-good-wash px-3 py-2.5">
+              <div className="flex items-start gap-2 border border-lamp-good-rim bg-lamp-good-wash px-3 py-2.5">
                 <Lightbulb className="mt-0.5 h-4 w-4 flex-shrink-0 text-lamp-good-ink" aria-hidden />
                 <div>
                   <p className="text-xs font-semibold text-lamp-good-ink">You might be able to fix this yourself</p>
@@ -162,7 +162,7 @@ export function TicketComposer({
             <button
               type="button"
               onClick={use}
-              className="cursor-pointer rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2"
+              className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2"
             >
               Use this draft
             </button>

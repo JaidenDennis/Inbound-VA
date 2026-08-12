@@ -81,9 +81,9 @@ export default function AnalyticsPage() {
 
   const chartData = data
     ? [
-        { name: 'Calls', value: data.totalCalls, fill: '#3b5bdb' },
-        { name: 'Leads', value: data.leadsCapured, fill: '#40c057' },
-        { name: 'Bookings', value: data.appointmentsBooked, fill: '#7950f2' },
+        { name: 'Calls', value: data.totalCalls, fill: 'var(--series-1)' },
+        { name: 'Leads', value: data.leadsCapured, fill: 'var(--series-2)' },
+        { name: 'Bookings', value: data.appointmentsBooked, fill: 'var(--series-1)' },
       ]
     : [];
 
@@ -99,7 +99,7 @@ export default function AnalyticsPage() {
       {/* Styled to match ClientPicker's visual treatment (border, label,
           select) even though it is a plain, page-local control rather than
           the shared client-scope hook. */}
-      <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-panel-200 bg-white p-4">
+      <div className="mb-6 flex flex-wrap items-end gap-3 border border-panel-200 bg-surface-raised p-4">
         <div className="flex min-w-[16rem] flex-col gap-1.5">
           <label htmlFor="analytics-company" className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
             Company
@@ -109,7 +109,7 @@ export default function AnalyticsPage() {
             value={clientId}
             disabled={clientsLoading}
             onChange={(e) => setClientId(e.target.value)}
-            className="cursor-pointer rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:cursor-wait disabled:bg-panel-50"
+            className="cursor-pointer border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:cursor-wait disabled:bg-panel-50"
           >
             <option value="">{clientsLoading ? 'Loading companies…' : 'All companies'}</option>
             {clients.map((c) => (
@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
       ) : error || !data ? (
         <div
           role="alert"
-          className="rounded-xl border border-lamp-bad-rim bg-lamp-bad-wash px-5 py-4 text-sm text-lamp-bad-ink"
+          className="border border-lamp-bad-rim bg-lamp-bad-wash px-5 py-4 text-sm text-lamp-bad-ink"
         >
           <p className="font-semibold">Figures did not load.</p>
           <p className="mt-1 text-xs leading-relaxed">
@@ -140,7 +140,7 @@ export default function AnalyticsPage() {
               traffic light over metrics that carry no health meaning at all — and
               purple is not in the token system, so it rendered as stock Tailwind.
               Figures are ink; chroma stays with real status. */}
-          <div className="mb-8 grid grid-cols-1 overflow-hidden rounded-xl border border-panel-200 bg-white sm:grid-cols-3">
+          <div className="mb-8 grid grid-cols-1 overflow-hidden border border-panel-200 bg-surface-raised sm:grid-cols-3">
             {[
               { label: 'Total calls', value: data.totalCalls },
               { label: 'Leads captured', value: data.leadsCapured },
@@ -159,15 +159,15 @@ export default function AnalyticsPage() {
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-xl border p-6">
+          <div className="bg-surface-raised border p-6 viz-root">
             <h2 className="font-semibold text-gray-700 mb-4">Performance Overview</h2>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f3f4" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--gridline)" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#3b5bdb" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="var(--series-1)" />
               </BarChart>
             </ResponsiveContainer>
           </div>

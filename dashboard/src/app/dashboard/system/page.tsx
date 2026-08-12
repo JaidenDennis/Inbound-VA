@@ -161,8 +161,8 @@ function SystemPageInner() {
   };
 
   const toggleCls = (active: boolean) =>
-    `flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-      active ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+    `flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+      active ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-surface-raised text-gray-600 hover:bg-gray-50'
     }`;
 
   return (
@@ -186,13 +186,13 @@ function SystemPageInner() {
       <FilterBar filters={filters} />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mb-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-hidden border border-gray-200 bg-surface-raised">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-14 animate-pulse border-b border-gray-100 bg-gray-50 last:border-0" />
           ))}
@@ -218,7 +218,7 @@ function SystemPageInner() {
             <button
               type="button"
               onClick={() => markReviewed(detail.id)}
-              className="flex cursor-pointer items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              className="flex cursor-pointer items-center gap-2 bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
               <Check className="h-4 w-4" aria-hidden /> Mark reviewed
             </button>
@@ -341,7 +341,7 @@ function GroupedTable({
                     <button
                       type="button"
                       onClick={() => setPending(g)}
-                      className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-2xs font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                      className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap border border-panel-300 bg-surface-raised px-2.5 py-1.5 text-2xs font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       <CheckCheck className="h-3.5 w-3.5" aria-hidden />
                       Clear group
@@ -430,7 +430,7 @@ function ActivityTable({
                     <button
                       type="button"
                       onClick={() => onOpen(row)}
-                      className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 hover:text-signal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                      className="cursor-pointer px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 hover:text-signal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       Details
                     </button>
@@ -440,7 +440,7 @@ function ActivityTable({
                       type="button"
                       onClick={() => onRetry(row.ref_id)}
                       aria-label={`Retry ${row.title}`}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 hover:text-signal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                      className="inline-flex cursor-pointer items-center gap-1 px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 hover:text-signal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Retry
                     </button>
@@ -494,7 +494,7 @@ function ErrorDetailBody({ detail }: { detail: ErrorDetail }) {
       {detail.stack && (
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Stack</p>
-          <pre className="mt-1 max-h-72 overflow-auto rounded-lg bg-gray-900 p-3 text-xs leading-relaxed text-gray-100">
+          <pre className="mt-1 max-h-72 overflow-auto bg-surface-dark p-3 text-xs leading-relaxed text-gray-100">
             {detail.stack}
           </pre>
         </div>
@@ -502,7 +502,7 @@ function ErrorDetailBody({ detail }: { detail: ErrorDetail }) {
 
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Context</p>
-        <pre className="mt-1 max-h-60 overflow-auto rounded-lg bg-gray-50 p-3 text-xs text-gray-700">
+        <pre className="mt-1 max-h-60 overflow-auto bg-gray-50 p-3 text-xs text-gray-700">
           {JSON.stringify(detail.context, null, 2)}
         </pre>
         <p className="mt-1 text-xs text-gray-400">
@@ -516,7 +516,7 @@ function ErrorDetailBody({ detail }: { detail: ErrorDetail }) {
 export default function SystemPage() {
   // useSearchParams needs a Suspense boundary in the app router.
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-gray-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100" />}>
       <SystemPageInner />
     </Suspense>
   );

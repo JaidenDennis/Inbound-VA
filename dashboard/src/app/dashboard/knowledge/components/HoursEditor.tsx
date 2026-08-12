@@ -53,7 +53,7 @@ function defaultHours(tz: string): Hours {
 }
 
 const timeCls =
-  'rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 transition-colors ' +
+  'border border-panel-300 bg-surface-raised px-2.5 py-1.5 text-sm text-ink-900 transition-colors ' +
   'hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 ' +
   'disabled:cursor-not-allowed disabled:bg-panel-50 disabled:text-panel-400';
 
@@ -114,14 +114,14 @@ export function HoursEditor({
     }
   };
 
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-64 animate-pulse bg-panel-100" />;
   if (!hours) return null;
 
   const ordered = [...hours.weekly].sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7));
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-panel-200 bg-white">
+      <div className="border border-panel-200 bg-surface-raised">
         <div className="border-b border-panel-200 px-5 py-3.5">
           <h2 className="font-heading text-sm font-semibold text-ink-900">Opening hours</h2>
           <p className="mt-0.5 text-xs text-panel-500">
@@ -140,7 +140,7 @@ export function HoursEditor({
                   checked={!d.closed}
                   disabled={readOnly}
                   onChange={(e) => setDay(d.day, { closed: !e.target.checked })}
-                  className="h-4 w-4 cursor-pointer rounded border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
+                  className="h-4 w-4 cursor-pointer border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
                 />
                 Open
               </label>
@@ -173,7 +173,7 @@ export function HoursEditor({
         </ul>
       </div>
 
-      <div className="rounded-xl border border-panel-200 bg-white">
+      <div className="border border-panel-200 bg-surface-raised">
         <div className="border-b border-panel-200 px-5 py-3.5">
           <h2 className="font-heading text-sm font-semibold text-ink-900">Holidays &amp; exceptions</h2>
           <p className="mt-0.5 text-xs text-panel-500">
@@ -202,7 +202,7 @@ export function HoursEditor({
                     checked={e.closed}
                     disabled={readOnly}
                     onChange={(ev) => setException(i, { closed: ev.target.checked })}
-                    className="h-4 w-4 cursor-pointer rounded border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
+                    className="h-4 w-4 cursor-pointer border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
                   />
                   Closed
                 </label>
@@ -235,7 +235,7 @@ export function HoursEditor({
                       setDirty(true);
                     }}
                     aria-label={`Remove exception ${i + 1}`}
-                    className="ml-auto cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
+                    className="ml-auto cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden />
                   </button>
@@ -255,7 +255,7 @@ export function HoursEditor({
                 );
                 setDirty(true);
               }}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+              className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
             >
               <Plus className="h-4 w-4" aria-hidden /> Add exception
             </button>
@@ -263,7 +263,7 @@ export function HoursEditor({
               type="button"
               onClick={save}
               disabled={saving || !dirty}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex cursor-pointer items-center gap-1.5 bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Save className="h-4 w-4" aria-hidden /> {saving ? 'Saving…' : 'Save hours'}
             </button>

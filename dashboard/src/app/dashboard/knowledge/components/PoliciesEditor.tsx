@@ -83,7 +83,7 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
           {
             icon: '⚠️',
             duration: 10000,
-            style: { background: '#FCF2E0', color: '#8A5600', border: '1px solid #EFD5A6' },
+            style: { background: 'var(--lamp-fair-wash)', color: 'rgb(var(--lamp-fair-ink-rgb))', border: '1px solid var(--lamp-fair-rim)' },
           },
         );
       } else {
@@ -96,10 +96,10 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
     }
   };
 
-  if (loading) return <div className="h-48 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-48 animate-pulse bg-panel-100" />;
 
   return (
-    <div className="rounded-xl border border-panel-200 bg-white">
+    <div className="border border-panel-200 bg-surface-raised">
       <div className="border-b border-panel-200 px-5 py-3.5">
         <h2 className="font-heading text-sm font-semibold text-ink-900">Business policies</h2>
         <p className="mt-0.5 text-xs text-panel-500">
@@ -139,7 +139,7 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
                     placeholder="Title"
                     maxLength={200}
                     aria-label={`Policy ${i + 1} title`}
-                    className={`w-full rounded-md border bg-white px-3 py-1.5 text-sm font-medium text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 read-only:bg-panel-50 read-only:text-panel-600 ${titleBlank ? 'border-lamp-bad' : 'border-panel-300'}`}
+                    className={`w-full border bg-surface-raised px-3 py-1.5 text-sm font-medium text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 read-only:bg-panel-50 read-only:text-panel-600 ${titleBlank ? 'border-lamp-bad' : 'border-panel-300'}`}
                   />
                   {titleBlank && (
                     <span className="text-xs text-lamp-bad-ink">Title is required</span>
@@ -152,7 +152,7 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
                     maxLength={4000}
                     placeholder="Body"
                     aria-label={`Policy ${i + 1} body`}
-                    className="w-full resize-y rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 read-only:bg-panel-50 read-only:text-panel-600"
+                    className="w-full resize-y border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 read-only:bg-panel-50 read-only:text-panel-600"
                   />
                 </div>
                 {!readOnly && (
@@ -160,7 +160,7 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
                     type="button"
                     onClick={() => remove(i)}
                     aria-label={`Remove policy ${i + 1}`}
-                    className="mt-1 cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
+                    className="mt-1 cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden />
                   </button>
@@ -176,7 +176,7 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
           <button
             type="button"
             onClick={() => { setPolicies((ps) => [...ps, { title: '', body: '' }]); setDirty(true); }}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
           >
             <Plus className="h-4 w-4" aria-hidden /> Add policy
           </button>
@@ -184,7 +184,7 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
             type="button"
             onClick={save}
             disabled={saving || !dirty}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex cursor-pointer items-center gap-1.5 bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Save className="h-4 w-4" aria-hidden /> {saving ? 'Saving…' : 'Save policies'}
           </button>

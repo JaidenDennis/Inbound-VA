@@ -132,7 +132,7 @@ function ReportsPageInner() {
     return (
       <div>
         <PageHeader title="Reports" description="Your call performance." />
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+        <div className="border border-gray-200 bg-surface-raised p-12 text-center">
           <p className="text-lg text-gray-600">Reporting starts when your agent goes live</p>
           <p className="mt-1 text-sm text-gray-400">
             Finish onboarding and your calls will appear here automatically.
@@ -148,16 +148,16 @@ function ReportsPageInner() {
         title="Reports"
         description="What your AI agent did on your calls."
         action={
-          <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1">
+          <div className="flex gap-1 border border-gray-200 bg-surface-raised p-1">
             {RANGES.map((r) => (
               <button
                 key={r.key}
                 type="button"
                 onClick={() => setRange(r.key)}
                 aria-pressed={range === r.key}
-                className={`cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                  range === r.key ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
-                }`}
+                className={`cursor-pointer px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+ range === r.key ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
+ }`}
               >
                 {r.label}
               </button>
@@ -167,7 +167,7 @@ function ReportsPageInner() {
       />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mb-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -175,13 +175,13 @@ function ReportsPageInner() {
       {/* KPI row — five headline numbers are stat tiles, not a bar chart. */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {KPI_CARDS.map(({ key, label, icon: Icon, format }) => (
-          <div key={key} className="rounded-xl border border-gray-200 bg-white p-4">
+          <div key={key} className="border border-gray-200 bg-surface-raised p-4">
             <div className="mb-2 flex items-center gap-2">
               <Icon className="h-4 w-4 text-gray-400" aria-hidden />
               <p className="text-xs font-medium text-gray-500">{label}</p>
             </div>
             {loading ? (
-              <div className="h-8 w-16 animate-pulse rounded bg-gray-100" />
+              <div className="h-8 w-16 animate-pulse bg-gray-100" />
             ) : (
               <p className="text-2xl font-bold text-gray-900">
                 {format ? format(kpis?.[key] ?? 0) : (kpis?.[key] ?? 0).toLocaleString()}
@@ -208,7 +208,7 @@ function ReportsPageInner() {
           }
         >
           {loading ? (
-            <div className="h-64 animate-pulse rounded-lg bg-gray-50" />
+            <div className="h-64 animate-pulse bg-gray-50" />
           ) : (
             <VolumeChart data={volume} bucket={bucket} />
           )}
@@ -225,14 +225,14 @@ function ReportsPageInner() {
           }
         >
           {loading ? (
-            <div className="h-64 animate-pulse rounded-lg bg-gray-50" />
+            <div className="h-64 animate-pulse bg-gray-50" />
           ) : (
             <OutcomeChart data={outcomes} />
           )}
         </ChartCard>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden border border-gray-200 bg-surface-raised">
         <div className="border-b border-gray-100 px-5 py-4">
           <h2 className="font-heading text-base font-semibold text-gray-900">Recent calls</h2>
           <p className="mt-0.5 text-sm text-gray-500">The most recent 25 calls in this period.</p>
@@ -264,7 +264,7 @@ function ReportsPageInner() {
                     <button
                       type="button"
                       onClick={() => openCall(c)}
-                      className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="cursor-pointer px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                       Details
                     </button>
@@ -313,7 +313,7 @@ function ReportsPageInner() {
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Transcript</p>
 
               {!canReadTranscripts ? (
-                <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-gray-600">
+                <div className="flex items-start gap-2 border border-gray-200 bg-gray-50 px-4 py-3 text-gray-600">
                   <Lock className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
                   <p>
                     Call transcripts contain caller personal details, so they are limited to account
@@ -325,15 +325,15 @@ function ReportsPageInner() {
               ) : transcriptError ? (
                 <p role="alert" className="text-red-600">{transcriptError}</p>
               ) : transcript === null ? (
-                <div className="h-32 animate-pulse rounded-lg bg-gray-50" />
+                <div className="h-32 animate-pulse bg-gray-50" />
               ) : (
                 <div className="space-y-2">
                   {transcript.map((turn, i) => (
                     <div key={i} className={turn.role === 'agent' ? 'flex justify-end' : 'flex'}>
                       <div
-                        className={`max-w-sm rounded-xl px-3 py-2 ${
-                          turn.role === 'agent' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`max-w-sm px-3 py-2 ${
+ turn.role === 'agent' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-800'
+ }`}
                       >
                         <p className={`mb-0.5 text-xs ${turn.role === 'agent' ? 'text-primary-100' : 'text-gray-500'}`}>
                           {turn.role === 'agent' ? 'Agent' : 'Caller'}
@@ -359,7 +359,7 @@ function ReportsPageInner() {
 
 export default function ReportsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-gray-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100" />}>
       <ReportsPageInner />
     </Suspense>
   );

@@ -71,7 +71,7 @@ export function ClientPicker({ label = 'Client' }: { label?: string }) {
   };
 
   return (
-    <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-panel-200 bg-white p-4">
+    <div className="mb-4 flex flex-wrap items-end gap-3 border border-panel-200 bg-surface-raised p-4">
       <div className="flex min-w-[16rem] flex-col gap-1.5">
         <label htmlFor="client-scope" className="text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
           {label}
@@ -81,7 +81,7 @@ export function ClientPicker({ label = 'Client' }: { label?: string }) {
           value={selected}
           disabled={loading}
           onChange={(e) => choose(e.target.value)}
-          className="cursor-pointer rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:cursor-wait disabled:bg-panel-50"
+          className="cursor-pointer border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 transition-colors duration-150 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:cursor-wait disabled:bg-panel-50"
         >
           <option value="">{loading ? 'Loading clients…' : 'Choose a client…'}</option>
           {clients.map((c) => (
@@ -96,7 +96,7 @@ export function ClientPicker({ label = 'Client' }: { label?: string }) {
 /** Shown in place of the page body while staff have not picked a client. */
 export function ChooseClientPrompt({ what }: { what: string }) {
   return (
-    <div className="rounded-xl border border-panel-200 bg-white px-6 py-14 text-center">
+    <div className="border border-panel-200 bg-surface-raised px-6 py-14 text-center">
       <p className="text-sm font-medium text-ink-800">Choose a client</p>
       <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-panel-500">
         {what} is configured per client. Pick one above to view or edit it.

@@ -51,13 +51,13 @@ export default function BookingsPage() {
     <div>
       <h1 className="text-2xl font-bold mb-6">Bookings</h1>
       {appointments.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-surface-raised border border-gray-200 p-12 text-center text-gray-400">
           No appointments found.
         </div>
       ) : (
         <div className="space-y-3">
           {appointments.map((a) => (
-            <div key={a.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+            <div key={a.id} className="bg-surface-raised border border-gray-200 p-4 flex items-center justify-between">
               <div>
                 <p className="font-medium text-gray-900">{a.title}</p>
                 <p className="text-sm text-gray-500">{format(new Date(a.start_time), 'PPp')} · {a.timezone}</p>

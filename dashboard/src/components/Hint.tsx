@@ -76,7 +76,7 @@ export function Hint({
         className={clsx(
           open
             ? [
-                'absolute top-6 z-30 w-64 rounded-xl border border-panel-200 bg-white p-3',
+                'absolute top-6 z-30 w-64 border border-panel-200 bg-surface-raised p-3',
                 'text-xs font-normal normal-case leading-relaxed tracking-normal text-panel-700 shadow-lg',
                 align === 'right' ? 'right-0' : 'left-0',
               ]

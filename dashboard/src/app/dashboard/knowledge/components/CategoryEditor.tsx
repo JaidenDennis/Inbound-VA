@@ -102,7 +102,7 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
         toast(warning, {
           icon: '⚠️',
           duration: 10000,
-          style: { background: '#FCF2E0', color: '#8A5600', border: '1px solid #EFD5A6' },
+          style: { background: 'var(--lamp-fair-wash)', color: 'rgb(var(--lamp-fair-ink-rgb))', border: '1px solid var(--lamp-fair-rim)' },
         });
       }
     } catch (err) {
@@ -128,10 +128,10 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
     }
   };
 
-  if (loading) return <div className="mb-6 h-32 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="mb-6 h-32 animate-pulse bg-panel-100" />;
 
   return (
-    <div className="mb-6 rounded-xl border border-panel-200 bg-white">
+    <div className="mb-6 border border-panel-200 bg-surface-raised">
       <div className="border-b border-panel-200 px-5 py-3.5">
         <h2 className="font-heading text-sm font-semibold text-ink-900">FAQ categories</h2>
         <p className="mt-0.5 text-xs text-panel-500">
@@ -155,14 +155,14 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
                     autoFocus
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
-                    className="flex-1 rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+                    className="flex-1 border border-panel-300 bg-surface-raised px-2.5 py-1.5 text-sm text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
                   />
                   <button
                     type="button"
                     onClick={() => rename(c.id)}
                     disabled={saving}
                     aria-label="Save category name"
-                    className="cursor-pointer rounded p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                    className="cursor-pointer p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
                   >
                     <Check className="h-4 w-4" aria-hidden />
                   </button>
@@ -171,7 +171,7 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
                     onClick={cancelRename}
                     disabled={saving}
                     aria-label="Cancel rename"
-                    className="cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
+                    className="cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
                   >
                     <X className="h-4 w-4" aria-hidden />
                   </button>
@@ -183,7 +183,7 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
                     type="button"
                     onClick={() => startRename(c)}
                     aria-label={`Rename ${c.name}`}
-                    className="cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                    className="cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                   >
                     <Pencil className="h-4 w-4" aria-hidden />
                   </button>
@@ -191,7 +191,7 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
                     type="button"
                     onClick={() => remove(c.id)}
                     aria-label={`Remove ${c.name}`}
-                    className="cursor-pointer rounded p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
+                    className="cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-lamp-bad-wash hover:text-lamp-bad-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamp-bad"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden />
                   </button>
@@ -214,13 +214,13 @@ export function CategoryEditor({ clientId, onChanged }: { clientId: string; onCh
           onKeyDown={(e) => {
             if (e.key === 'Enter') add();
           }}
-          className="flex-1 rounded-md border border-panel-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+          className="flex-1 border border-panel-300 bg-surface-raised px-2.5 py-1.5 text-sm text-ink-900 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
         />
         <button
           type="button"
           onClick={add}
           disabled={saving || !newName.trim()}
-          className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus className="h-4 w-4" aria-hidden /> Add
         </button>

@@ -79,7 +79,7 @@ function PlatformRollup() {
       />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
@@ -91,7 +91,7 @@ function PlatformRollup() {
       )}
 
       {loading ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : rows.length === 0 ? (
         <TableEmpty
           icon={<ListChecks className="h-8 w-8 text-panel-300" aria-hidden />}
@@ -134,7 +134,7 @@ function PlatformRollup() {
                   <TD align="right">
                     <Link
                       href={`/dashboard/onboarding/${r.client_id}`}
-                      className="rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                      className="px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
                     >
                       Open
                     </Link>
@@ -177,7 +177,7 @@ function ClientTimeline() {
     }
   };
 
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-64 animate-pulse bg-panel-100" />;
 
   const pending = items.filter((i) => i.status === 'pending');
   const current = currentStageIndex(milestones);
@@ -195,7 +195,7 @@ function ClientTimeline() {
       />
 
       {items.length > 0 && (
-        <section className="mb-8 rounded-xl border border-panel-200 bg-white p-5">
+        <section className="mb-8 border border-panel-200 bg-surface-raised p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-heading text-sm font-semibold text-ink-900">Waiting on you</h2>
             {pending.length > 0 && <StatusPill tone="warning" label={`${pending.length} pending`} />}
@@ -208,7 +208,7 @@ function ClientTimeline() {
                   type="checkbox"
                   checked={item.status === 'done'}
                   onChange={() => toggleItem(item)}
-                  className="mt-0.5 h-4 w-4 cursor-pointer rounded border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
+                  className="mt-0.5 h-4 w-4 cursor-pointer border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600"
                 />
                 <label
                   htmlFor={`item-${item.id}`}
@@ -240,8 +240,8 @@ function ClientTimeline() {
               <li key={m.id} className="mb-6 ml-6 last:mb-0">
                 <span
                   className={`absolute -left-[0.7rem] flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-panel-50 ${
-                    isComplete ? 'bg-lamp-good' : isCurrent ? 'bg-ink-700' : 'bg-panel-300'
-                  }`}
+ isComplete ? 'bg-lamp-good' : isCurrent ? 'bg-ink-700' : 'bg-panel-300'
+ }`}
                 >
                   {isComplete && <Check className="h-3 w-3 text-white" aria-hidden />}
                 </span>
@@ -269,6 +269,6 @@ function ClientTimeline() {
 
 export default function OnboardingPage() {
   const { isPlatform, loading } = useSession();
-  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-64 animate-pulse bg-panel-100" />;
   return isPlatform ? <PlatformRollup /> : <ClientTimeline />;
 }

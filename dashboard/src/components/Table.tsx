@@ -19,7 +19,7 @@ import clsx from 'clsx';
 
 export function TableShell({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={clsx('overflow-hidden rounded-xl border border-panel-200 bg-white', className)}>
+    <div className={clsx('overflow-hidden border border-panel-200 bg-surface-raised', className)}>
       {/* Horizontal escape hatch: dense tables must scroll inside their own
           container rather than pushing the page sideways. */}
       <div className="overflow-x-auto">{children}</div>
@@ -153,7 +153,7 @@ export function TableEmpty({
   icon?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-panel-200 bg-white px-6 py-14 text-center">
+    <div className="border border-panel-200 bg-surface-raised px-6 py-14 text-center">
       {icon && <div className="mb-3 flex justify-center">{icon}</div>}
       <p className="text-sm font-medium text-ink-800">{title}</p>
       <p className="mt-1 text-xs text-panel-500">{body}</p>

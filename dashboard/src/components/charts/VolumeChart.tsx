@@ -41,11 +41,11 @@ export function VolumeChart({ data, bucket }: { data: VolumePoint[]; bucket: 'da
           series colour, which would be illegible for the lighter hues. */}
       <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-gray-600">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--series-1)' }} aria-hidden />
+          <span className="h-2.5 w-2.5" style={{ background: 'var(--series-1)' }} aria-hidden />
           Answered
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--series-2)' }} aria-hidden />
+          <span className="h-2.5 w-2.5" style={{ background: 'var(--series-2)' }} aria-hidden />
           Voicemail
         </span>
       </div>

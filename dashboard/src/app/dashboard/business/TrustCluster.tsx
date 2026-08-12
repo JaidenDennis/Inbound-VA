@@ -98,7 +98,7 @@ export function TrustCluster({ data }: { data: TrustData | null }) {
         ) : (
           <ul className="space-y-2">
             {data.escalationsByReason.map((e) => (
-              <li key={e.reason} className="rounded-lg border border-panel-200 bg-white px-4 py-3">
+              <li key={e.reason} className="border border-panel-200 bg-surface-raised px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-sm text-ink-800">{humanise(e.reason)}</span>
                   <span data-numeric className="text-sm font-semibold text-ink-900">{e.count}</span>

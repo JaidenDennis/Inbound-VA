@@ -61,24 +61,24 @@ function AuditPageInner() {
       <FilterBar filters={filters} />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mb-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-hidden border border-gray-200 bg-surface-raised">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-14 animate-pulse border-b border-gray-100 bg-gray-50 last:border-0" />
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+        <div className="border border-gray-200 bg-surface-raised p-12 text-center">
           <p className="text-lg text-gray-500">No audit entries</p>
           <p className="mt-1 text-sm text-gray-400">Nothing matched these filters.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-hidden border border-gray-200 bg-surface-raised">
           <div className="overflow-x-auto">
             <table className="w-full">
               <caption className="sr-only">{count} audit entries</caption>
@@ -114,7 +114,7 @@ function AuditPageInner() {
                         <button
                           type="button"
                           onClick={() => setSelected(row)}
-                          className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          className="cursor-pointer px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                           Changes
                         </button>
@@ -133,13 +133,13 @@ function AuditPageInner() {
           <div className="space-y-5 text-sm">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Before</p>
-              <pre className="mt-1 max-h-60 overflow-auto rounded-lg bg-gray-50 p-3 text-xs text-gray-700">
+              <pre className="mt-1 max-h-60 overflow-auto bg-gray-50 p-3 text-xs text-gray-700">
                 {JSON.stringify(selected.old_value ?? {}, null, 2)}
               </pre>
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">After</p>
-              <pre className="mt-1 max-h-60 overflow-auto rounded-lg bg-gray-50 p-3 text-xs text-gray-700">
+              <pre className="mt-1 max-h-60 overflow-auto bg-gray-50 p-3 text-xs text-gray-700">
                 {JSON.stringify(selected.new_value ?? {}, null, 2)}
               </pre>
             </div>
@@ -152,7 +152,7 @@ function AuditPageInner() {
 
 export default function AuditPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-gray-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100" />}>
       <AuditPageInner />
     </Suspense>
   );

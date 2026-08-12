@@ -106,7 +106,7 @@ export function ConfirmDialog({
     // raised from inside the drawer still reads as the foreground decision.
     <div className="fixed inset-0 z-40 flex items-center justify-center px-4">
       <div
-        className="absolute inset-0 bg-ink-900/45"
+        className="absolute inset-0 bg-scrim"
         onClick={busy ? undefined : onCancel}
         aria-hidden
       />
@@ -116,7 +116,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-body"
-        className="relative w-full max-w-sm animate-rise rounded-xl border border-panel-200 bg-white p-5 shadow-xl"
+        className="relative w-full max-w-sm animate-rise border border-panel-200 bg-surface-raised p-5 shadow-xl"
       >
         <div className="flex items-start gap-3">
           {destructive ? (
@@ -142,7 +142,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="cursor-pointer rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
+            className="cursor-pointer border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
           >
             {cancelLabel}
           </button>
@@ -151,12 +151,12 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
             className={clsx(
-              'flex cursor-pointer items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold text-white',
+              'flex cursor-pointer items-center gap-2 px-3.5 py-2 text-sm font-semibold text-white',
               'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               'disabled:cursor-not-allowed disabled:opacity-60',
               destructive
-                ? 'bg-lamp-bad-ink hover:bg-[#8d1811] focus-visible:ring-lamp-bad'
-                : 'bg-ink-800 hover:bg-ink-900 focus-visible:ring-signal-600'
+                ? 'bg-lamp-bad-ink hover:bg-lamp-bad focus-visible:ring-lamp-bad'
+                : 'bg-action hover:bg-action-800 focus-visible:ring-signal-600'
             )}
           >
             {busy && (

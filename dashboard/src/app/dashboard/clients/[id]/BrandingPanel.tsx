@@ -23,7 +23,7 @@ interface Branding {
 }
 
 const inputCls =
-  'w-full rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 ' +
+  'w-full border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 ' +
   'placeholder:text-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25';
 
 export function BrandingPanel({ clientId }: { clientId: string }) {
@@ -60,10 +60,10 @@ export function BrandingPanel({ clientId }: { clientId: string }) {
     }
   };
 
-  if (loading) return <div className="h-48 animate-pulse rounded-xl bg-panel-100" />;
+  if (loading) return <div className="h-48 animate-pulse bg-panel-100" />;
 
   return (
-    <section className="rounded-xl border border-panel-200 bg-white p-5">
+    <section className="border border-panel-200 bg-surface-raised p-5">
       <h2 className="font-heading text-base font-semibold text-ink-900">Branding</h2>
       <p className="mt-0.5 max-w-xl text-sm leading-relaxed text-panel-600">
         Applies to this client&apos;s login screen, the rail, and their weekly digest email.
@@ -99,7 +99,7 @@ export function BrandingPanel({ clientId }: { clientId: string }) {
               type="color"
               value={branding.primary_hex ?? '#2F6FED'}
               onChange={(e) => setBranding((b) => ({ ...b, primary_hex: e.target.value }))}
-              className="h-9 w-12 cursor-pointer rounded border border-panel-300 bg-white"
+              className="h-9 w-12 cursor-pointer border border-panel-300 bg-surface-raised"
               aria-label="Accent colour"
             />
             <input
@@ -117,7 +117,7 @@ export function BrandingPanel({ clientId }: { clientId: string }) {
       </div>
 
       {rejection && (
-        <div role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm leading-relaxed text-lamp-fair-ink">
+        <div role="alert" className="mt-4 flex items-start gap-2 border border-lamp-fair-rim bg-lamp-fair-wash px-4 py-3 text-sm leading-relaxed text-lamp-fair-ink">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
           <p>{rejection}</p>
         </div>
@@ -127,7 +127,7 @@ export function BrandingPanel({ clientId }: { clientId: string }) {
         type="button"
         onClick={save}
         disabled={saving}
-        className="mt-4 cursor-pointer rounded-md bg-ink-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-4 cursor-pointer bg-action px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {saving ? 'Saving…' : 'Save branding'}
       </button>

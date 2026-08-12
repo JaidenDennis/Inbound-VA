@@ -79,7 +79,7 @@ export function OutcomeChart({ data }: { data: OutcomePoint[] }) {
           formatter={(value: number) => [value, 'Calls']}
         />
 
-        {/* 4px rounded data-end, square at the baseline; ≤24px thick. */}
+        {/* 4px radius on the data-end, square at the baseline; ≤24px thick. */}
         <Bar dataKey="count" fill="var(--series-1)" barSize={20} radius={[0, 4, 4, 0]}>
           {/* Value at the tip — six bars is few enough that every value fits
               outside the bar without collision, and it saves a second lookup. */}

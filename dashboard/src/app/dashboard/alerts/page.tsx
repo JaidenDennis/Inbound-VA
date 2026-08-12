@@ -158,19 +158,19 @@ function AlertsInner() {
       <ClientPicker label="Alerts for" />
 
       {!ready ? (
-        <div className="h-64 animate-pulse rounded-xl bg-panel-100" />
+        <div className="h-64 animate-pulse bg-panel-100" />
       ) : needsChoice || !clientId ? (
         <ChooseClientPrompt what="Alerts" />
       ) : loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-32 animate-pulse rounded-xl bg-panel-100" />
+            <div key={i} className="h-32 animate-pulse bg-panel-100" />
           ))}
         </div>
       ) : (
         <>
           {!canWrite && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-panel-200 bg-panel-50 px-4 py-3 text-sm text-panel-700">
+            <div className="mb-4 flex items-start gap-2 border border-panel-200 bg-panel-50 px-4 py-3 text-sm text-panel-700">
               <Info className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
               <p>You can see these rules but not change them. Ask an account owner.</p>
             </div>
@@ -183,7 +183,7 @@ function AlertsInner() {
               const busy = saving === spec.metric;
 
               return (
-                <section key={spec.metric} className="rounded-xl border border-panel-200 bg-white px-5 py-4">
+                <section key={spec.metric} className="border border-panel-200 bg-surface-raised px-5 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-sm font-semibold text-ink-900">{spec.label}</h2>
@@ -196,7 +196,7 @@ function AlertsInner() {
                         checked={rule?.enabled ?? false}
                         disabled={!canWrite || busy}
                         onChange={(e) => save(spec.metric, { enabled: e.target.checked })}
-                        className="h-4 w-4 cursor-pointer rounded border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600 disabled:cursor-not-allowed"
+                        className="h-4 w-4 cursor-pointer border-panel-300 text-ink-800 focus:ring-2 focus:ring-signal-600 disabled:cursor-not-allowed"
                       />
                       {rule?.enabled ? 'On' : 'Off'}
                     </label>
@@ -216,7 +216,7 @@ function AlertsInner() {
                             const value = Number(e.target.value);
                             if (value !== rule.threshold) save(spec.metric, { threshold: value });
                           }}
-                          className="w-full rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:bg-panel-50"
+                          className="w-full border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:bg-panel-50"
                         />
                       </label>
 
@@ -228,7 +228,7 @@ function AlertsInner() {
                           value={rule.window_minutes}
                           disabled={!canWrite || busy}
                           onChange={(e) => save(spec.metric, { window_minutes: Number(e.target.value) })}
-                          className="w-full cursor-pointer rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:bg-panel-50"
+                          className="w-full cursor-pointer border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:bg-panel-50"
                         >
                           {WINDOWS.map((w) => (
                             <option key={w.value} value={w.value}>{w.label}</option>
@@ -244,7 +244,7 @@ function AlertsInner() {
                           value={rule.cooldown_minutes}
                           disabled={!canWrite || busy}
                           onChange={(e) => save(spec.metric, { cooldown_minutes: Number(e.target.value) })}
-                          className="w-full cursor-pointer rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:bg-panel-50"
+                          className="w-full cursor-pointer border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25 disabled:bg-panel-50"
                         >
                           {COOLDOWNS.map((c) => (
                             <option key={c.value} value={c.value}>{c.label}</option>
@@ -272,13 +272,13 @@ function AlertsInner() {
               <BellRing className="h-3.5 w-3.5" aria-hidden /> Recently sent
             </h2>
             {recent.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-panel-300 bg-panel-25 px-5 py-8 text-center text-sm text-panel-500">
+              <div className="border border-dashed border-panel-300 bg-panel-25 px-5 py-8 text-center text-sm text-panel-500">
                 Nothing has triggered an alert. Nothing has gone wrong badly enough to tell you about.
               </div>
             ) : (
               <ul className="space-y-2">
                 {recent.map((event) => (
-                  <li key={event.id} className="rounded-lg border border-panel-200 bg-white px-4 py-3">
+                  <li key={event.id} className="border border-panel-200 bg-surface-raised px-4 py-3">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="text-sm text-ink-800">{event.message}</span>
                       <span className="whitespace-nowrap text-xs text-panel-500">
@@ -307,7 +307,7 @@ function AlertsInner() {
 
 export default function AlertsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-panel-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
       <AlertsInner />
     </Suspense>
   );

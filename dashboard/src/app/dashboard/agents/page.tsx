@@ -74,7 +74,7 @@ export default function AgentsPage() {
       {failing.length > 0 && (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink"
+          className="mb-4 flex items-start gap-2 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
           <p>
@@ -85,19 +85,19 @@ export default function AgentsPage() {
       )}
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
+        <div role="alert" className="mb-4 border border-lamp-bad-rim bg-lamp-bad-wash px-4 py-3 text-sm text-lamp-bad-ink">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="overflow-hidden rounded-xl border border-panel-200 bg-white">
+        <div className="overflow-hidden border border-panel-200 bg-surface-raised">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-16 animate-pulse border-b border-panel-100 bg-panel-50 last:border-0" />
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-panel-200 bg-white">
+        <div className="overflow-hidden border border-panel-200 bg-surface-raised">
           <div className="overflow-x-auto">
             <table className="w-full">
               <caption className="sr-only">Client agents and sync state</caption>
@@ -168,7 +168,7 @@ export default function AgentsPage() {
                           onClick={() => syncNow(row.id)}
                           disabled={syncing === row.id}
                           aria-label={`Publish ${row.name}'s agent now`}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
+                          className="inline-flex cursor-pointer items-center gap-1 px-2 py-1 text-xs font-medium text-signal-700 transition-colors hover:bg-signal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
                         >
                           <RefreshCw className={`h-3.5 w-3.5 ${syncing === row.id ? 'animate-spin' : ''}`} aria-hidden />
                           {syncing === row.id ? 'Queueing…' : 'Publish now'}

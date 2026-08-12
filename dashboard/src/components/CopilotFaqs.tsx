@@ -77,7 +77,7 @@ export function CopilotFaqs({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-panel-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+        className="mb-4 flex cursor-pointer items-center gap-2 border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
       >
         <Sparkles className="h-4 w-4 text-panel-500" aria-hidden />
         Suggest FAQs
@@ -86,7 +86,7 @@ export function CopilotFaqs({
   }
 
   return (
-    <section className="mb-4 rounded-xl border border-panel-200 bg-white">
+    <section className="mb-4 border border-panel-200 bg-surface-raised">
       <div className="flex items-start justify-between gap-3 border-b border-panel-200 px-5 py-3.5">
         <div>
           <h2 className="flex items-center gap-2 font-heading text-sm font-semibold text-ink-900">
@@ -100,7 +100,7 @@ export function CopilotFaqs({
           type="button"
           onClick={() => setOpen(false)}
           aria-label="Close suggestions"
-          className="cursor-pointer rounded p-1 text-panel-500 transition-colors hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+          className="cursor-pointer p-1 text-panel-500 transition-colors hover:bg-panel-50 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
         >
           <X className="h-4 w-4" aria-hidden />
         </button>
@@ -113,13 +113,13 @@ export function CopilotFaqs({
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="Optional: focus on a topic, e.g. parking, insurance"
-          className="min-w-[16rem] flex-1 rounded-md border border-panel-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+          className="min-w-[16rem] flex-1 border border-panel-300 bg-surface-raised px-3 py-2 text-sm text-ink-900 placeholder:text-panel-400 transition-colors hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
         />
         <button
           type="button"
           onClick={generate}
           disabled={loading}
-          className="cursor-pointer rounded-md bg-ink-800 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+          className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
         >
           {loading ? 'Thinking…' : drafts.length > 0 ? 'Suggest more' : 'Suggest'}
         </button>
@@ -130,7 +130,7 @@ export function CopilotFaqs({
       {loading && drafts.length === 0 && (
         <div className="space-y-3 p-5">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-panel-100" />
+            <div key={i} className="h-16 animate-pulse bg-panel-100" />
           ))}
         </div>
       )}
@@ -153,7 +153,7 @@ export function CopilotFaqs({
                   type="button"
                   onClick={() => accept(draft, i)}
                   disabled={adding === i || added.has(i)}
-                  className="flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-panel-300 bg-white px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex flex-shrink-0 cursor-pointer items-center gap-1.5 border border-panel-300 bg-surface-raised px-3 py-1.5 text-xs font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="h-3.5 w-3.5" aria-hidden />
                   {added.has(i) ? 'Added' : adding === i ? 'Adding…' : 'Add'}
