@@ -9,6 +9,9 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Phone, Users, Calendar, TrendingUp } from 'lucide-react';
+import { KPICard } from '@/components/KPICard';
+import { Table, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
 
 // Tailwind scans source text, so interpolated class names are purged.
 // This literal array is never rendered; it exists to be scanned. The
@@ -151,6 +154,40 @@ function TokenSheetInner() {
           <div className="border border-hairline bg-surface-raised px-6 py-8 text-sm shadow-lg">
             shadow-lg (ink)
           </div>
+        </Row>
+
+        <Row title="KPI — the site's .kpi, cobalt-rimmed well on a cobalt wash">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KPICard label="Calls" value="1,284" icon={Phone} color="primary" trend={12} trendLabel="vs last week" />
+            <KPICard label="Leads captured" value="342" icon={Users} color="primary" trend={-4} trendLabel="vs last week" />
+            <KPICard label="Appointments" value="96" icon={Calendar} color="primary" subtitle="booked this week" />
+            <KPICard label="Conversion" value="26.6%" icon={TrendingUp} color="primary" trend={3} />
+          </div>
+        </Row>
+
+        <Row title="Table — the site's .log, mono heads, hairline rows, cobalt hover">
+          <TableShell className="w-full">
+            <Table caption="Recent calls">
+              <THead>
+                <TH>Caller</TH>
+                <TH>Outcome</TH>
+                <TH align="right">Duration</TH>
+              </THead>
+              <TBody>
+                {[
+                  { caller: '(415) 555-0182', outcome: 'Booked', duration: '4m 12s' },
+                  { caller: '(212) 555-0143', outcome: 'FAQ answered', duration: '1m 48s' },
+                  { caller: '(646) 555-0119', outcome: 'Transferred', duration: '6m 02s' },
+                ].map((row) => (
+                  <TR key={row.caller}>
+                    <TD mono>{row.caller}</TD>
+                    <TD>{row.outcome}</TD>
+                    <TD align="right" numeric>{row.duration}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
         </Row>
 
         <Row title="Chart series — cobalt + ink, texture not hue">

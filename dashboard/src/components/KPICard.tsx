@@ -12,8 +12,9 @@ import clsx from 'clsx';
  * figure at real scale in tabular figures, and the movement underneath.
  *
  * Props are unchanged so existing routes keep working. `icon` and `color` are
- * still accepted; the icon now sits inline at label scale, and `color` no
- * longer tints the cell, because chroma on this surface is reserved for status.
+ * still accepted; the icon now sits inline at label scale, and `color` remains
+ * accepted and inert — the cell's chroma is the cobalt wash, which means
+ * "this is a readout you can open", not a status.
  */
 
 interface KPICardProps {
@@ -31,28 +32,30 @@ export function KPICard({ label, value, icon: Icon, trend, trendLabel, subtitle 
   const Arrow = rising ? ArrowUpRight : ArrowDownRight;
 
   return (
-    <div className="group relative border border-panel-200 bg-surface-raised px-5 py-4 transition-colors duration-150 ease-out hover:border-panel-300">
+    // The site's `.kpi`: a cobalt-rimmed well on a cobalt wash. The figure
+    // is the subject; everything else is a label around it.
+    <div
+      className="group border bg-action-50 px-4 py-3"
+      style={{ borderColor: 'var(--action-rim)' }}
+    >
       <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 flex-shrink-0 text-panel-500" aria-hidden strokeWidth={1.75} />
-        <p className="truncate text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500">
+        <Icon className="h-3 w-3 flex-shrink-0 text-text-muted" aria-hidden strokeWidth={1.75} />
+        <p className="truncate font-mono text-2xs uppercase tracking-[0.16em] text-text-muted">
           {label}
         </p>
       </div>
 
-      <p
-        data-numeric
-        className="mt-2.5 font-heading text-3xl font-semibold tracking-[-0.022em] text-ink-900"
-      >
+      <p data-numeric className="mt-2 font-heading text-3xl font-medium tracking-[-0.022em] text-text">
         {value}
       </p>
 
       {(trend !== undefined || trendLabel || subtitle) && (
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           {trend !== undefined && (
             <span
               data-numeric
               className={clsx(
-                'inline-flex items-baseline gap-0.5 text-xs font-semibold',
+                'inline-flex items-baseline gap-0.5 font-mono text-2xs font-medium',
                 rising ? 'text-lamp-good-ink' : 'text-lamp-bad-ink'
               )}
             >
@@ -61,7 +64,7 @@ export function KPICard({ label, value, icon: Icon, trend, trendLabel, subtitle 
             </span>
           )}
           {(trendLabel || subtitle) && (
-            <span className="truncate text-xs text-panel-500">{trendLabel ?? subtitle}</span>
+            <span className="truncate text-xs text-text-muted">{trendLabel ?? subtitle}</span>
           )}
         </div>
       )}

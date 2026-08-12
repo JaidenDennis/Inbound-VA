@@ -19,7 +19,7 @@ import clsx from 'clsx';
 
 export function TableShell({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={clsx('overflow-hidden border border-panel-200 bg-surface-raised', className)}>
+    <div className={clsx('overflow-hidden border border-hairline bg-surface-raised', className)}>
       {/* Horizontal escape hatch: dense tables must scroll inside their own
           container rather than pushing the page sideways. */}
       <div className="overflow-x-auto">{children}</div>
@@ -39,7 +39,7 @@ export function Table({ children, caption }: { children: ReactNode; caption?: st
 export function THead({ children, sticky = false }: { children: ReactNode; sticky?: boolean }) {
   return (
     <thead className={clsx('bg-panel-50', sticky && 'sticky top-0 z-10')}>
-      <tr className="border-b border-panel-200 text-left">{children}</tr>
+      <tr className="text-left">{children}</tr>
     </thead>
   );
 }
@@ -61,7 +61,7 @@ export function TH({
       scope="col"
       style={{ width }}
       className={clsx(
-        'whitespace-nowrap px-5 py-3 text-2xs font-semibold uppercase tracking-[0.07em] text-panel-500',
+        'whitespace-nowrap border-b border-rule px-4 py-2.5 text-left font-mono text-2xs uppercase tracking-[0.16em] text-text-muted',
         align === 'right' && 'text-right'
       )}
     >
@@ -71,7 +71,7 @@ export function TH({
 }
 
 export function TBody({ children }: { children: ReactNode }) {
-  return <tbody className="divide-y divide-panel-100">{children}</tbody>;
+  return <tbody className="divide-y divide-hairline">{children}</tbody>;
 }
 
 export function TR({
@@ -98,10 +98,10 @@ export function TR({
       onKeyDown={onKeyDown}
       tabIndex={onActivate ? 0 : undefined}
       className={clsx(
-        'text-sm transition-colors duration-150 ease-out',
+        'text-sm transition-colors duration-120',
         onActivate
-          ? 'cursor-pointer hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal-600'
-          : 'hover:bg-panel-25',
+          ? 'cursor-pointer hover:bg-action-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal-600'
+          : 'hover:bg-action-50',
         className
       )}
     >
@@ -153,7 +153,7 @@ export function TableEmpty({
   icon?: ReactNode;
 }) {
   return (
-    <div className="border border-panel-200 bg-surface-raised px-6 py-14 text-center">
+    <div className="border border-hairline bg-surface-raised px-6 py-14 text-center">
       {icon && <div className="mb-3 flex justify-center">{icon}</div>}
       <p className="text-sm font-medium text-ink-800">{title}</p>
       <p className="mt-1 text-xs text-panel-500">{body}</p>
