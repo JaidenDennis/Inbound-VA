@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Moon, Sun } from 'lucide-react';
 
 /**
@@ -12,24 +12,41 @@ import { Moon, Sun } from 'lucide-react';
  *
  * Default is light — the marketing site's world, which is the point of
  * the whole facelift.
+ *
+ * The theme is external mutable state — a DOM attribute THEME_BOOT already
+ * set before React hydrated, not component-owned state. useSyncExternalStore
+ * reads that attribute directly instead of shadowing it in useState and
+ * catching up via useEffect (which double-renders and desyncs from the DOM
+ * whenever another tab or script changes it).
  */
 const KEY = 'gravvia_theme';
 
-export function ThemeToggle() {
-  // Starts null so the first render matches what the boot script already
-  // painted; reading localStorage during render would desync hydration.
-  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
+function subscribe(cb: () => void) {
+  window.addEventListener('storage', cb);
+  window.addEventListener('theme-change', cb);
+  return () => {
+    window.removeEventListener('storage', cb);
+    window.removeEventListener('theme-change', cb);
+  };
+}
 
-  useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(KEY) : null;
-    setTheme(stored === 'dark' ? 'dark' : 'light');
-  }, []);
+function getSnapshot(): 'light' | 'dark' {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+// Matches THEME_BOOT's default when it has not run (SSR has no localStorage/DOM).
+function getServerSnapshot(): 'light' | 'dark' {
+  return 'light';
+}
+
+export function ThemeToggle() {
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
     document.documentElement.setAttribute('data-theme', next);
     try { localStorage.setItem(KEY, next); } catch { /* private mode */ }
+    window.dispatchEvent(new Event('theme-change'));
   };
 
   const dark = theme === 'dark';
