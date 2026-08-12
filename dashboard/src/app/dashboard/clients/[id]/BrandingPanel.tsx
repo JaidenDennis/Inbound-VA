@@ -127,7 +127,7 @@ export function BrandingPanel({ clientId }: { clientId: string }) {
         type="button"
         onClick={save}
         disabled={saving}
-        className="mt-4 cursor-pointer bg-action px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-4 cursor-pointer bg-action px-4 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {saving ? 'Saving…' : 'Save branding'}
       </button>

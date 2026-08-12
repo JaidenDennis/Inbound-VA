@@ -222,7 +222,7 @@ function AssistantInner() {
         <button
           type="submit"
           disabled={sending || !input.trim()}
-          className="flex cursor-pointer items-center gap-2 bg-action px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex cursor-pointer items-center gap-2 bg-action px-4 py-2.5 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Send className="h-4 w-4" aria-hidden />
           <span className="sr-only sm:not-sr-only">Ask</span>

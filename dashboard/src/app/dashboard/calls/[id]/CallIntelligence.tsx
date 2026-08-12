@@ -83,7 +83,7 @@ export function CallIntelligence({ callId }: { callId: string }) {
             type="button"
             onClick={run}
             disabled={loading}
-            className="flex cursor-pointer items-center gap-2 bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="flex cursor-pointer items-center gap-2 bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             <Sparkles className="h-4 w-4" aria-hidden />
             {loading ? 'Reading the transcript…' : 'Review this call'}

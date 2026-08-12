@@ -19,7 +19,7 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<NonNullable<BadgeProps['variant']>, string> = {
-  primary: 'bg-action text-white border-action',
+  primary: 'bg-action text-[rgb(var(--action-contrast-rgb))] border-action',
   secondary: 'bg-signal-50 text-signal-800 border-signal-200',
   success: 'bg-lamp-good-wash text-lamp-good-ink border-lamp-good-rim',
   warning: 'bg-lamp-fair-wash text-lamp-fair-ink border-lamp-fair-rim',

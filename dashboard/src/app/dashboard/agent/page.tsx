@@ -516,7 +516,7 @@ function AgentCustomiserInner() {
                     type="button"
                     onClick={() => setReviewing(true)}
                     disabled={saving || !dirty}
-                    className="flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <ClipboardCheck className="h-4 w-4" aria-hidden /> Review changes
                   </button>
@@ -528,7 +528,7 @@ function AgentCustomiserInner() {
                   className={
                     canReview
                       ? 'flex cursor-pointer items-center gap-2 border border-panel-300 bg-surface-raised px-4 py-2 text-sm font-medium text-ink-800 transition-colors hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-40'
-                      : 'flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40'
+                      : 'flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40'
                   }
                 >
                   <Save className="h-4 w-4" aria-hidden /> {saving ? 'Saving…' : canReview ? 'Save without reviewing' : 'Save changes'}

@@ -168,7 +168,7 @@ export default function ClientDetailPage() {
   }
 
   const saveButtonCls =
-    'flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-white ' +
+    'flex cursor-pointer items-center gap-2 bg-action px-4 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] ' +
     'transition-colors duration-150 hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 ' +
     'focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 

@@ -202,13 +202,13 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group flex w-full cursor-pointer items-center justify-center gap-2 bg-action py-2.5 text-sm font-semibold text-white transition-all duration-150 ease-out hover:bg-action-800 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-panel-400"
+              className="group flex w-full cursor-pointer items-center justify-center gap-2 bg-action py-2.5 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-all duration-150 ease-out hover:bg-action-800 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-panel-400"
             >
               {loading ? (
                 <>
                   <span
                     aria-hidden
-                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white"
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/35 border-t-current"
                   />
                   Signing in
                 </>

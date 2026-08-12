@@ -151,18 +151,18 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
             className={clsx(
-              'flex cursor-pointer items-center gap-2 px-3.5 py-2 text-sm font-semibold text-white',
+              'flex cursor-pointer items-center gap-2 px-3.5 py-2 text-sm font-semibold',
               'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               'disabled:cursor-not-allowed disabled:opacity-60',
               destructive
-                ? 'bg-lamp-bad-ink hover:bg-lamp-bad focus-visible:ring-lamp-bad'
-                : 'bg-action hover:bg-action-800 focus-visible:ring-signal-600'
+                ? 'bg-lamp-bad-ink hover:bg-lamp-bad focus-visible:ring-lamp-bad text-white'
+                : 'bg-action hover:bg-action-800 focus-visible:ring-signal-600 text-[rgb(var(--action-contrast-rgb))]'
             )}
           >
             {busy && (
               <span
                 aria-hidden
-                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white"
+                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/35 border-t-current"
               />
             )}
             {confirmLabel}

@@ -112,7 +112,7 @@ export function TicketComposer({
             type="button"
             onClick={generate}
             disabled={loading}
-            className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {loading ? 'Writing it up…' : 'Draft the ticket'}
           </button>
@@ -162,7 +162,7 @@ export function TicketComposer({
             <button
               type="button"
               onClick={use}
-              className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2"
+              className="cursor-pointer bg-action px-3.5 py-2 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2"
             >
               Use this draft
             </button>

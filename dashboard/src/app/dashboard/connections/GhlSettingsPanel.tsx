@@ -132,7 +132,7 @@ export function GhlSettingsPanel({ clientId, canWrite }: { clientId: string; can
             type="button"
             onClick={save}
             disabled={saving}
-            className="cursor-pointer bg-action px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="cursor-pointer bg-action px-3.5 py-2 text-xs font-semibold text-[rgb(var(--action-contrast-rgb))] transition-colors hover:bg-action-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save settings'}
           </button>
