@@ -68,6 +68,9 @@
   --action-wash:   rgba(29, 79, 216, .06);
   --action-wash-2: rgba(29, 79, 216, .10);
   --action-rim:    rgba(29, 79, 216, .35);
+  /* A permanently-light cobalt for surfaces that are dark in BOTH themes
+     (the nav rail). Same value in both blocks, following --tint-on-dark-rgb. */
+  --action-on-dark-rgb: var(--cobalt-lt-rgb);
 
   /* Scrim behind floating layers */
   --scrim: rgba(3, 3, 3, .55);
@@ -88,6 +91,10 @@
   --lamp-off-rgb:      194 200 200;
   --lamp-off-ink-rgb:  147 157 157;
   --lamp-glow: 0.32;
+
+  /* A permanently-light red for text on a surface that is dark in BOTH
+     themes (the nav rail). Same value in both blocks. */
+  --lamp-bad-on-dark-rgb: 240 121 111;
 }
 
 [data-theme='dark'] {
@@ -131,6 +138,8 @@
   --action-wash:   rgba(138, 164, 255, .08);
   --action-wash-2: rgba(138, 164, 255, .14);
   --action-rim:    rgba(138, 164, 255, .35);
+  /* Same value as :root — the rail stays dark in both themes. */
+  --action-on-dark-rgb: var(--cobalt-lt-rgb);
 
   --scrim: rgba(0, 0, 0, .72);
 
@@ -148,6 +157,9 @@
   --lamp-off-rgb:      58  58  56;
   --lamp-off-ink-rgb: 110 110 106;
   --lamp-glow: 0.55;
+
+  /* Same value as :root — the rail stays dark in both themes. */
+  --lamp-bad-on-dark-rgb: 240 121 111;
 }
 
 @layer base {

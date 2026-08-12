@@ -335,7 +335,7 @@ function ReportsPageInner() {
  turn.role === 'agent' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-800'
  }`}
                       >
-                        <p className={`mb-0.5 text-xs ${turn.role === 'agent' ? 'text-primary-100' : 'text-gray-500'}`}>
+                        <p className={`mb-0.5 text-xs ${turn.role === 'agent' ? 'text-[rgb(var(--action-contrast-rgb))]' : 'text-gray-500'}`}>
                           {turn.role === 'agent' ? 'Agent' : 'Caller'}
                         </p>
                         {turn.content}

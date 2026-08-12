@@ -63,6 +63,7 @@ const lamp = {
   'bad-ink': c('--lamp-bad-ink-rgb'),
   'bad-wash': 'var(--lamp-bad-wash)',
   'bad-rim': 'var(--lamp-bad-rim)',
+  'bad-on-dark': c('--lamp-bad-on-dark-rgb'),
   off: c('--lamp-off-rgb'),
   'off-ink': c('--lamp-off-ink-rgb'),
 };
@@ -94,6 +95,7 @@ const config: Config = {
         rule: 'var(--rule)',
         edge: c('--edge-rgb'),
         'tint-on-dark': c('--tint-on-dark-rgb'),
+        'action-on-dark': c('--action-on-dark-rgb'),
         scrim: 'var(--scrim)',
         lamp,
 
@@ -151,6 +153,8 @@ const config: Config = {
           900: c('--lamp-bad-ink-rgb'),
         },
       },
+
+      ringOffsetColor: { DEFAULT: c('--surface-rgb') },
 
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],

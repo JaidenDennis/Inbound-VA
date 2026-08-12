@@ -247,10 +247,11 @@ Carried from `progress.md`, not resolved in this task:
   property of the design at that scale, not a Phase 1 regression, but worth
   revisiting if "lamps differ by structure, not hue alone" is meant to hold
   at every size.
-- **5 display tables are still hand-rolled `<table>` markup** rather than
+- **6 display tables are still hand-rolled `<table>` markup** rather than
   the shared `Table`/`TableShell` primitives: `agents/page.tsx:102`,
   `audit/page.tsx:83`, `clients/[id]/agent/page.tsx:318`,
-  `reports/page.tsx:241`, `support/page.tsx:214`. They inherit the palette
+  `reports/page.tsx:241`, `support/page.tsx:214`, `business/DemandCluster.tsx:126`.
+  They inherit the palette
   through tokens but not the primitives' keyboard row activation or
   empty/loading states. (`calls`, `clients`, and `crm` were converted to the
   shared `Table` primitive since this list was first written and are no

@@ -11,9 +11,11 @@ import { severityTerm, REVIEW_STATE } from '@/lib/vocabulary';
 /**
  * The supervisory lamp.
  *
- * Green is good, amber is fair, red is bad — the whole product's chroma budget,
- * spent here and nowhere else. Because interactive affordance is achromatic, a
- * lit lamp on this surface always means state and never means "clickable".
+ * Green is good, amber is fair, red is bad. Cobalt is the other half of the
+ * product's chroma: it means "you can act on this" and never appears here —
+ * a lamp is state, not an affordance, and the two hues never cross. That
+ * boundary, not an achromatic UI, is what keeps a lit lamp from ever reading
+ * as "clickable".
  *
  * Colour is reinforcement, never the carrier. A lamp that appears without a
  * visible word carries an `sr-only` one, so the meaning survives greyscale

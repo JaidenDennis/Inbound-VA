@@ -65,8 +65,11 @@ export default function LoginPage() {
       <aside
         className="relative hidden flex-col justify-between overflow-hidden bg-surface-dark px-12 py-11 lg:flex lg:w-[46%] xl:w-[48%]"
         style={{
+          // action-on-dark, not action-wash-2: this panel is dark in BOTH
+          // themes, but action-wash-2 is a light-theme cobalt wash — nearly
+          // invisible against a dark panel in light theme.
           backgroundImage:
-            'linear-gradient(var(--action-wash-2) 1px, transparent 1px), linear-gradient(90deg, var(--action-wash-2) 1px, transparent 1px)',
+            'linear-gradient(rgb(var(--action-on-dark-rgb) / 0.10) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--action-on-dark-rgb) / 0.10) 1px, transparent 1px)',
           backgroundSize: '48px 48px',
         }}
       >

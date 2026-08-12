@@ -291,7 +291,7 @@ export default function TicketDetailPage() {
                     <div
                       className={clsx(
                         'mb-1 flex items-center gap-1.5 text-xs',
-                        isInternal ? 'font-medium text-amber-700' : mine ? 'text-primary-100' : 'text-gray-400'
+                        isInternal ? 'font-medium text-amber-700' : mine ? 'text-[rgb(var(--action-contrast-rgb))]' : 'text-gray-400'
                       )}
                     >
                       {isInternal && <Lock className="h-3 w-3" aria-hidden />}
