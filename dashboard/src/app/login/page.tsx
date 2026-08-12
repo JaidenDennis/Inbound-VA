@@ -60,24 +60,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-surface-raised">
+    <div className="flex min-h-[100dvh] bg-surface">
       {/* ---- Mechanism panel ---- */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-surface-dark px-12 py-11 text-white lg:flex lg:w-[46%] xl:w-[48%]">
-        <div className="flex items-center gap-3">
-          <Mark className="h-9 w-9 text-white" />
+      <aside
+        className="relative hidden flex-col justify-between overflow-hidden bg-surface-dark px-12 py-11 lg:flex lg:w-[46%] xl:w-[48%]"
+        style={{
+          backgroundImage:
+            'linear-gradient(var(--action-wash-2) 1px, transparent 1px), linear-gradient(90deg, var(--action-wash-2) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }}
+      >
+        <div className="relative flex items-center gap-3">
+          <Mark className="h-9 w-9 text-text-on-dark" />
           <div className="leading-tight">
-            <p className="font-heading text-base font-semibold">Gravvia Engage</p>
-            <p className="text-2xs uppercase tracking-[0.09em] text-panel-400">AI Voice Operations</p>
+            <p className="font-heading text-base font-semibold text-text-on-dark">Gravvia Engage</p>
+            <p className="font-mono text-2xs uppercase tracking-[0.2em] text-text-on-dark-muted">AI Voice Operations</p>
           </div>
         </div>
 
-        <div className="max-w-md">
-          <h2 className="font-heading text-3xl font-semibold leading-[1.14] tracking-[-0.022em] text-white xl:text-4xl">
+        <div className="relative max-w-md">
+          <h2 className="font-heading text-4xl font-light leading-[1.06] tracking-[-0.026em] text-text-on-dark xl:text-5xl">
             The voice answers.
             <br />
             The system decides.
           </h2>
-          <p className="mt-4 text-sm leading-relaxed text-panel-300">
+          <p className="mt-4 text-sm leading-relaxed text-text-on-dark-secondary">
             Business logic never lives in the phone line. It lives here, where you can
             read it, change it, and hold it to account.
           </p>
@@ -97,17 +104,17 @@ export default function LoginPage() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm">
-                    <span className="font-semibold text-white">{stage}</span>
-                    <span className="text-panel-400"> {line}</span>
+                    <span className="font-medium text-text-on-dark">{stage}</span>
+                    <span className="text-text-on-dark-muted"> {line}</span>
                   </p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-panel-400">{detail}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-text-on-dark-muted">{detail}</p>
                 </div>
               </li>
             ))}
           </ol>
         </div>
 
-        <p className="text-xs text-panel-500">
+        <p className="relative font-mono text-2xs uppercase tracking-[0.16em] text-text-on-dark-muted">
           One console. Every client, every call, every sync.
         </p>
       </aside>
@@ -121,17 +128,16 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-7">
-            <h1 className="font-heading text-2xl font-semibold tracking-[-0.02em] text-ink-900">
+            <p className="label-instrument mb-2">Operations console</p>
+            <h1 className="font-heading text-2xl font-medium tracking-[-0.02em] text-text">
               Sign in
             </h1>
-            <p className="mt-1.5 text-sm text-panel-600">
-              Operations console access.
-            </p>
+            <p className="mt-1.5 text-sm text-text-secondary">Access is provisioned by your administrator.</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div>
-              <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-ink-700">
+              <label htmlFor="email" className="mb-1.5 block font-mono text-2xs uppercase tracking-[0.16em] text-text-secondary">
                 Work email
               </label>
               <input
@@ -145,18 +151,18 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 aria-invalid={!!error}
                 aria-describedby={error ? 'signin-error' : undefined}
-                className="w-full border border-panel-300 bg-surface-raised px-3 py-2.5 text-sm text-ink-900 transition-colors duration-150 placeholder:text-panel-400 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+                className="w-full border border-rule bg-surface-raised px-3 py-2.5 text-sm text-text transition-colors duration-150 placeholder:text-text-muted hover:border-text-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/25"
               />
             </div>
 
             <div>
               <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                <label htmlFor="password" className="block text-xs font-semibold text-ink-700">
+                <label htmlFor="password" className="block font-mono text-2xs uppercase tracking-[0.16em] text-text-secondary">
                   Password
                 </label>
                 <a
                   href="mailto:support@gravvia.com?subject=Password%20reset"
-                  className="text-xs font-medium text-signal-700 underline decoration-signal-300 transition-colors hover:text-signal-800 hover:decoration-signal-600"
+                  className="text-xs font-medium text-action underline decoration-action/40 hover:decoration-action"
                 >
                   Forgot password?
                 </a>
@@ -171,14 +177,14 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   aria-invalid={!!error}
                   aria-describedby={error ? 'signin-error' : undefined}
-                  className="w-full border border-panel-300 bg-surface-raised py-2.5 pl-3 pr-11 text-sm text-ink-900 transition-colors duration-150 placeholder:text-panel-400 hover:border-panel-400 focus:border-signal-600 focus:outline-none focus:ring-2 focus:ring-signal-600/25"
+                  className="w-full border border-rule bg-surface-raised py-2.5 pl-3 pr-11 text-sm text-text transition-colors duration-150 placeholder:text-text-muted hover:border-text-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/25"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   aria-pressed={showPassword}
-                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center text-text-muted transition-colors hover:bg-surface-inset hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
                 </button>
@@ -202,7 +208,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group flex w-full cursor-pointer items-center justify-center gap-2 bg-action py-2.5 text-sm font-semibold text-[rgb(var(--action-contrast-rgb))] transition-all duration-150 ease-out hover:bg-action-800 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-panel-400"
+              className="group flex w-full cursor-pointer items-center justify-center gap-2 border border-action bg-action py-2.5 text-sm font-medium text-[rgb(var(--action-contrast-rgb))] transition-colors duration-150 ease-out hover:bg-transparent hover:text-action active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-rule disabled:bg-transparent disabled:text-text-muted"
             >
               {loading ? (
                 <>
@@ -224,11 +230,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-7 border-t border-panel-200 pt-5 text-xs text-panel-600">
-            Access is provisioned by your administrator.{' '}
+          <p className="mt-7 border-t border-hairline pt-5 text-xs text-text-muted">
+            Need access?{' '}
             <a
               href="mailto:support@gravvia.com"
-              className="font-medium text-signal-700 underline decoration-signal-300 transition-colors hover:text-signal-800 hover:decoration-signal-600"
+              className="font-medium text-action underline decoration-action/40 hover:decoration-action"
             >
               Request an account
             </a>
