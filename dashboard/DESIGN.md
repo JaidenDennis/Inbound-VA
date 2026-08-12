@@ -3,214 +3,266 @@
 Recorded from the built world, not from intention. Where this file and the code
 disagree, the code is right and this file is stale.
 
+This document replaces the previous `DESIGN.md`, which described a different,
+now-retired world: an achromatic "supervisory panel" with a teal `signal`
+accent, Archivo type, and 12px-radius cards. None of that survives in the
+current code. That document was left in place through most of Phase 1 while
+the world it described was being replaced underneath it — if you read an
+earlier copy, or a summary that quotes "chroma is reserved for state" or
+"signal-600" or "Archivo", it is describing the retired system, not this one.
+
 ## The world
 
-**A supervisory panel read in daylight.**
+**A brand transplant from the shipped marketing site**, not a new visual
+identity invented for the console. `gravvia-site/assets/site.css` is the
+source of truth for every raw colour value in this document; the dashboard's
+`globals.css` token layer was built by lifting those values, not by picking
+new ones.
 
-The console's ancestor is the telephone exchange lamp field: a wall of jewel
-lamps where a supervisor learned the state of every line before reading a single
-label. That is what this product does across tenants, so that is the grammar it
-is built in.
-
-Two defaults were refused explicitly:
-
-- **Dark console with a neon accent.** The category default for anything that
-  wants to signal AI. Rejected because the use scene is an operator scanning
-  dense comparison tables for long stretches in bright office light, then
-  screenshotting rows into tickets. Light won on the scene, not on taste.
-- **White enterprise dashboard with a blue accent.** The incumbent, and the
-  predictable opposite of the first default.
-
-"Frontier" is carried by instrument precision (calibrated state, tabular
-figures, live measurement), never by mysticism (no neural mesh, no particle
-field, no gradient glow).
-
-## The governing rule
-
-**Chroma is reserved for state.**
-
-Green, amber, and red mean good, fair, and bad. Nothing else on the surface may
-use them. Because of that, interactive affordance is *achromatic* — primary
-buttons, active nav, and links are graphite ink, so a call-to-action can never be
-misread as a healthy row, and a lit lamp always means state.
-
-This is the constraint the whole palette is derived from, and it is the one to
-protect when extending the system.
-
-## Color
+Three colours, used almost exclusively:
 
 | Role | Token | Value |
 |---|---|---|
-| Ground | `panel-50` | `#F4F6F6` |
-| Surface | white | `#FFFFFF` |
-| Housing (rail, login panel) | `ink-900` | `#101314` |
-| Primary action | `ink-800` | `#1A1E1F` |
-| Body text | `ink-800` | `#1A1E1F` |
-| Secondary text | `panel-600` | `#545D5D` |
-| Hairline | `panel-200` | `#D8DDDD` |
-| Focus / link / selection | `signal-600` | `#0B6E7F` |
-| Lamp good | `lamp-good` | `#1FA35F` |
-| Lamp fair | `lamp-fair` | `#E0921A` |
-| Lamp bad | `lamp-bad` | `#DC3B30` |
+| Ground | `bone` | `#f0f0ee` |
+| Ink | `ink` | `#030303` |
+| Action | `cobalt` | `#1d4fd8` |
 
-Panel grey is deliberately green-shifted rather than the blue-slate every
-dashboard ships. `signal` teal exists so focus and links have a hue that is
-emphatically *not* a lamp.
+Type is **DM Sans** (`--font-sans`, UI and display) and **DM Mono**
+(`--font-mono`, every micro-label and every figure) — both pulled from the
+marketing site, replacing the previous Archivo/JetBrains Mono pair.
 
-Lamp text uses the `-ink` variants (`lamp-good-ink` etc.), which clear 4.5:1 on
-white and on their own `-wash` backgrounds. The lit `core` values are for the
-lens only and must never be used as text.
+**Radius is `0` everywhere** except things that are structurally round: lamp
+dots and `rounded-full` pills. `tailwind.config.ts` maps every named radius
+step (`sm` through `3xl`) to `0`, so all pre-existing `rounded-*` classes in
+untouched files go square with zero file edits — only `rounded-full` survives,
+by an explicit exception (see `ROUND_ALLOWED` in the guards script below).
 
-**Legacy names are remapped, not removed.** `primary` → ink, `navy` → panel,
-`secondary` → signal, `gray` → panel, and `green`/`amber`/`red`/`emerald`/
-`yellow` → the lamps. This is why routes that were never hand-revised still sit
-in the new world. Do not "clean this up" by deleting the aliases without first
-migrating every consumer.
+**Shadows are hard offsets only** — `Npx Npx 0 0 <color>`, no blur, no
+zero-offset halos. `boxShadow.cobalt` (`6px 6px 0 0` cobalt) is the signature
+"lift" effect on hover; the inherited `xs`..`xl` steps resolve to a soft ink
+offset for genuinely floating layers (drawer, dialog, toast). The previous
+system's blurred "ghost card" shadow (1px border + soft shadow) is gone.
 
-**On dark surfaces, minimum text token is `panel-400`.** Anything darker looks
-correct in isolation and fails contrast on `ink-900`.
+## The rule, and what it replaced
 
-## Type
+**Cobalt means "you can act on this." Green, amber, and red mean state.
+Neither hue ever crosses into the other's job.**
 
-- **Archivo** (`--font-sans`) for UI and display. Chosen for flat terminals,
-  tight apertures, and real tabular figures. It replaced Plus Jakarta Sans,
-  whose rounded humanist warmth fought the instrument reading.
-- **JetBrains Mono** (`--font-mono`) for measurement only: counts, durations,
-  ids, routes, stack traces. Never as a costume for "technical".
-- `font-variant-numeric: tabular-nums` is applied globally to tables, `time`,
-  `.tabular`, and `[data-numeric]`. Every figure here is compared against
-  another figure, so digits hold their column.
-- Headings set face and weight but **not colour** — they inherit it. A blanket
-  heading colour silently rendered the login headline near-black on near-black.
-  Do not reintroduce one.
+Primary buttons, active nav, links, and focus rings are cobalt. Lamps —
+`StatusLamp`, `StatusPill`, `SeverityPill`, `SyncBadge` — are the only things
+on the surface allowed to be green, amber, or red, and they mean exactly
+"good", "fair", "bad".
 
-## Material
+**This replaces the previous rule, which was the opposite: "chroma is
+reserved for state," with interactive affordance built achromatic (graphite
+ink) specifically so a call-to-action could never be misread as a healthy
+lamp.** The swap is a real reversal, not a refinement, and it is worth being
+explicit about why it is safe:
 
-- **Elevation is declared once.** Cards are hairline-bordered surfaces with **no
-  shadow**. The 1px-border-under-a-soft-shadow "ghost card" is not used.
-- Shadow is reserved for layers that genuinely float: drawer, toast, menu, the
-  mobile nav panel.
-- **Radius rule:** cards `12px` (`rounded-xl`), controls `6px` (`rounded-md`),
-  status chips full pill. One rule, followed everywhere.
-- The active nav row is a *depressed key* — seated inset background plus the
-  `shadow-seat` inner highlight. Not a coloured stripe on the edge.
+The original concern was never "interactive things must be colourless." It
+was narrower — **a status lamp must never read as a control** (or the reverse:
+a control must never read as a status lamp) — because an operator scanning a
+dense field of lamps needs every lit light to mean "this line needs you," not
+"this is also a button." That concern is fully preserved under the new rule.
+Cobalt is not one of the three lamp hues and never appears as a lamp core;
+green/amber/red never appear on a button, a link, or active nav. The two
+palettes are disjoint by construction (`tailwind.config.ts`'s `lamp` object
+and `action` object share no colour), so a lit lamp still always means state
+and a cobalt element still always means "act here." What changed is only
+*which* non-lamp hue carries affordance — graphite ink, then cobalt — not
+whether affordance and state stay separated.
 
-## The lamp
+## Token architecture
 
-`src/components/StatusLamp.tsx` is the centre of the system.
+**Raw hex exists in exactly one place: the `:root` and `[data-theme="dark"]`
+blocks at the top of `src/app/globals.css`.** Every other file — components,
+pages, and all of `tailwind.config.ts` — references a CSS custom property,
+never a literal colour. `tailwind.config.ts`'s own docblock states this
+directly: "This file contains NO colour values."
 
-The lens is drawn with a rim, a body, and a specular highlight at the top-left,
-so the three states differ by **internal structure and brightness, not only
-hue**. A lit lamp throws a small halo onto the panel around it; this is light,
-not a glow effect, and it is sized to stay that way.
+The mechanism (`c()` in `tailwind.config.ts`):
 
-**Colour is never the carrier.** A lamp always ships with a word, and when no
-visible word sits beside it, it carries an `sr-only` one. This survives
-greyscale printing, a screenshot pasted into a ticket, and every form of colour
-blindness.
+```ts
+const c = (v: string) => `rgb(var(${v}) / <alpha-value>)`;
+```
 
-`live` (the breathing pulse) is reserved for a state that is *actively wrong
-right now* — currently `fatal` severity and the aggregate bad verdict. It is not
-decoration and must not be applied to every lamp on a page.
+Every Tailwind colour resolves through this to `rgb(var(--some-rgb) /
+<alpha-value>)`, which is why `bg-action/50` and similar opacity modifiers
+work on tokens that are themselves indirections — the RGB triplet form
+(`29 79 216`, not `#1d4fd8`) is what makes Tailwind's alpha-value substitution
+possible at all. A `rgba(...)` value (used for a handful of pre-composited
+tokens like `--text-secondary`) cannot take a Tailwind alpha modifier; those
+are used only where no opacity modifier is ever applied to them.
 
-Backend vocabularies map on through `SeverityLamp`, `SyncLamp`, and `ReviewLamp`
-rather than at each call site.
+That indirection is what makes dark mode a single `data-theme="dark"`
+attribute on `<html>` instead of a `dark:` variant scattered across every
+file. Two rules that flow from it:
 
-## Motion
+1. **Names are preserved, values are replaced.** Legacy Tailwind class names
+   from the previous system — `panel-*`, `signal-*`, `primary-*`, `navy-*`,
+   `green-*`, `amber-*`, `red-*`, `emerald-*`, `yellow-*`, `brand-*`,
+   `accent-*` — still work, because `tailwind.config.ts` maps every one of
+   them onto the new token set (`signal` and `primary` and `blue` all resolve
+   to `action`/cobalt now; `green`/`emerald` resolve to the good lamp; etc).
+   This is the mechanism that makes **roughly 294 legacy colour class
+   references across the codebase theme-aware for free**, without anyone
+   touching the files that use them.
+2. **The neutral ramp inverts between themes.** In `:root`, `--n-25-rgb` is
+   the lightest step and `--n-950-rgb` is bone (`--n-950-rgb: var(--bone-rgb)`
+   — i.e. the ramp still terminates at the light colour, just at the opposite
+   numeric end from where you'd expect). In `[data-theme="dark"]`, the same
+   twelve custom properties are reassigned so `--n-25-rgb` becomes the
+   darkest step and `--n-950-rgb` becomes bone. A component that reads
+   `bg-panel-900` gets near-black text-on-light in light mode and
+   near-bone in dark mode — the ramp inverted under it without the component
+   changing. This inversion is *why* rule 1 works: an old `bg-panel-800
+   text-panel-100` pairing that was legible in the old light-only system
+   stays legible in both themes, because both halves of the ramp moved
+   together.
 
-One authored moment, not scattered effects: `animate-rise` on page entry, and
-the lamp breath. Exponential ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`) from an
-already-visible default. A global `prefers-reduced-motion` block collapses
-everything.
+## The hazard the inversion creates
 
-## Browser surfaces
+Inversion is only safe for fills that are *supposed* to flip with the theme.
+**A surface that must stay dark in both themes — the nav rail is the
+example — must use `surface-dark` (or `surface-dark-inset`), never
+`ink-900` or a numbered `panel-*`/`n-*` step.** `ink-900` and the `n-*` ramp
+are defined to invert; `surface-dark` (`--surface-dark-rgb`) is defined to
+hold `3 3 3` in *both* the `:root` and `[data-theme="dark"]` blocks, on
+purpose, because "a dark panel beside a bone body" is the marketing site's
+actual composition in both of its own themes.
 
-Selection, caret, `accent-color`, scrollbars, focus rings, placeholder colour,
-and underline offset are all themed from the palette in `globals.css`. Left at
-their defaults these belong to no design system.
+This is not a hypothetical. During Task 2's mechanical sweep converting the
+old palette to the new token names, a regex meant to catch `bg-white`
+(`\bbg-white\b`) also matched *inside* `bg-white/[0.05]` — the `/` reads as a
+word boundary — and rewrote five nav-rail alpha tints in `Sidebar.tsx` (the
+active-item highlight and two hover states) from `bg-white/[alpha]` to
+`bg-surface-raised/[alpha]`. In light mode nothing looked wrong. In dark
+mode, `--surface-raised-rgb` (`20 20 20`, a raised card colour) is close
+enough to the rail's own `--surface-dark-rgb` (`12 12 12`) that the active-nav
+highlight and both hover states became visually indistinguishable from the
+rail itself — a real, invisible-in-dark-mode regression that every automated
+gate (tsc, eslint, build, the guards script) passed clean, because nothing
+about it is a type error, a lint violation, or a banned string.
 
-## Data visualisation
+The fix was a dedicated token, `--tint-on-dark-rgb` (`255 255 255` in *both*
+theme blocks, exposed as `bg-tint-on-dark`), for exactly this situation: a
+light-coloured tint painted onto a surface that is dark in both themes. Use
+`bg-tint-on-dark/[alpha]`, not `bg-surface-raised/[alpha]` or
+`bg-white/[alpha]`, whenever the base surface itself is `surface-dark`.
 
-`.viz-root` series are teal (`#1E7A90`) and mulberry (`#9B4D93`). The previous
-blue/orange pair put a series colour inside the amber lamp's hue range, which
-let a chart line read as a status.
+The general lesson: **before using a numbered neutral step or `ink-*` on a
+surface, ask "should this get lighter in dark mode?" If the answer is no,
+it is not a numbered-ramp token.**
 
-**These two slots have not been re-run through the numeric CVD/contrast gate
-that validated the previous pair.** They are reasoned, not measured. Re-validate
-before adding a third categorical slot.
+## Charts are two-colour by construction
 
-## Freshness and destructive actions
+`.viz-root` (`globals.css`) defines exactly two series tokens:
 
-Two conventions the console now depends on:
+```css
+--series-1: rgb(var(--action-rgb));   /* cobalt, solid fill */
+--series-2: var(--text-muted);        /* ink at reduced opacity, hatched */
+```
 
-**A reading always shows its age.** The lamp field polls every 30s, stops while
-the tab is hidden, and refreshes on return. The header states how long ago it
-read, and switches to an amber `stale ·` label past 90s. A refresh that fails
-keeps the last good values rather than blanking the panel — the staleness clock
-is what tells the operator the reading is aging, so it must never be replaced by
-an empty state.
+`VolumeChart` and `OutcomeChart` distinguish their two series by **fill
+texture (solid vs. diagonal hatch) and luminance, not by a second hue.** The
+site itself is a cobalt-and-ink binary with no third brand colour; inventing
+one for chart series risks landing inside the amber lamp's hue range (the
+previous system's actual failure mode — see below) or otherwise smuggling a
+non-lamp hue that a viewer could misread as status.
 
-**Irreversible actions confirm, and the dialog names the consequence.**
-`ConfirmDialog` states what will happen ("marks all 96 occurrences as reviewed,
-under your name, and cannot be undone"), never "Are you sure?". Cancel takes
-initial focus; the destructive button never does, so a repeated or reflexive
-Enter resolves to "nothing happened". Focus is trapped and returned to the
-invoking control.
+This is also why the two-colour, texture-differentiated approach **retires
+the numeric colour-vision-deficiency (CVD) contrast gate** that the *previous*
+teal (`#1E7A90`) / mulberry (`#9B4D93`) series pair was designed to need but,
+per the project ledger, was never actually run through. Distinguishing series
+by luminance and fill pattern rather than hue is CVD-safe by construction —
+there is no hue discrimination required to tell the two series apart, so
+there is no CVD gate left to fail or to skip.
 
-## Language
+## `npm run guards`
 
-`lib/vocabulary.ts` is the terminology glossary and the only place a backend
-enum becomes a word. `warn` reads as "Warning", `startup` as "Startup",
-`resolved` (job) as "Re-queued". An unrecognised code is humanised, never
-rendered raw. Filter options are generated from the same tables as the rows they
-filter, which is what stopped `startup` being "Process" in one place and
-"Startup" in another.
+`scripts/design-guards.mjs` is **the closest thing this workspace has to a
+test** — there is no test framework here by design (see Testing below), so
+this script is what stands in for regression coverage on the visual system.
+It walks every `.ts`/`.tsx`/`.css` file under `src/` and fails the run
+(non-zero exit) if it finds any of four things:
 
-Terms the product cannot avoid (fingerprint, severity, reviewed) carry a
-`Hint` — a real button, not a hover tooltip, because hover has no keyboard or
-touch equivalent and the users most likely to need a definition are the least
-able to reach one. The definition sits in the accessibility tree whether or not
-the panel is painted.
+1. **Hex outside the token layer** — any `#`-prefixed colour literal outside
+   `src/app/globals.css`'s `:root`/`[data-theme="dark"]` blocks, with one
+   named exception (`BrandingPanel.tsx`, where a hex value is *client data* —
+   a colour picker's default/placeholder — not a design token).
+2. **A resurrected corner radius** — any `rounded-*` class other than
+   `rounded-full`.
+3. **`bg-white`** — a Tailwind default colour, not a token, which does not
+   follow the theme and will render as a literal white square in dark mode.
+4. **The retired teal** — any of the ten hex values that made up the previous
+   `signal` ramp, in case a stale value gets pasted back in.
 
-**Hints are rationed.** Three per table at most, on genuinely product-internal
-terms. A hint on every column is noise, and noise is what made help invisible
-before.
+Run it with `npm run guards`. Clean output is `design-guards: clean`; any
+violation prints the file, line, and a one-line fix hint, and the script
+exits 1.
 
-## Tables
+## What is NOT done: Phases 2 and 3
 
-One implementation. `components/Table.tsx` holds the primitives (`TableShell`,
-`Table`, `THead`, `TH`, `TBody`, `TR`, `TD`, `TableEmpty`); `DataTable` is a
-column-driven wrapper over them, and screens needing bespoke cells compose the
-primitives directly. Previously `DataTable` carried the chrome, sticky heads,
-keyboard row activation and a real empty state, while hand-rolled `<table>`
-markup in system/users/settings carried none of it.
-
-`TR` takes `onActivate` rather than `onClick`, which is what makes a clickable
-row focusable and Enter/Space-operable. Use it; do not put `onClick` on a raw
-`<tr>`.
+Phase 1 built the token layer, the guards script, and recomposed a small,
+explicit set of shared components and pages (see the per-task history in
+`.superpowers/sdd/2026-08-11-dashboard-cobalt-facelift-phase1/progress.md`
+for exactly which). **29 routes still inherit the new world only through the
+token remap described above — they have not been individually composed or
+visually reviewed.** They render in the new colours, type, radius, and
+shadows because the tokens they already reference were redefined underneath
+them, not because anyone opened those files this phase. Phase 2 and Phase 3
+are where those routes get individually composed, and where `/_tokens`,
+`/tokens-sheet`, and the `next.config.js` rewrite that makes `/_tokens`
+resolve (marked `TODO(phase-3-cleanup)`) are scheduled for deletion.
 
 ## Known gaps
 
-- **Light-locked.** `color-scheme: light`, no dark variant. Decided from the use
-  scene. Adding dark mode means re-deriving the lamp `-ink` values, which are
-  tuned for light grounds.
-- **Verified surfaces.** Login, the shell, the overview, and System Health were
-  built and inspected directly. The other ~15 routes inherit the world through
-  the token remap and the shared components; they have not been individually
-  composed.
-- **Eight display tables are still hand-rolled** and inherit the palette but not
-  the primitives, so their rows are not keyboard-operable and their empty and
-  loading states are inconsistent: `agents`, `audit`, `calls`, `clients`,
-  `clients/[id]/agent`, `crm`, `reports`, `support`. Migrated so far:
-  `DataTable`, `system`, `users`, `settings`.
-  (`ChartCard` and `InlineEditTable` also contain `<table>` markup but are
-  deliberately different: one is a screen-reader alternative to a chart, the
-  other an editable grid. Neither should adopt the display-table chrome.)
-- No keyboard shortcuts and no saved filter views. Filters already live in the
-  URL, so saved views are mostly a naming problem, not a data one.
-- **Reduced motion caps transitions at 90ms rather than deleting them.** The
-  usual blanket `0.01ms` kill also destroys the hover, focus, and lamp-state
-  feedback this interface runs on. Do not "simplify" it back.
-- Charts (`ChartCard`, `OutcomeChart`, `VolumeChart`), `Drawer`, `Tabs`,
-  `InlineEditTable`, and `SlaCountdown` inherit tokens but were not
-  recomposed.
+Carried from `progress.md`, not resolved in this task:
+
+- **Duplicate `body {}` selector** in `globals.css`'s `@layer base` — a new
+  `@apply bg-surface text-text` rule sits beside the pre-existing
+  font-smoothing rule instead of being merged into it. Harmless (no cascade
+  conflict), but untidy. Triage whenever that file is next touched.
+- **~20 lines lost their leading indentation** inside multi-line template
+  literals during the Task 2 mechanical sweep (queue, reports, onboarding
+  ×2, connections, `calls/[id]`, business, assistant pages). Inert —
+  behaviour and rendering are unaffected — but it is exactly the "reformat
+  unrelated code" outcome the original plan warned against.
+- **3 ambiguous fills defaulted to `bg-surface-dark`** under the sweep's
+  fallback rule (`assistant/page.tsx:157,182`; `calls/[id]/page.tsx:136` —
+  chat bubbles/avatars). No visible change in light mode; low contrast in
+  dark mode. These routes are Phase 2/3 territory anyway; revisit when they
+  are composed.
+- **`Sidebar.tsx` `ring-offset-ink-900`** (two call sites) uses an inverting
+  token for a focus-ring offset against the permanently-dark rail — the same
+  class of hazard described above, on a lower-visibility property
+  (`ring-offset-color` rather than `background-color`). Flagged, not yet
+  fixed.
+- **8px lamp dots read as flat**, not structured (rim + specular highlight +
+  core), at the smallest size — a pre-existing property of the design at that
+  scale, not a Phase 1 regression, but worth revisiting if "lamps differ by
+  structure, not hue alone" is meant to hold at every size.
+- **8 display tables are still hand-rolled `<table>` markup** rather than
+  the shared `Table`/`DataTable` primitives: `agents`, `audit`, `calls`,
+  `clients`, `clients/[id]/agent`, `crm`, `reports`, `support`. They inherit
+  the palette through tokens but not the primitives' keyboard row activation
+  or empty/loading states.
+- **Authenticated routes were never visually verified during this phase.**
+  Every component that lives behind the dashboard's login (the nav rail,
+  `ThemeToggle` in its real location, both `Drawer` and `ConfirmDialog` in
+  their real call sites, and all 29 inherited-only routes) has been read and
+  reasoned about, but not screenshotted signed in, because doing so would
+  require a real authenticated session and no shortcut around that
+  (forged token, stubbed middleware, seeded credential) is permitted. The
+  Task 12 evidence package documents exactly which routes were reachable
+  without authentication and which were not, rather than working around the
+  gap.
+
+## Testing
+
+There is no test framework in this workspace, by design (see the global
+constraints for this build — no test framework may be added). `npm run
+guards`, `npx tsc --noEmit`, `npx eslint .`, and `npm run build` are the full
+verification gate; `npm run guards` is the only one of the four that checks
+anything specific to this design system rather than general TypeScript/lint/
+build correctness.
