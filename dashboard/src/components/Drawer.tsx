@@ -86,7 +86,7 @@ export function Drawer({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="relative flex h-full w-full max-w-2xl flex-col border-l border-panel-200 bg-surface-raised shadow-xl focus:outline-none"
+        className="relative flex h-full w-full max-w-2xl flex-col border-l border-edge bg-surface-raised shadow-xl focus:outline-none"
       >
         <div className="flex items-start justify-between gap-4 border-b border-panel-200 px-6 py-4">
           <h2 className="font-heading text-lg font-semibold text-ink-900">{title}</h2>
@@ -94,7 +94,7 @@ export function Drawer({
             type="button"
             onClick={onClose}
             aria-label="Close panel"
-            className="cursor-pointer p-1.5 text-panel-500 transition-colors hover:bg-panel-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
+            className="cursor-pointer p-1.5 text-text-muted transition-colors hover:bg-panel-100 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>

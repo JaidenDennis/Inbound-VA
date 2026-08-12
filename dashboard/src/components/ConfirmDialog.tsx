@@ -116,7 +116,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-body"
-        className="relative w-full max-w-sm animate-rise border border-panel-200 bg-surface-raised p-5 shadow-xl"
+        className="relative w-full max-w-sm animate-rise border border-edge bg-surface-raised p-5 shadow-xl"
       >
         <div className="flex items-start gap-3">
           {destructive ? (
@@ -142,7 +142,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="cursor-pointer border border-panel-300 bg-surface-raised px-3.5 py-2 text-sm font-semibold text-ink-800 transition-colors duration-150 hover:border-panel-400 hover:bg-panel-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
+            className="cursor-pointer border border-rule bg-surface-raised px-3.5 py-2 text-sm font-semibold text-ink-800 transition-colors duration-150 hover:border-action hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:opacity-50"
           >
             {cancelLabel}
           </button>
