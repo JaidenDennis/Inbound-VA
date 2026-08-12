@@ -263,9 +263,9 @@ function RowActions({ saving, onSave, onCancel }: { saving: boolean; onSave: () 
         onClick={onSave}
         disabled={saving}
         aria-label="Save row"
-        className="cursor-pointer p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+        className="cursor-pointer border border-action bg-action p-1.5 text-[rgb(var(--action-contrast-rgb))] transition-colors duration-150 hover:bg-transparent hover:text-action focus:outline-none focus:ring-2 focus:ring-action disabled:opacity-50"
       >
-        <Check className="h-4 w-4" aria-hidden />
+        <Check className="h-4 w-4 text-current" aria-hidden />
       </button>
       <button
         type="button"
