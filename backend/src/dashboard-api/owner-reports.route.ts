@@ -5,6 +5,7 @@ import { requirePermission, assertClientAccess, resolveClientScope } from '../mi
 import { logger } from '../utils/index.js';
 import { buildExport, EXPORT_KINDS, type ExportKind } from '../services/export.service.js';
 import { periodInsights } from '../ai/insights.service.js';
+import { exportFilename } from '../utils/exportFilename.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -418,9 +419,20 @@ export async function ownerReportRoutes(app: FastifyInstance): Promise<void> {
         const result = await buildExport(kind, range);
         const stamp = range.to.slice(0, 10);
 
+        // Named for the business, not the vendor: the file lands beside
+        // exports from every other tool, and "which of my clients is this?"
+        // is the question the operator actually has. The dashboard sets
+        // `link.download` from the same helper — the two must agree.
+        const { data: client } = await supabase
+          .from('clients')
+          .select('name')
+          .eq('id', range.clientId)
+          .maybeSingle();
+        const filename = exportFilename((client as { name?: string } | null)?.name, result.filename, stamp);
+
         reply
           .header('content-type', 'text/csv; charset=utf-8')
-          .header('content-disposition', `attachment; filename="gravvia-${result.filename}-${stamp}.csv"`)
+          .header('content-disposition', `attachment; filename="${filename}"`)
           // Surfaced so a client can tell an empty export from a failed one
           // without opening the file.
           .header('x-row-count', String(result.rowCount))

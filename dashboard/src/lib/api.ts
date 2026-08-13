@@ -46,6 +46,34 @@ export function errorMessage(e: unknown, fallback = 'Something went wrong'): str
   return fields.length ? `${base}: ${fields.join('; ')}` : base;
 }
 
+/**
+ * Pull the filename out of a Content-Disposition header.
+ *
+ * The server names exports after the business, and a blob download only keeps
+ * that name if `link.download` is set from it — anything else silently
+ * overrides the header. Reading it back keeps one source of truth.
+ *
+ * Requires `content-disposition` in the API's CORS `exposedHeaders`; without
+ * that the browser hides it from JS and this quietly returns the fallback.
+ * Handles RFC 5987 `filename*=UTF-8''…` first, since a business name with an
+ * accent arrives that way.
+ */
+export function filenameFromDisposition(header: unknown, fallback: string): string {
+  if (typeof header !== 'string') return fallback;
+
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1].trim());
+    } catch {
+      // A malformed escape sequence is not worth failing a download over.
+    }
+  }
+
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || fallback;
+}
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {

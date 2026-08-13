@@ -85,3 +85,42 @@ describe('CORS allows the methods the dashboard actually uses', () => {
     }
   });
 });
+
+/**
+ * The same failure one layer over: a response header the browser will not hand
+ * to JavaScript unless it is named in `access-control-expose-headers`.
+ *
+ * Only a short safelist (content-type, cache-control and a few others) is
+ * readable by default. `x-row-count` was added to the export route "so a client
+ * can tell an empty export from a failed one", and `content-disposition`
+ * carries the filename — both were invisible to the dashboard, silently, with
+ * the server logging a perfectly good response.
+ */
+describe('CORS exposes the response headers the dashboard has to read', () => {
+  async function actual() {
+    const app = Fastify();
+    await app.register(cors, buildCorsOptions([ORIGIN]));
+    app.get('/export', async (_req, reply) =>
+      reply
+        .header('content-disposition', 'attachment; filename="acme-money-2026-08-13.csv"')
+        .header('x-row-count', '42')
+        .send('a,b\n1,2\n')
+    );
+    await app.ready();
+    const res = await app.inject({ method: 'GET', url: '/export', headers: { origin: ORIGIN } });
+    await app.close();
+    return res;
+  }
+
+  it.each(['content-disposition', 'x-row-count'])('exposes %s', async (header) => {
+    const res = await actual();
+    const exposed = String(res.headers['access-control-expose-headers'] ?? '').toLowerCase();
+    expect(exposed).toContain(header);
+  });
+
+  it('names them on the options object too, so the list is greppable', () => {
+    const opts = buildCorsOptions([ORIGIN]);
+    expect(opts.exposedHeaders).toContain('content-disposition');
+    expect(opts.exposedHeaders).toContain('x-row-count');
+  });
+});

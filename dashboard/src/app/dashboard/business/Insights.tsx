@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Download, Sparkles } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, filenameFromDisposition } from '@/lib/api';
 import { useSession } from '@/lib/SessionProvider';
 import { NothingYet } from './Readout';
 
@@ -138,7 +138,13 @@ export function ExportBar({ clientId, from, to }: { clientId: string; from: stri
       const url = URL.createObjectURL(new Blob([response.data as BlobPart], { type: 'text/csv' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `gravvia-${kind}-${to.slice(0, 10)}.csv`;
+      // The server names the file after the business. Setting `download` from
+      // anything else would silently win over that header, so the name is read
+      // back rather than rebuilt — one source of truth, no drift.
+      link.download = filenameFromDisposition(
+        response.headers?.['content-disposition'],
+        `${kind}-${to.slice(0, 10)}.csv`
+      );
       link.click();
       // Revoking immediately can cancel the download in some browsers; a tick is
       // enough for the click to have been handled.
