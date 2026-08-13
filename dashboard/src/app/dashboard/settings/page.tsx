@@ -1,111 +1,112 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { AlertTriangle } from 'lucide-react';
-import { jobStatusTerm, JOB_STATUS } from '@/lib/vocabulary';
-import { HintedHeading } from '@/components/Hint';
+import { Suspense } from 'react';
 import { PageHeader } from '@/components/PageHeader';
-import { StatusLamp } from '@/components/StatusLamp';
-import { Table, TableEmpty, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
+import { Tabs, useActiveTab, type TabSpec } from '@/components/Tabs';
+import { ClientPicker, useClientScope } from '@/components/ClientPicker';
+import { useSession } from '@/lib/SessionProvider';
+import type { Permission } from '@/lib/session';
+import { BusinessProfile } from './BusinessProfile';
+import { FailedJobs } from './FailedJobs';
+import UsersPage from '../users/page';
+import ConnectionsPage from '../connections/page';
 
-interface FailedJob {
-  id: string;
-  queue_name: string;
-  job_id: string;
-  error_message: string;
-  attempts: number;
-  status: string;
-  created_at: string;
+/**
+ * Settings — the things you configure once.
+ *
+ * Team, Connections and Billing used to each hold a slot in the rail, which
+ * pushed the daily work down a list an owner reads every morning to make room
+ * for pages they visit twice a year. They are gathered here, and Settings sits
+ * in the rail's footer beside Sign out.
+ *
+ * Tab selection lives in the URL (`?tab=`), so a tab is a place: it survives a
+ * reload and can be linked to from an onboarding step.
+ */
+
+interface SettingsTab extends TabSpec {
+  /** Omitted means every signed-in user who can reach Settings may see it. */
+  permission?: Permission;
+  /** Platform staff only, regardless of permission. */
+  platformOnly?: boolean;
 }
 
-export default function SettingsPage() {
-  const [failedJobs, setFailedJobs] = useState<FailedJob[]>([]);
-  const [retrying, setRetrying] = useState<string | null>(null);
+const TABS: SettingsTab[] = [
+  { key: 'profile', label: 'Business Profile' },
+  { key: 'team', label: 'Team', permission: 'users:read' },
+  { key: 'connections', label: 'Connections', permission: 'crm:read' },
+  { key: 'billing', label: 'Billing' },
+  // The failed-job console that used to be the whole of this page. Kept, and
+  // kept platform-only: it is the queue's manual-review path, not a client
+  // setting, and it was only ever reachable by staff.
+  { key: 'jobs', label: 'Jobs', platformOnly: true, permission: 'system:read' },
+];
 
-  useEffect(() => {
-    api.get('/admin/failed-jobs').then((r) => setFailedJobs(r.data));
-  }, []);
+function SettingsBody() {
+  const { can, isPlatform } = useSession();
+  const { clientId } = useClientScope();
 
-  const retryJob = async (job: FailedJob) => {
-    setRetrying(job.id);
-    try {
-      await api.post('/admin/retry-job', { jobId: job.job_id, queueName: job.queue_name });
-      setFailedJobs((prev) => prev.filter((j) => j.id !== job.id));
-    } finally {
-      setRetrying(null);
-    }
-  };
+  const visible = TABS.filter(
+    (t) => (!t.platformOnly || isPlatform) && (!t.permission || can(t.permission))
+  );
+  const active = useActiveTab(visible.map(({ key, label }) => ({ key, label })));
 
   return (
     <div>
       <PageHeader
+        eyebrow={isPlatform ? 'Platform console' : 'Account'}
         title="Settings"
-        description="Jobs that exhausted their retries and are waiting on a human decision."
+        description="Your business details, the people who can sign in, the systems you are connected to, and billing."
+        action={isPlatform ? <ClientPicker /> : undefined}
       />
 
-      <div className="mb-3 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-lamp-fair-ink" aria-hidden />
-        <h2 className="font-heading text-sm font-semibold text-ink-900">
-          Failed jobs
-        </h2>
-        <span
-          data-numeric
-          className="rounded-full border border-panel-200 bg-panel-100 px-2 py-0.5 text-2xs font-semibold text-panel-700"
-        >
-          {failedJobs.length}
-        </span>
-      </div>
+      <Tabs tabs={visible.map(({ key, label }) => ({ key, label }))} />
 
-      {failedJobs.length === 0 ? (
-        <TableEmpty
-          icon={<StatusLamp level="good" size="lg" label="Good" />}
-          title="No failed jobs"
-          body="Every queued job has completed or is still retrying."
-        />
-      ) : (
-        <TableShell>
-          <Table caption={`${failedJobs.length} failed jobs`}>
-            <THead>
-              <TH>Queue</TH>
-              <TH>Error</TH>
-              <TH>Attempts</TH>
-              <TH>
-                <HintedHeading term="Awaiting review" hint={JOB_STATUS.pending.hint ?? ''}>
-                  Status
-                </HintedHeading>
-              </TH>
-              <TH align="right" srOnly>Actions</TH>
-            </THead>
-            <TBody>
-              {failedJobs.map((job) => (
-                <TR key={job.id}>
-                  <TD mono>{job.queue_name}</TD>
-                  <TD className="max-w-xs truncate text-xs text-lamp-bad-ink" >
-                    {job.error_message}
-                  </TD>
-                  <TD numeric className="text-panel-600">{job.attempts}</TD>
-                  <TD>
-                    <span className="whitespace-nowrap rounded-full border border-lamp-fair-rim bg-lamp-fair-wash px-2.5 py-1 text-xs font-medium text-lamp-fair-ink">
-                      {jobStatusTerm(job.status).label}
-                    </span>
-                  </TD>
-                  <TD align="right">
-                    <button
-                      onClick={() => retryJob(job)}
-                      disabled={retrying === job.id}
-                      aria-label={`Retry ${job.queue_name} job`}
-                      className="cursor-pointer whitespace-nowrap px-1.5 py-1 text-xs font-medium text-signal-700 underline decoration-signal-300 underline-offset-2 transition-colors hover:text-signal-800 hover:decoration-signal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {retrying === job.id ? 'Retrying…' : 'Retry'}
-                    </button>
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        </TableShell>
-      )}
+      {active === 'profile' && <BusinessProfile clientId={clientId} />}
+      {active === 'team' && <UsersPage />}
+      {active === 'connections' && <ConnectionsPage />}
+      {active === 'billing' && <BillingPlaceholder />}
+      {active === 'jobs' && <FailedJobs />}
     </div>
+  );
+}
+
+/**
+ * Billing is wired but has no payment provider behind it yet.
+ *
+ * Rather than render invented figures — a fabricated "next payment" date is
+ * worse than none, because a customer will believe it — this states plainly
+ * what is not connected. It is replaced by the real tabs when the
+ * subscriptions and payments tables land.
+ */
+function BillingPlaceholder() {
+  return (
+    <div className="max-w-2xl border border-hairline bg-surface-raised px-5 py-6">
+      <p className="font-mono text-2xs uppercase tracking-[0.16em] text-text-muted">Billing</p>
+      <p className="mt-2 text-base text-text">Not connected yet.</p>
+      <p className="mt-2 max-w-prose text-sm leading-relaxed text-text-secondary">
+        Subscription, payment history and billing notifications will appear here once the
+        payment provider is connected. Nothing is shown in the meantime rather than showing
+        figures that are not real.
+      </p>
+      <p className="mt-4 text-sm text-text-secondary">
+        For a billing question in the meantime, contact{' '}
+        <a
+          href="mailto:hello@gravvia.com?subject=Billing%20question"
+          className="text-action underline decoration-action/40 underline-offset-2 transition-colors hover:decoration-action"
+        >
+          hello@gravvia.com
+        </a>
+        .
+      </p>
+    </div>
+  );
+}
+
+export default function SettingsPage() {
+  // useActiveTab and ClientPicker both read search params.
+  return (
+    <Suspense fallback={<div className="h-64 animate-pulse bg-panel-100" />}>
+      <SettingsBody />
+    </Suspense>
   );
 }

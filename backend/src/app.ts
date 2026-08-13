@@ -40,6 +40,7 @@ import { systemRoutes } from './dashboard-api/system.route.js';
 import { knowledgeRoutes } from './dashboard-api/knowledge.route.js';
 import { agentRoutes } from './dashboard-api/agents.route.js';
 import { myAgentRoutes } from './dashboard-api/my-agent.route.js';
+import { businessProfileRoutes } from './dashboard-api/business-profile.route.js';
 import { connectionRoutes } from './dashboard-api/connections.route.js';
 import { aiRoutes } from './dashboard-api/ai.route.js';
 import { reportRoutes } from './dashboard-api/reports.route.js';
@@ -174,6 +175,7 @@ export async function buildApp() {
   await app.register(knowledgeRoutes);
   await app.register(agentRoutes);
   await app.register(myAgentRoutes);
+  await app.register(businessProfileRoutes);
   await app.register(connectionRoutes);
   await app.register(aiRoutes);
   await app.register(reportRoutes);

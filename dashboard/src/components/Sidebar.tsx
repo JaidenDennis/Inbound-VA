@@ -66,34 +66,111 @@ const staffNav: NavGroup[] = [
       { href: '/dashboard/alerts', label: 'Alerts', icon: BellRing, permission: 'analytics:read' },
       { href: '/dashboard/users', label: 'Users', icon: Users, permission: 'users:read' },
       { href: '/dashboard/audit', label: 'Audit Log', icon: ScrollText, permission: 'system:read' },
-      { href: '/dashboard/settings', label: 'Settings', icon: Settings, permission: 'settings:read' },
+      // Settings is not listed here: it sits in the footer beside Sign out for
+      // both shells, so the two rails agree on where account-level settings are.
     ],
   },
 ];
 
+/**
+ * The client rail, ordered the way an owner's day runs: what happened, what is
+ * booked, what needs a person, then what it was worth, then the agent itself.
+ *
+ * Two things are deliberately absent.
+ *
+ * Assistant is no longer a destination. Navigating away from the page you were
+ * reading in order to ask a question about it is exactly backwards, so it is a
+ * panel that opens over the current route — see AssistantPanel.
+ *
+ * Team, Connections and Billing are no longer top-level. They are settings, and
+ * an owner visits them rarely; promoting each to the rail pushed the daily work
+ * down. They live under Settings, which sits in the footer beside Sign out —
+ * the conventional place for the thing you configure once.
+ */
 const clientNav: NavGroup[] = [
   {
     label: null,
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-      { href: '/dashboard/assistant', label: 'Assistant', icon: Sparkles },
+      { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar, permission: 'bookings:read' },
+      { href: '/dashboard/queue', label: 'Work Queue', icon: Inbox, permission: 'flags:read' },
       // Business before Reports: the owner cares what it is worth before what it
       // did. Reports stays as the call-by-call detail behind these figures.
       { href: '/dashboard/business', label: 'Business', icon: TrendingUp, permission: 'analytics:read' },
-      { href: '/dashboard/queue', label: 'Work Queue', icon: Inbox, permission: 'flags:read' },
       { href: '/dashboard/reports', label: 'Reports', icon: BarChart2, permission: 'analytics:read' },
       // Analytics (cross-company roll-up) is platform-only — see staffNav.
       // A client's own numbers live on Business, above.
       { href: '/dashboard/agent', label: 'My Agent', icon: Bot, permission: 'knowledge:read' },
-      { href: '/dashboard/knowledge', label: 'Knowledge', icon: BookOpen, permission: 'knowledge:read' },
-      { href: '/dashboard/connections', label: 'Connections', icon: Plug, permission: 'crm:read' },
+      { href: '/dashboard/knowledge', label: 'Agent Knowledge', icon: BookOpen, permission: 'knowledge:read' },
+      { href: '/dashboard/alerts', label: 'Alerts', icon: BellRing, permission: 'analytics:read' },
       { href: '/dashboard/support', label: 'Support', icon: LifeBuoy, permission: 'tickets:read' },
       { href: '/dashboard/onboarding', label: 'Onboarding', icon: ListChecks, permission: 'clients:read' },
-      { href: '/dashboard/alerts', label: 'Alerts', icon: BellRing, permission: 'analytics:read' },
-      { href: '/dashboard/team', label: 'Team', icon: Users, permission: 'users:write' },
     ],
   },
 ];
+
+/**
+ * Settings sits with Sign out rather than in the scrolling list above.
+ *
+ * Both are account-level acts you reach for occasionally and deliberately, and
+ * neither belongs in the run of daily work. Keeping it out of the group above
+ * also means the rail's length tracks what the owner actually does.
+ */
+const SETTINGS_ITEM: NavItem = {
+  href: '/dashboard/settings',
+  label: 'Settings',
+  icon: Settings,
+  permission: 'settings:read',
+};
+
+/**
+ * One rail row. Extracted so Settings — which sits in the footer beside Sign
+ * out rather than in the scrolling list — is visually identical to the items
+ * above it. Two copies of this markup would drift the moment one is touched.
+ */
+function NavRow({
+  item,
+  active,
+  onNavigate,
+}: {
+  item: NavItem;
+  active: boolean;
+  onNavigate?: () => void;
+}) {
+  const { href, label, icon: Icon } = item;
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
+      className={clsx(
+        // py-3 keeps the row at a >=44px touch target without costing a visible
+        // line of nav. pl-[10px] below overrides px-3's left padding so the 2px
+        // active border does not shift the row.
+        'group flex cursor-pointer items-center gap-3 px-3 py-3 text-sm',
+        'transition-colors duration-150 ease-out',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark focus-visible:ring-offset-2 focus-visible:ring-offset-surface-dark',
+        active
+          // A lit cobalt edge: the rail's one piece of chroma, and it means
+          // "you are here", which is an action relationship, not a status.
+          // action-on-dark (not action) because the rail is dark in BOTH themes
+          // and plain action drops to 3.11:1 in light theme.
+          ? 'border-l-2 border-action bg-action-100 pl-[10px] font-medium text-action-on-dark'
+          : 'border-l-2 border-transparent pl-[10px] font-normal text-text-on-dark-muted hover:bg-tint-on-dark/[0.05] hover:text-text-on-dark'
+      )}
+    >
+      <Icon
+        className={clsx(
+          'h-[18px] w-[18px] flex-shrink-0 transition-colors duration-150',
+          active ? 'text-action-on-dark' : 'text-text-on-dark-muted group-hover:text-text-on-dark'
+        )}
+        aria-hidden
+        strokeWidth={1.75}
+      />
+      <span className="flex-1 truncate">{label}</span>
+    </Link>
+  );
+}
 
 /** The monogram, drawn as geometry rather than set as two letters in a box. */
 function Mark({ className }: { className?: string }) {
@@ -161,46 +238,11 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
                 </p>
               )}
               <ul className="space-y-0.5 px-3">
-                {group.items.map(({ href, label, icon: Icon }) => {
-                  const active = isActive(href);
-                  return (
-                    <li key={href}>
-                      <Link
-                        href={href}
-                        onClick={onNavigate}
-                        aria-current={active ? 'page' : undefined}
-                        className={clsx(
-                          // py-3 keeps the row at a >=44px touch target without
-                          // costing a visible line of nav on a 13-item rail.
-                          // pl-[10px] below (from the active/inactive branch)
-                          // overrides px-3's left padding so the 2px border
-                          // does not shift the row.
-                          'group flex cursor-pointer items-center gap-3 px-3 py-3 text-sm',
-                          'transition-colors duration-150 ease-out',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark focus-visible:ring-offset-2 focus-visible:ring-offset-surface-dark',
-                          active
-                            // A lit cobalt edge: the rail's one piece of chroma,
-                            // and it means "you are here", which is an action
-                            // relationship, not a status. action-on-dark (not
-                            // action) because the rail is dark in BOTH themes and
-                            // plain action drops to 3.11:1 in light theme.
-                            ? 'border-l-2 border-action bg-action-100 pl-[10px] font-medium text-action-on-dark'
-                            : 'border-l-2 border-transparent pl-[10px] font-normal text-text-on-dark-muted hover:bg-tint-on-dark/[0.05] hover:text-text-on-dark'
-                        )}
-                      >
-                        <Icon
-                          className={clsx(
-                            'h-[18px] w-[18px] flex-shrink-0 transition-colors duration-150',
-                            active ? 'text-action-on-dark' : 'text-text-on-dark-muted group-hover:text-text-on-dark'
-                          )}
-                          aria-hidden
-                          strokeWidth={1.75}
-                        />
-                        <span className="flex-1 truncate">{label}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
+                {group.items.map((item) => (
+                  <li key={item.href}>
+                    <NavRow item={item} active={isActive(item.href)} onNavigate={onNavigate} />
+                  </li>
+                ))}
               </ul>
             </div>
           ))
@@ -216,6 +258,16 @@ function NavRail({ onNavigate }: { onNavigate?: () => void }) {
               {roleLabel(auth.role)}
             </p>
           </div>
+        )}
+        {/* Settings sits here rather than in the list above: it and Sign out are
+            both account-level acts reached occasionally and deliberately, and
+            neither belongs in the run of daily work. */}
+        {can(SETTINGS_ITEM.permission!) && (
+          <NavRow
+            item={SETTINGS_ITEM}
+            active={isActive(SETTINGS_ITEM.href)}
+            onNavigate={onNavigate}
+          />
         )}
         <ThemeToggle />
         <button
