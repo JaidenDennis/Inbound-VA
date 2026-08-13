@@ -70,6 +70,107 @@ function detectFlags(transcript: string): {
   };
 }
 
+/**
+ * Recreate `calls` rows for call_records that have no matching one.
+ *
+ * call_records and calls are parallel tables keyed on retell_call_id, written
+ * by different webhook handlers. Where call_analyzed landed but the
+ * started/ended handler did not, the analysis row exists with no call beside
+ * it — and because the client_call_log view is driven FROM call_records, those
+ * calls show on the reporting page with no caller number and no transcript.
+ *
+ * Everything written here comes from the Retell API. The contact is resolved by
+ * phone number the same way the live path does, so recovered calls thread into
+ * the existing contact list rather than creating duplicates.
+ */
+async function recoverOrphans(clientId: string): Promise<number> {
+  const { data: records } = await sb
+    .from('call_records')
+    .select('retell_call_id')
+    .eq('client_id', clientId);
+  const { data: existing } = await sb
+    .from('calls')
+    .select('retell_call_id')
+    .eq('client_id', clientId);
+
+  const have = new Set((existing ?? []).map((c) => c.retell_call_id));
+  const orphans = (records ?? []).filter((r) => !have.has(r.retell_call_id));
+  if (!orphans.length) {
+    console.log('No orphaned call_records to recover.');
+    return 0;
+  }
+
+  console.log(`\nRecovering ${orphans.length} call_records with no calls row:`);
+  let recovered = 0;
+
+  for (const orphan of orphans) {
+    let remote;
+    try {
+      remote = await retell.call.retrieve(orphan.retell_call_id);
+    } catch {
+      console.log(`  ${orphan.retell_call_id.slice(0, 22)}  UNAVAILABLE at Retell`);
+      continue;
+    }
+
+    const from = remote.from_number ?? '';
+    const to = remote.to_number ?? '';
+    if (!from || !to) {
+      console.log(`  ${orphan.retell_call_id.slice(0, 22)}  no phone numbers held, skipping`);
+      continue;
+    }
+
+    // Resolve the contact by phone, creating one only if genuinely new.
+    let contactId: string | null = null;
+    const { data: contact } = await sb
+      .from('contacts')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('phone', from)
+      .maybeSingle();
+    if (contact) {
+      contactId = contact.id;
+    } else {
+      const { data: made } = await sb
+        .from('contacts')
+        .insert({ client_id: clientId, phone: from, tags: ['recovered'] })
+        .select('id')
+        .single();
+      contactId = made?.id ?? null;
+    }
+
+    const startedAt = remote.start_timestamp ? new Date(remote.start_timestamp) : new Date();
+    const endedAt = remote.end_timestamp ? new Date(remote.end_timestamp) : null;
+
+    if (dryRun) {
+      console.log(`  ${String(startedAt.toISOString()).slice(0, 16)}  ${from} -> would recover`);
+      recovered += 1;
+      continue;
+    }
+
+    const { error } = await sb.from('calls').insert({
+      client_id: clientId,
+      contact_id: contactId,
+      retell_call_id: orphan.retell_call_id,
+      direction: remote.direction === 'outbound' ? 'outbound' : 'inbound',
+      from_number: from,
+      to_number: to,
+      status: 'completed',
+      duration_seconds: remote.duration_ms ? Math.round(remote.duration_ms / 1000) : null,
+      recording_url: remote.recording_url ?? null,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt ? endedAt.toISOString() : null,
+    });
+    if (error) {
+      console.log(`  ${orphan.retell_call_id.slice(0, 22)}  insert failed: ${error.message}`);
+      continue;
+    }
+    console.log(`  ${String(startedAt.toISOString()).slice(0, 16)}  ${from}  recovered`);
+    recovered += 1;
+  }
+
+  return recovered;
+}
+
 async function main(): Promise<void> {
   const { data: client, error: clientErr } = await sb
     .from('clients')
@@ -77,6 +178,12 @@ async function main(): Promise<void> {
     .eq('slug', slug)
     .single();
   if (clientErr || !client) throw new Error(`No client with slug '${slug}'`);
+
+  // Recover missing calls rows FIRST so the transcript pass below picks them up.
+  if (process.argv.includes('--recover-orphans')) {
+    const n = await recoverOrphans(client.id);
+    console.log(`Recovered ${n} calls.\n`);
+  }
 
   const { data: settings } = await sb
     .from('client_settings')

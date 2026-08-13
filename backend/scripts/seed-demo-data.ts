@@ -77,6 +77,9 @@ interface Scenario {
   handoffRequested: boolean;
   leadCaptured: boolean;
   callStatus: 'completed' | 'transferred';
+  /** Overrides for the call_records analysis columns; all derived when omitted. */
+  callReason?: string;
+  qualityScore?: number;
   turns: Turn[];
   /** Optional appointment produced by the call. */
   appointment?: {
@@ -431,6 +434,51 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+/**
+ * Derive the call_records analysis row from the scenario.
+ *
+ * call_records is a PARALLEL table to calls, joined on retell_call_id, and the
+ * client_call_log view the reporting pages read is driven FROM call_records
+ * (LEFT JOIN calls). A call with no call_records row is invisible on the calls
+ * report no matter how complete its `calls` row is — which is exactly what
+ * happened on the first seed run.
+ *
+ * `outcome` is not stored: the view computes it via call_outcome() from
+ * appointment_booked / lead_recaptured / call status / in_voicemail /
+ * call_successful, in that precedence. These flags are set so each scenario
+ * lands on the outcome its transcript actually describes.
+ */
+function deriveRecord(s: Scenario): Record<string, unknown> {
+  const booked = Boolean(s.appointment && s.appointment.status !== 'cancelled');
+  const successful = s.callStatus === 'transferred' ? true : booked || s.leadCaptured;
+  const base = s.sentiment === 'negative' ? 7 : s.followUp ? 8 : 9;
+  return {
+    agent_id: 'agent_2ad66579467380fee2d1b7b6e7',
+    in_voicemail: false,
+    disconnection_reason: 'user_hangup',
+    user_sentiment: s.sentiment.charAt(0).toUpperCase() + s.sentiment.slice(1),
+    call_successful: successful,
+    appointment_booked: booked,
+    // Only counts when a lead was captured WITHOUT a booking, otherwise the
+    // outcome precedence would hide the booking behind 'lead_captured'.
+    lead_recaptured: !booked && s.leadCaptured,
+    missed_call_recovered: false,
+    call_reason: s.callReason ?? (s.keyTopics[0] ? `${s.keyTopics[0]} enquiry` : 'General enquiry'),
+    requested_service: s.keyTopics[0] ?? null,
+    service_available: s.keyTopics.length > 0,
+    escalation_reason: s.handoffRequested ? s.actionItems[0] ?? 'Caller asked for a person' : null,
+    // 0-10 scale (CHECK call_records_quality_range), not a percentage.
+    quality_score: s.qualityScore ?? base,
+    quality_accuracy: Math.min(10, base + 1),
+    quality_resolution: booked ? Math.min(10, base + 1) : Math.max(0, base - 1),
+    quality_tone: s.sentiment === 'negative' ? 8 : 9,
+    flagged: s.sentiment === 'negative',
+    flag_reasons: s.sentiment === 'negative' ? ['negative_sentiment'] : [],
+    analyzed_at: new Date().toISOString(),
+    raw_analysis: { demo_seed: true },
+  };
+}
+
 /** Front-desk tasks. Mixed pending/done so the list reads as lived-in. */
 const ACTION_ITEMS: Array<{ title: string; description: string; status: 'pending' | 'done' }> = [
   { title: 'Call Yvonne Castellanos about Friday wait time', description: 'Escalated by Emily. Client waited 40 minutes past her appointment. Practice manager to call after 4pm.', status: 'pending' },
@@ -469,6 +517,9 @@ async function main(): Promise<void> {
       await sb.from('appointments').delete().in('call_id', seededIds);
       await sb.from('calls').delete().in('id', seededIds);
     }
+    // call_records is a parallel table with no FK to calls, so cascade does not
+    // reach it — it has to be cleaned on its own key.
+    await sb.from('call_records').delete().eq('client_id', clientId).like('retell_call_id', `${SEED_PREFIX}%`);
     await sb.from('contacts').delete().eq('client_id', clientId).contains('custom_fields', { demo_seed: true });
     await sb.from('client_action_items').delete().eq('client_id', clientId).like('description', '%[demo]%');
     await sb.from('tickets').delete().eq('client_id', clientId).like('description', '%[demo]%');
@@ -500,12 +551,14 @@ async function main(): Promise<void> {
       .single();
     if (contactErr) throw new Error(`contact ${s.first}: ${contactErr.message}`);
 
+    const retellCallId = `${SEED_PREFIX}${String(index).padStart(3, '0')}_${startedAt.getTime()}`;
+
     const { data: call, error: callErr } = await sb
       .from('calls')
       .insert({
         client_id: clientId,
         contact_id: contact.id,
-        retell_call_id: `${SEED_PREFIX}${String(index).padStart(3, '0')}_${startedAt.getTime()}`,
+        retell_call_id: retellCallId,
         direction: 'inbound',
         from_number: s.phone,
         to_number: '+19047605971',
@@ -517,6 +570,18 @@ async function main(): Promise<void> {
       .select('id')
       .single();
     if (callErr) throw new Error(`call ${s.first}: ${callErr.message}`);
+
+    // Parallel analysis row. The calls report reads client_call_log, which is
+    // driven from call_records — without this the call does not appear at all.
+    const { error: recErr } = await sb.from('call_records').insert({
+      client_id: clientId,
+      retell_call_id: retellCallId,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
+      duration_seconds: s.durationSeconds,
+      ...deriveRecord(s),
+    });
+    if (recErr) throw new Error(`call_record ${s.first}: ${recErr.message}`);
 
     const flat = s.turns.map((t) => t.content).join(' ');
     await sb.from('call_transcripts').upsert(
