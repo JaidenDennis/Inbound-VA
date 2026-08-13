@@ -22,7 +22,9 @@ export default function BookingsPage() {
   const fetchAppointments = (cid: string) => {
     if (!cid) return;
     setLoading(true);
-    api.get(`/booking/availability?clientId=${cid}&date=${new Date().toISOString().split('T')[0]}`)
+    api.get(`/booking/appointments?clientId=${cid}`)
+      .then((r) => setAppointments(r.data.data ?? []))
+      .catch(() => setAppointments([]))
       .finally(() => setLoading(false));
   };
 
@@ -43,6 +45,8 @@ export default function BookingsPage() {
     pending: 'bg-yellow-100 text-yellow-700',
     cancelled: 'bg-red-100 text-red-600',
     rescheduled: 'bg-blue-100 text-blue-700',
+    completed: 'bg-green-100 text-green-700',
+    no_show: 'bg-gray-100 text-gray-600',
   };
 
   if (loading) return <div className="text-gray-400 animate-pulse">Loading appointments...</div>;

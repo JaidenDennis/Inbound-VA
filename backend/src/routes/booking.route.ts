@@ -81,6 +81,31 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
+  /**
+   * List a client's appointments.
+   *
+   * bookingService.listAppointments has existed since launch with no route
+   * exposing it, which is why the dashboard bookings page had no data source to
+   * call and rendered "No appointments found" regardless of what was stored.
+   */
+  app.get<{ Querystring: { clientId?: string; status?: string } }>(
+    '/booking/appointments',
+    {
+      preHandler: requirePermission('bookings:read'),
+      handler: async (request, reply) => {
+        const user = request.user as JwtPayload;
+        // Client-scoped users are locked to their own tenant regardless of query.
+        const clientId = user.clientId ?? request.query.clientId;
+        if (!clientId) return reply.code(400).send({ error: 'clientId required' });
+        if (!assertClientAccess(user, clientId)) {
+          return reply.code(403).send({ error: 'Forbidden' });
+        }
+        const appointments = await bookingService.listAppointments(clientId, request.query.status);
+        reply.send({ data: appointments, count: appointments.length });
+      },
+    }
+  );
+
   app.get<{ Querystring: { clientId: string; date: string; timezone?: string } }>(
     '/booking/availability',
     {
