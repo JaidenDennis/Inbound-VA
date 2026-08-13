@@ -7,6 +7,7 @@ import { ClientPicker, useClientScope } from '@/components/ClientPicker';
 import { useSession } from '@/lib/SessionProvider';
 import type { Permission } from '@/lib/session';
 import { BusinessProfile } from './BusinessProfile';
+import { Billing } from './Billing';
 import { FailedJobs } from './FailedJobs';
 import UsersPage from '../users/page';
 import ConnectionsPage from '../connections/page';
@@ -64,40 +65,8 @@ function SettingsBody() {
       {active === 'profile' && <BusinessProfile clientId={clientId} />}
       {active === 'team' && <UsersPage />}
       {active === 'connections' && <ConnectionsPage />}
-      {active === 'billing' && <BillingPlaceholder />}
+      {active === 'billing' && <Billing clientId={clientId} />}
       {active === 'jobs' && <FailedJobs />}
-    </div>
-  );
-}
-
-/**
- * Billing is wired but has no payment provider behind it yet.
- *
- * Rather than render invented figures — a fabricated "next payment" date is
- * worse than none, because a customer will believe it — this states plainly
- * what is not connected. It is replaced by the real tabs when the
- * subscriptions and payments tables land.
- */
-function BillingPlaceholder() {
-  return (
-    <div className="max-w-2xl border border-hairline bg-surface-raised px-5 py-6">
-      <p className="font-mono text-2xs uppercase tracking-[0.16em] text-text-muted">Billing</p>
-      <p className="mt-2 text-base text-text">Not connected yet.</p>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-text-secondary">
-        Subscription, payment history and billing notifications will appear here once the
-        payment provider is connected. Nothing is shown in the meantime rather than showing
-        figures that are not real.
-      </p>
-      <p className="mt-4 text-sm text-text-secondary">
-        For a billing question in the meantime, contact{' '}
-        <a
-          href="mailto:hello@gravvia.com?subject=Billing%20question"
-          className="text-action underline decoration-action/40 underline-offset-2 transition-colors hover:decoration-action"
-        >
-          hello@gravvia.com
-        </a>
-        .
-      </p>
     </div>
   );
 }
