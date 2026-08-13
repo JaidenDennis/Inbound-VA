@@ -24,6 +24,10 @@ export const QUEUE_KINDS = [
   'failed_booking',
   'untouched_escalation',
   'calendar_conflict',
+  // Operational action items (migration 034). Onboarding-category items are
+  // excluded by the view — those belong to the bounded pre-go-live sequence on
+  // the Onboarding page, not to the queue a manager works every day.
+  'action_item',
 ] as const;
 
 export type QueueKind = (typeof QUEUE_KINDS)[number];
@@ -167,6 +171,17 @@ export async function queueRoutes(app: FastifyInstance): Promise<void> {
           .update({ status: 'resolved' })
           .eq('id', id)
           .eq('job_data->>clientId', clientId);
+        return error ? { ok: false, error: error.message } : { ok: true };
+      }
+      case 'action_item': {
+        // An action item owns its own state, so closing is marking it done —
+        // no dismissals row, and the same transition the Onboarding page and
+        // the client-facing list already use.
+        const { error } = await supabase
+          .from('client_action_items')
+          .update({ status: 'done' })
+          .eq('id', id)
+          .eq('client_id', clientId);
         return error ? { ok: false, error: error.message } : { ok: true };
       }
       case 'untouched_escalation':

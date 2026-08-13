@@ -2,13 +2,21 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { actionItemService, writeAuditLog, withAudit } from '../services/index.js';
 import { requirePermission, assertClientAccess, isPlatformUser } from '../middleware/index.js';
-import { ACTION_ITEM_STATUSES } from '../types/index.js';
-import type { JwtPayload, ActionItemStatus } from '../types/index.js';
+import { ACTION_ITEM_STATUSES, ACTION_ITEM_CATEGORIES } from '../types/index.js';
+import type { JwtPayload, ActionItemStatus, ActionItemCategory } from '../types/index.js';
 
 const createSchema = z.object({
   clientId: z.string().uuid(),
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
+  // Omitted means 'operations' — see migration 033. Onboarding is the narrow
+  // case and names itself; ongoing work is the default.
+  category: z.enum(ACTION_ITEM_CATEGORIES as [string, ...string[]]).optional(),
+});
+
+const listSchema = z.object({
+  clientId: z.string().uuid().optional(),
+  category: z.enum(ACTION_ITEM_CATEGORIES as [string, ...string[]]).optional(),
 });
 
 const updateSchema = z
@@ -23,18 +31,20 @@ const updateSchema = z
 
 export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
   // List a client's action items (own tenant for clients; ?clientId for staff).
-  app.get<{ Querystring: { clientId?: string } }>('/action-items', {
+  app.get<{ Querystring: { clientId?: string; category?: string } }>('/action-items', {
     preHandler: requirePermission('clients:read'),
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
-      const clientId = user.clientId ?? request.query.clientId;
+      const query = listSchema.parse(request.query);
+      const category = query.category as ActionItemCategory | undefined;
+      const clientId = user.clientId ?? query.clientId;
       // Staff with no client named see every client's items rather than a 400.
       if (!clientId) {
         if (!isPlatformUser(user)) return reply.code(403).send({ error: 'Forbidden' });
         return reply.send({ scope: 'platform', data: await actionItemService.listAllForPlatform() });
       }
       if (!assertClientAccess(user, clientId)) return reply.code(403).send({ error: 'Forbidden' });
-      const items = await actionItemService.listForClient(clientId);
+      const items = await actionItemService.listForClient(clientId, category);
       reply.send({ scope: 'client', data: items });
     },
   });
@@ -60,6 +70,7 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
             title: body.title,
             description: body.description,
             createdBy: user.sub,
+            category: body.category as ActionItemCategory | undefined,
           }),
       });
 

@@ -29,6 +29,8 @@ const KIND_LABEL: Record<string, string> = {
   failed_booking: 'Failed bookings',
   untouched_escalation: 'Untracked transfers',
   calendar_conflict: 'Double bookings',
+  // Operational items only — onboarding steps stay on the Onboarding page.
+  action_item: 'Action items',
 };
 
 /** Derived items have no row of their own; closing them records a judgement. */

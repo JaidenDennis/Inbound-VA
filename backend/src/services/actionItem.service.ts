@@ -1,11 +1,13 @@
 import { supabase } from '../db/index.js';
-import type { ActionItemStatus, ClientActionItem } from '../types/index.js';
+import type { ActionItemCategory, ActionItemStatus, ClientActionItem } from '../types/index.js';
 
 export interface CreateActionItemInput {
   clientId: string;
   title: string;
   description?: string | null;
   createdBy: string;
+  /** Omitted means 'operations', matching the column default in migration 033. */
+  category?: ActionItemCategory;
 }
 
 export interface UpdateActionItemInput {
@@ -15,12 +17,20 @@ export interface UpdateActionItemInput {
 }
 
 export class ActionItemService {
-  async listForClient(clientId: string): Promise<ClientActionItem[]> {
-    const { data } = await supabase
+  /**
+   * @param category narrows to one bucket. Omitted returns every category,
+   *   which is what the platform-wide views and older callers expect — adding
+   *   the filter must not silently change what they see.
+   */
+  async listForClient(clientId: string, category?: ActionItemCategory): Promise<ClientActionItem[]> {
+    let query = supabase
       .from('client_action_items')
       .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: true });
+      .eq('client_id', clientId);
+
+    if (category) query = query.eq('category', category);
+
+    const { data } = await query.order('created_at', { ascending: true });
     return (data ?? []) as ClientActionItem[];
   }
 
@@ -50,6 +60,9 @@ export class ActionItemService {
         title: input.title,
         description: input.description ?? null,
         status: 'pending',
+        // Written explicitly rather than left to the column default, so the
+        // value is visible in the audit trail the route wraps this in.
+        category: input.category ?? 'operations',
         created_by: input.createdBy,
       })
       .select()

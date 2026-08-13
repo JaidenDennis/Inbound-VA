@@ -38,7 +38,13 @@ export default function StaffOnboardingDetail() {
   const load = useCallback(() => {
     Promise.all([
       api.get('/onboarding', { params: { clientId } }).then((r) => setMilestones(r.data.data ?? [])),
-      api.get('/action-items', { params: { clientId } }).then((r) => setItems(r.data.data ?? [])),
+      // Onboarding steps only. Without the filter this listed every action
+      // item for the tenant, so operational work raised months after go-live
+      // appeared here as though the client were still being onboarded — and
+      // never appeared in the Work Queue, where it belonged.
+      api
+        .get('/action-items', { params: { clientId, category: 'onboarding' } })
+        .then((r) => setItems(r.data.data ?? [])),
       api.get(`/clients/${clientId}`).then((r) => setClientName(r.data?.name ?? '')).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, [clientId]);
@@ -62,7 +68,9 @@ export default function StaffOnboardingDetail() {
     if (!title) return;
     setAdding(true);
     try {
-      const { data } = await api.post('/action-items', { clientId, title });
+      // Added from the Onboarding page, so it is an onboarding step. Anything
+      // ongoing belongs in the Work Queue and is created there.
+      const { data } = await api.post('/action-items', { clientId, title, category: 'onboarding' });
       setItems((xs) => [...xs, data]);
       setNewTitle('');
     } catch (e) {

@@ -17,6 +17,15 @@ import { env } from '../config/index.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const MIGRATION_025 = resolve(here, '../../../supabase/migrations/025_manager_queue.sql');
 
+/**
+ * The migration that currently defines `manager_queue`.
+ *
+ * 034 re-declares the view to add the `action_item` kind, reproducing 025's
+ * five branches verbatim. Assertions about the view's *current* shape must read
+ * the latest definition; assertions about 025's own history still read 025.
+ */
+const MIGRATION_034 = resolve(here, '../../../supabase/migrations/034_queue_action_items.sql');
+
 const db = vi.hoisted(() => ({
   queue: [] as Record<string, unknown>[],
   writes: [] as { table: string; op: string; payload: unknown }[],
@@ -254,11 +263,37 @@ describe('pulse', () => {
 
 describe('migration 025', () => {
   const sql = readFileSync(MIGRATION_025, 'utf8');
+  // The live view, which 034 re-declares. The rule this enforces is about what
+  // the queue currently emits, so it must read the current definition — not the
+  // migration that happened to introduce the view first.
+  const liveViewSql = readFileSync(MIGRATION_034, 'utf8');
 
   it('produces every kind the route knows how to close', () => {
     for (const kind of QUEUE_KINDS) {
-      expect(sql).toContain(`'${kind}'`);
+      expect(liveViewSql).toContain(`'${kind}'`);
     }
+  });
+
+  /**
+   * 034 must carry 025's branches forward unchanged. A `CREATE OR REPLACE VIEW`
+   * restates the whole definition, so a paraphrase there silently rewrites
+   * behaviour that four other tests in this file are asserting against 025 —
+   * including the double-booking ordering rule below, which was a real bug.
+   */
+  it('carries the original branches into the replacement view verbatim', () => {
+    // Line endings differ between the two files (025 is CRLF, 034 LF), and that
+    // is not the thing under test — the SQL is.
+    const lf = (s: string) => s.replace(/\r\n/g, '\n');
+    const original = lf(sql);
+    const branches = original.slice(
+      original.indexOf('CREATE OR REPLACE VIEW manager_queue AS'),
+      // Up to but not including the terminating semicolon: 034 continues the
+      // statement with another UNION ALL where 025 ended it.
+      original.lastIndexOf('    );') + '    )'.length
+    );
+
+    expect(branches).toContain('flagged_call');
+    expect(lf(liveViewSql)).toContain(branches);
   });
 
   // The regression: two competing ordering conditions meant any conflict whose
