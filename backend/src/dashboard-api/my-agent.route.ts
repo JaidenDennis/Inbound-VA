@@ -12,6 +12,7 @@ import {
   PromptBoundaryError,
 } from '../services/index.js';
 import { toSettingsPatch } from '../services/agentDraft.service.js';
+import { sanitizeAgentReadback } from './my-agent.sanitize.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -137,6 +138,31 @@ export async function myAgentRoutes(app: FastifyInstance): Promise<void> {
       const config = (settings?.agent_config ?? {}) as Record<string, unknown>;
       const booking = (settings?.booking_rules ?? {}) as Record<string, unknown>;
 
+      // The editor must never be handed a value this route's own PATCH would
+      // refuse. Without this, one stored value outside `updateSchema` — an
+      // older template's voice, a placeholder in the notification list — makes
+      // the whole record un-editable, because the form posts it back untouched
+      // with every save. See my-agent.sanitize.ts.
+      const safe = sanitizeAgentReadback(
+        {
+          voice_id: client.retell_voice_id,
+          agent_tone: settings?.agent_tone,
+          agent_response_style: settings?.agent_response_style,
+          agent_personality: settings?.agent_personality,
+          responsiveness: config.responsiveness,
+          interruption_sensitivity: config.interruption_sensitivity,
+          voice_temperature: config.voice_temperature,
+          notification_emails: settings?.notification_emails,
+          pronunciation_dictionary: config.pronunciation_dictionary,
+        },
+        {
+          voices: VOICE_OPTIONS.map((v) => v.id),
+          tones: TONE_OPTIONS,
+          styles: STYLE_OPTIONS,
+          personalities: PERSONALITY_OPTIONS,
+        }
+      );
+
       reply.send({
         // Options are served with the values so the UI never hardcodes a list
         // that can drift from what the API will accept.
@@ -150,13 +176,13 @@ export async function myAgentRoutes(app: FastifyInstance): Promise<void> {
           business_name: settings?.business_name ?? client.name,
           agent_name: settings?.agent_name ?? '',
           opening_message: config.opening_message ?? null,
-          agent_personality: settings?.agent_personality ?? '',
-          agent_tone: settings?.agent_tone ?? '',
-          agent_response_style: settings?.agent_response_style ?? '',
-          voice_id: client.retell_voice_id ?? '',
-          responsiveness: config.responsiveness ?? null,
-          interruption_sensitivity: config.interruption_sensitivity ?? null,
-          voice_temperature: config.voice_temperature ?? null,
+          agent_personality: safe.agent_personality,
+          agent_tone: safe.agent_tone,
+          agent_response_style: safe.agent_response_style,
+          voice_id: safe.voice_id,
+          responsiveness: safe.responsiveness,
+          interruption_sensitivity: safe.interruption_sensitivity,
+          voice_temperature: safe.voice_temperature,
           booking_enabled: settings?.booking_enabled ?? false,
           transfer_enabled: config.transfer_enabled ?? false,
           transfer_number: config.transfer_number ?? null,
@@ -168,9 +194,9 @@ export async function myAgentRoutes(app: FastifyInstance): Promise<void> {
           buffer_minutes: booking.buffer_minutes ?? null,
           cancellation_notice_hours: booking.cancellation_notice_hours ?? null,
           cancellation_policy: booking.cancellation_policy ?? null,
-          notification_emails: settings?.notification_emails ?? [],
+          notification_emails: safe.notification_emails,
           escalation_rules: settings?.escalation_rules ?? [],
-          pronunciation_dictionary: config.pronunciation_dictionary ?? [],
+          pronunciation_dictionary: safe.pronunciation_dictionary,
         },
         sync: {
           state: (client as unknown as { agent_sync_state?: string }).agent_sync_state ?? 'never',
