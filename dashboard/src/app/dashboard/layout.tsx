@@ -1,9 +1,16 @@
 import Sidebar from '@/components/Sidebar';
 import { SessionProvider } from '@/lib/SessionProvider';
+import { AssistantProvider } from '@/components/AssistantPanel';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
+      {/* The assistant lives in the LAYOUT, not a page. Next keeps a layout
+          mounted across navigations within its segment, which is what lets the
+          panel stay open — and keep its conversation — while you move between
+          Reports and Calls. Mounted on a page it would be torn down by the
+          very navigation it exists to avoid. */}
+      <AssistantProvider>
       {/* Nav is 13 items for staff; keyboard users need a way past it. */}
       <a
         href="#main-content"
@@ -25,6 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </main>
       </div>
+      </AssistantProvider>
     </SessionProvider>
   );
 }

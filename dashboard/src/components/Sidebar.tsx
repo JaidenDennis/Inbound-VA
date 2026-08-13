@@ -13,6 +13,7 @@ import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useSession } from '@/lib/SessionProvider';
 import { clearSession, roleLabel, type Permission } from '@/lib/session';
+import { useAssistant } from '@/components/AssistantPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface NavItem {
@@ -28,6 +29,16 @@ interface NavGroup {
   items: NavItem[];
 }
 
+/**
+ * Sentinel href for the Assistant row.
+ *
+ * The row lives in the same list as every real destination so it looks and
+ * keyboards identically, but it opens the side panel instead of navigating.
+ * A sentinel keeps that decision in one place rather than adding an
+ * `onClick?` to NavItem that only one entry ever sets.
+ */
+const ASSISTANT_HREF = '#assistant';
+
 // A flat list stops working past roughly seven entries and staff now has
 // thirteen, so staff navigation is grouped by what the person is doing.
 const staffNav: NavGroup[] = [
@@ -35,7 +46,9 @@ const staffNav: NavGroup[] = [
     label: 'Operate',
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-      { href: '/dashboard/assistant', label: 'Assistant', icon: Sparkles },
+      // Not a destination. Opens the panel over whatever page you are on —
+      // navigating away from the thing you wanted to ask about is backwards.
+      { href: ASSISTANT_HREF, label: 'Assistant', icon: Sparkles },
       // Above Calls deliberately: this is the list with things waiting on a
       // person, and it should be the second thing an operator looks at.
       { href: '/dashboard/queue', label: 'Work Queue', icon: Inbox, permission: 'flags:read' },
@@ -138,27 +151,29 @@ function NavRow({
   onNavigate?: () => void;
 }) {
   const { href, label, icon: Icon } = item;
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      aria-current={active ? 'page' : undefined}
-      className={clsx(
-        // py-3 keeps the row at a >=44px touch target without costing a visible
-        // line of nav. pl-[10px] below overrides px-3's left padding so the 2px
-        // active border does not shift the row.
-        'group flex cursor-pointer items-center gap-3 px-3 py-3 text-sm',
-        'transition-colors duration-150 ease-out',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark focus-visible:ring-offset-2 focus-visible:ring-offset-surface-dark',
-        active
-          // A lit cobalt edge: the rail's one piece of chroma, and it means
-          // "you are here", which is an action relationship, not a status.
-          // action-on-dark (not action) because the rail is dark in BOTH themes
-          // and plain action drops to 3.11:1 in light theme.
-          ? 'border-l-2 border-action bg-action-100 pl-[10px] font-medium text-action-on-dark'
-          : 'border-l-2 border-transparent pl-[10px] font-normal text-text-on-dark-muted hover:bg-tint-on-dark/[0.05] hover:text-text-on-dark'
-      )}
-    >
+  const { setOpen: setAssistantOpen } = useAssistant();
+  const isAssistant = href === ASSISTANT_HREF;
+
+  const className = clsx(
+    // py-3 keeps the row at a >=44px touch target without costing a visible
+    // line of nav. pl-[10px] below overrides px-3's left padding so the 2px
+    // active border does not shift the row.
+    'group flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left text-sm',
+    'transition-colors duration-150 ease-out',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-on-dark focus-visible:ring-offset-2 focus-visible:ring-offset-surface-dark',
+    active
+      // A lit cobalt edge: the rail's one piece of chroma, and it means
+      // "you are here", which is an action relationship, not a status.
+      // action-on-dark (not action) because the rail is dark in BOTH themes
+      // and plain action drops to 3.11:1 in light theme.
+      ? 'border-l-2 border-action bg-action-100 pl-[10px] font-medium text-action-on-dark'
+      : 'border-l-2 border-transparent pl-[10px] font-normal text-text-on-dark-muted hover:bg-tint-on-dark/[0.05] hover:text-text-on-dark'
+  );
+
+  // Identical in both branches, so the Assistant row is indistinguishable from
+  // a destination until you click it.
+  const inner = (
+    <>
       <Icon
         className={clsx(
           'h-[18px] w-[18px] flex-shrink-0 transition-colors duration-150',
@@ -168,6 +183,35 @@ function NavRow({
         strokeWidth={1.75}
       />
       <span className="flex-1 truncate">{label}</span>
+    </>
+  );
+
+  // A button, not a Link: it goes nowhere. Rendering it as an anchor would put
+  // a URL in the status bar and let a middle-click open a page that is not a
+  // page — and screen readers would announce a link that never navigates.
+  if (isAssistant) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setAssistantOpen(true);
+          onNavigate?.();
+        }}
+        className={className}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
+      className={className}
+    >
+      {inner}
     </Link>
   );
 }
