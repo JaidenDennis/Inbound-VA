@@ -15,6 +15,37 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * The backend's Zod handler (backend/src/app.ts) answers a failed `.parse()`
+ * with `{ error: 'Validation failed', details: { field: [message, ...] } }`.
+ * Reading only `.error` throws away the one part a person can act on, so the
+ * user is told a validation failed without being told which field — and so is
+ * anyone trying to diagnose it from a bug report.
+ *
+ * Field names are the API's snake_case keys rather than the form's labels.
+ * That is deliberate: it keeps the message truthful about what the server
+ * rejected, and a mapping table here would silently rot as fields are added.
+ */
+export function errorMessage(e: unknown, fallback = 'Something went wrong'): string {
+  const data = (e as { response?: { data?: { error?: string; details?: unknown } } })?.response?.data;
+  if (!data) return fallback;
+
+  const base = data.error ?? fallback;
+  const details = data.details;
+  if (!details || typeof details !== 'object') return base;
+
+  const fields = Object.entries(details as Record<string, unknown>)
+    .map(([field, messages]) => {
+      const first = Array.isArray(messages) ? messages[0] : messages;
+      return typeof first === 'string' ? `${field} — ${first}` : field;
+    })
+    // Two named fields is enough to act on; a wall of them is not readable in
+    // a toast, and the rest are usually the same mistake repeated.
+    .slice(0, 2);
+
+  return fields.length ? `${base}: ${fields.join('; ')}` : base;
+}
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {

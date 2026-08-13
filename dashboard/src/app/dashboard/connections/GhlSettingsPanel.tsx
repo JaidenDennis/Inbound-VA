@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { RefreshCw } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 /**
  * Where GoHighLevel puts what the agent captures.
@@ -66,8 +66,7 @@ export function GhlSettingsPanel({ clientId, canWrite }: { clientId: string; can
       toast.success('GoHighLevel settings saved');
     } catch (e) {
       toast.error(
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          'Could not save GoHighLevel settings'
+        errorMessage(e, 'Could not save GoHighLevel settings')
       );
     } finally {
       setSaving(false);

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, Check, X, Pencil } from 'lucide-react';
+import { errorMessage } from '@/lib/api';
 
 export interface FieldSpec {
   key: string;
@@ -89,8 +90,7 @@ export function InlineEditTable<T extends { id: string }>({
       else if (editingId) await onUpdate(editingId, draft);
       cancel();
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? 'Could not save');
+      toast.error(errorMessage(err, 'Could not save'));
     } finally {
       setSaving(false);
     }

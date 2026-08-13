@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { ArrowDown, ArrowUp, Check, Minus, RefreshCw, X } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientPicker, useClientScope } from '@/components/ClientPicker';
 import { StatusLamp, type LampLevel } from '@/components/StatusLamp';
@@ -153,7 +153,7 @@ function QueueInner() {
     }
 
     Promise.all(jobs)
-      .catch((e) => setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not load the queue'))
+      .catch((e) => setError(errorMessage(e, 'Could not load the queue')))
       .finally(() => setLoading(false));
   }, [clientId, kind]);
 
@@ -168,7 +168,7 @@ function QueueInner() {
       setItems((list) => list.filter((i) => !(i.kind === item.kind && i.id === item.id)));
       setCounts((c) => ({ ...c, [item.kind]: Math.max(0, (c[item.kind] ?? 1) - 1) }));
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not close that');
+      toast.error(errorMessage(e, 'Could not close that'));
     } finally {
       setClosing(null);
     }

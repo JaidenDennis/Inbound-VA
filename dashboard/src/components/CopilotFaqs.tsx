@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Sparkles, X } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 /**
  * Suggests FAQs the agent is missing, grounded in the client's own services.
@@ -51,8 +51,7 @@ export function CopilotFaqs({
       }
     } catch (e) {
       setError(
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          'Could not draft FAQs right now.'
+        errorMessage(e, 'Could not draft FAQs right now.')
       );
     } finally {
       setLoading(false);

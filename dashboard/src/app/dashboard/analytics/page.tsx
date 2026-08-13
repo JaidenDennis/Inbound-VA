@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 /**
@@ -70,8 +70,7 @@ export default function AnalyticsPage() {
         setError(
           status === 403
             ? 'This roll-up is staff-only. Your own figures are on the Business page.'
-            : ((e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-              'The analytics service did not respond.')
+            : (errorMessage(e, 'The analytics service did not respond.'))
         );
       })
       .finally(() => setLoading(false));

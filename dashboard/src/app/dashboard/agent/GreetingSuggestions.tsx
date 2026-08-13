@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 /**
  * Draft opening lines in a few different registers.
@@ -43,8 +43,7 @@ export function GreetingSuggestions({
       setOptions(data.data ?? []);
     } catch (e) {
       setError(
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          'Could not draft greetings right now.'
+        errorMessage(e, 'Could not draft greetings right now.')
       );
     } finally {
       setLoading(false);

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AlertTriangle, ClipboardCheck, Info, Save, Volume2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Tabs, useActiveTab, type TabSpec } from '@/components/Tabs';
 import { SyncBadge } from '@/components/StatusPill';
@@ -241,8 +241,7 @@ function AgentCustomiserInner() {
       toast.success('Saved — your agent updates on new calls within about a minute');
       if (tab === 'greeting') loadPreview();
     } catch (e) {
-      const data = (e as { response?: { data?: { error?: string } } })?.response?.data;
-      toast.error(data?.error ?? 'Could not save those changes');
+      toast.error(errorMessage(e, 'Could not save those changes'));
     } finally {
       setSaving(false);
     }

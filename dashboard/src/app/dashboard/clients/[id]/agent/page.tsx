@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Tabs, useActiveTab, type TabSpec } from '@/components/Tabs';
 import { SyncBadge, StatusPill } from '@/components/StatusPill';
@@ -145,8 +145,7 @@ function AgentEditorInner() {
       toast.success('Saved — publishing to the live agent shortly');
       load();
     } catch (e) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? 'Could not save');
+      toast.error(errorMessage(e, 'Could not save'));
     } finally {
       setSaving(false);
     }

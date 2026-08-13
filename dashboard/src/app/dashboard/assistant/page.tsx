@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { Sparkles, Send, User } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientPicker, useClientScope } from '@/components/ClientPicker';
 import { useSession } from '@/lib/SessionProvider';
@@ -90,8 +90,7 @@ function AssistantInner() {
       });
       setTurns([...next, { role: 'assistant', content: data.reply, consulted: data.consulted }]);
     } catch (e) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg ?? 'The assistant could not answer that. Try again shortly.');
+      setError(errorMessage(e, 'The assistant could not answer that. Try again shortly.'));
       setTurns(next);
     } finally {
       setSending(false);

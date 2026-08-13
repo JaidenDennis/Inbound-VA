@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Check, Plus } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusPill } from '@/components/StatusPill';
 import { useSession } from '@/lib/SessionProvider';
@@ -53,7 +53,7 @@ export default function StaffOnboardingDetail() {
       toast.success(`${stageLabel(stageKey)} → ${STATUS_LABEL[status]}`);
     } catch (e) {
       setMilestones(previous);
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not update that stage');
+      toast.error(errorMessage(e, 'Could not update that stage'));
     }
   };
 
@@ -66,7 +66,7 @@ export default function StaffOnboardingDetail() {
       setItems((xs) => [...xs, data]);
       setNewTitle('');
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not add that item');
+      toast.error(errorMessage(e, 'Could not add that item'));
     } finally {
       setAdding(false);
     }

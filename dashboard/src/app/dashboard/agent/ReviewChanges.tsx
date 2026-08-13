@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AlertTriangle, ArrowRight, Check, Loader2, X } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 /**
  * Read what a change does, then publish it.
@@ -93,8 +93,7 @@ export function ReviewChanges({
       .put('/my-agent/draft', payload, { params: { clientId } })
       .then((r) => setState(r.data))
       .catch((e) => {
-        const data = (e as { response?: { data?: { error?: string } } })?.response?.data;
-        setError(data?.error ?? 'Could not work out what these changes do.');
+        setError(errorMessage(e, 'Could not work out what these changes do.'));
       });
     // `payload` is rebuilt on every render of the parent; staging once on open is
     // the intent, so it is deliberately not a dependency.

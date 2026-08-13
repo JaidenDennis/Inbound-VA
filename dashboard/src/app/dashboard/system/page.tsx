@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { FilterBar, type FilterSpec } from '@/components/FilterBar';
 import { SeverityLamp, ReviewLamp, StatusLamp } from '@/components/StatusLamp';
@@ -155,8 +155,7 @@ function SystemPageInner() {
       toast.success(`Re-queued as job ${r.data.jobId}`);
       load();
     } catch (e) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? 'Retry failed');
+      toast.error(errorMessage(e, 'Retry failed'));
     }
   };
 
@@ -259,8 +258,7 @@ function GroupedTable({
       setPending(null);
       onReviewed();
     } catch (e) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? 'Could not clear that group');
+      toast.error(errorMessage(e, 'Could not clear that group'));
     } finally {
       setBusy(false);
     }

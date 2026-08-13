@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Bot, BookOpen, ListChecks, Plug, Save } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusPill } from '@/components/StatusPill';
 import { useSession } from '@/lib/SessionProvider';
@@ -137,7 +137,7 @@ export default function ClientDetailPage() {
       });
       toast.success('Business details saved');
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not save');
+      toast.error(errorMessage(e, 'Could not save'));
     } finally {
       setSavingClient(false);
     }
@@ -152,7 +152,7 @@ export default function ClientDetailPage() {
       });
       toast.success('Operations settings saved');
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not save');
+      toast.error(errorMessage(e, 'Could not save'));
     } finally {
       setSavingSettings(false);
     }

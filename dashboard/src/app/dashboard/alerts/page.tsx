@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { BellRing, Info } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientPicker, ChooseClientPrompt, useClientScope } from '@/components/ClientPicker';
 import { LampStatus } from '@/components/StatusLamp';
@@ -142,7 +142,7 @@ function AlertsInner() {
         );
       });
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not save that rule');
+      toast.error(errorMessage(e, 'Could not save that rule'));
     } finally {
       setSaving(null);
     }

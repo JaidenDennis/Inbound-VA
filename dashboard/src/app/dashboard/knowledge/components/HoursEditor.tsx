@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Save, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 /**
  * Opening hours.
@@ -108,7 +108,7 @@ export function HoursEditor({
       setDirty(false);
       toast.success('Hours saved — publishing to the agent shortly');
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not save hours');
+      toast.error(errorMessage(e, 'Could not save hours'));
     } finally {
       setSaving(false);
     }

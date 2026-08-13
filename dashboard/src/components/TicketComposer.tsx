@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Lightbulb, Sparkles } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 /**
  * Describe the problem in plain language; get a ticket support can act on.
@@ -55,8 +55,7 @@ export function TicketComposer({
       setDraft(data);
     } catch (e) {
       setError(
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          'Could not draft that right now — you can still write the ticket yourself.'
+        errorMessage(e, 'Could not draft that right now — you can still write the ticket yourself.')
       );
     } finally {
       setLoading(false);

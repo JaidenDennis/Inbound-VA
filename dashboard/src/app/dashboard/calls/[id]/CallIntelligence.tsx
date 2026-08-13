@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AlertTriangle, BookOpen, Bot, CheckCircle2, Sparkles, UserCheck } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { StatusPill, type Tone } from '@/components/StatusPill';
 
 /**
@@ -60,8 +60,7 @@ export function CallIntelligence({ callId }: { callId: string }) {
       const { data } = await api.post(`/ai/calls/${callId}/analyze`);
       setAnalysis(data);
     } catch (e) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg ?? 'Could not analyse this call.');
+      setError(errorMessage(e, 'Could not analyse this call.'));
     } finally {
       setLoading(false);
     }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 
 // Keep in sync with the Industry union in backend/src/types/client.types.ts —
@@ -47,8 +47,7 @@ export default function NewClientPage() {
       });
       router.push(`/dashboard/clients/${data.id}`);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg ?? 'Failed to create client');
+      setError(errorMessage(err, 'Failed to create client'));
     } finally {
       setSaving(false);
     }

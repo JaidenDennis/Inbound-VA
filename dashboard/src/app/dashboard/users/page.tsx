@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { Plus, UserPlus } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Table, TableEmpty, TableShell, TBody, TD, TH, THead, TR } from '@/components/Table';
@@ -66,8 +66,7 @@ export default function UsersPage() {
       setShowForm(false);
       load();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg ?? 'Failed to create user');
+      setError(errorMessage(err, 'Failed to create user'));
     } finally {
       setSaving(false);
     }
@@ -147,8 +146,7 @@ export default function UsersPage() {
       setPendingDisable(null);
       load();
     } catch (e) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? 'Could not change that user');
+      toast.error(errorMessage(e, 'Could not change that user'));
     } finally {
       setToggling(false);
     }

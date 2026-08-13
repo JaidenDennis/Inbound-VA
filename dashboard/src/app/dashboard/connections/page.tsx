@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AlertTriangle, Calendar, Database, Link2, Lock, RefreshCw } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusPill } from '@/components/StatusPill';
 import { LampStatus, type LampLevel } from '@/components/StatusLamp';
@@ -59,8 +59,7 @@ function ConnectionCard({
       window.location.href = data.url;
     } catch (e) {
       toast.error(
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          'Could not start the GoHighLevel install flow.'
+        errorMessage(e, 'Could not start the GoHighLevel install flow.')
       );
       setBusy(false);
     }
@@ -74,8 +73,7 @@ function ConnectionCard({
       onChanged();
     } catch (e) {
       toast.error(
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          'Could not change the active CRM'
+        errorMessage(e, 'Could not change the active CRM')
       );
     } finally {
       setBusy(false);

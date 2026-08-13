@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Plus, Search, Pencil, Archive, RotateCcw, Building2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusPill } from '@/components/StatusPill';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -66,7 +66,7 @@ export default function ClientsPage() {
       setPendingArchive(null);
       load();
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not archive that client');
+      toast.error(errorMessage(e, 'Could not archive that client'));
     } finally {
       setBusy(false);
     }
@@ -78,7 +78,7 @@ export default function ClientsPage() {
       toast.success(`${client.name} restored`);
       load();
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not restore that client');
+      toast.error(errorMessage(e, 'Could not restore that client'));
     }
   };
 

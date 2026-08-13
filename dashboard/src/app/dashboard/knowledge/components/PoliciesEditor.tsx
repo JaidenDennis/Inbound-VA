@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { GripVertical, Plus, Save, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 type Policy = { id?: string; title: string; body: string };
 
@@ -90,7 +90,7 @@ export function PoliciesEditor({ clientId, readOnly }: { clientId: string; readO
         toast.success('Policies saved — publishing to the agent shortly');
       }
     } catch (e) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not save policies');
+      toast.error(errorMessage(e, 'Could not save policies'));
     } finally {
       setSaving(false);
     }
