@@ -119,7 +119,29 @@ COMMENT ON COLUMN client_settings.billing_notification_email IS
   'Where payment and invoice notices go. Separate from notification_emails, which is operational alerting.';
 
 -- ------------------------------------------------------------
--- 4. Verification — abort rather than half-migrate
+-- 4. Row Level Security
+-- ------------------------------------------------------------
+-- Enabled with no policy, matching every other table since 002.
+--
+-- The backend connects with the service role key, which bypasses RLS, and the
+-- dashboard never talks to Supabase directly — it only calls this API. So RLS
+-- is not the security boundary here; the app layer is.
+--
+-- It matters anyway: Supabase exposes every public table over PostgREST to
+-- anyone holding the anon key, and the anon key is designed to be published.
+-- A table without RLS is world-readable to that key. Of everything in this
+-- schema, subscriptions and payment history is the worst thing to leave open.
+ALTER TABLE client_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE client_payments      ENABLE ROW LEVEL SECURITY;
+
+-- Not new to this migration, but missed when the table was created in 008 —
+-- every sibling there (tickets, ticket_messages, onboarding_milestones,
+-- call_records) got RLS and this one did not. Closing it here rather than
+-- leaving a lone unlocked table behind, since 033 has just given it a column.
+ALTER TABLE client_action_items  ENABLE ROW LEVEL SECURITY;
+
+-- ------------------------------------------------------------
+-- 5. Verification — abort rather than half-migrate
 -- ------------------------------------------------------------
 DO $$
 BEGIN

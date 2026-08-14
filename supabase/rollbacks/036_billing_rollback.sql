@@ -13,3 +13,6 @@ DROP TABLE IF EXISTS client_subscriptions;
 
 ALTER TABLE client_settings
   DROP COLUMN IF EXISTS billing_notification_email;
+
+-- client_action_items keeps its RLS: it predates this migration, was missing it
+-- by oversight, and disabling it here would open a table 036 never created.

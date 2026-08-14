@@ -27,6 +27,7 @@ import { callEndedRoute } from './routes/webhooks/call-ended.route.js';
 import { transcriptRoute } from './routes/webhooks/transcript.route.js';
 import { summaryRoute } from './routes/webhooks/summary.route.js';
 import { clayLeadRoute } from './routes/webhooks/clay-lead.route.js';
+import { siteLeadRoute } from './routes/webhooks/site-lead.route.js';
 import { authRoutes } from './dashboard-api/auth.route.js';
 import { analyticsRoutes } from './dashboard-api/analytics.route.js';
 import { adminRoutes } from './dashboard-api/admin.route.js';
@@ -164,6 +165,7 @@ export async function buildApp() {
   await app.register(transcriptRoute);
   await app.register(summaryRoute);
   await app.register(clayLeadRoute);
+  await app.register(siteLeadRoute);
   await app.register(analyticsRoutes);
   await app.register(adminRoutes);
   await app.register(userRoutes);

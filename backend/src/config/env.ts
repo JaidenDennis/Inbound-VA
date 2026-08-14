@@ -53,6 +53,25 @@ const envSchema = z.object({
   // global cap. This endpoint is secret-authenticated and gets its own limit.
   CLAY_RATE_LIMIT_MAX: z.coerce.number().default(600),
 
+  // Website intake form (POST /webhooks/site/lead).
+  //
+  // Deliberately has NO shared secret, unlike the Clay endpoint above. The
+  // marketing site is a Render Static Site with no server side, so any secret
+  // it held would be in browser JavaScript and therefore public — worse than
+  // no secret, because it would look like auth while being none.
+  //
+  // The endpoint is instead disabled unless a client is named, and defended by
+  // origin, rate limit, a honeypot and a minimum fill time.
+  SITE_LEAD_CLIENT_ID: z.string().uuid().optional(),
+  // Origins allowed to post the form. Comma-separated; unset means the
+  // endpoint refuses every browser request.
+  SITE_LEAD_ORIGINS: z.string().optional(),
+  // Per-IP. A human filling in one form does not need many; anything higher is
+  // a script. Far below CLAY_RATE_LIMIT_MAX because this path is public.
+  SITE_LEAD_RATE_LIMIT_MAX: z.coerce.number().default(5),
+  // A form returned faster than this was not typed by a person.
+  SITE_LEAD_MIN_FILL_MS: z.coerce.number().default(3000),
+
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
