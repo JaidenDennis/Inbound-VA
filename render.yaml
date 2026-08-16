@@ -63,6 +63,26 @@ services:
       - key: RUN_WORKERS_IN_API
         value: "true"
 
+      # ─── Website intake form (gravvia-site → /webhooks/site/lead) ───────
+      # The route refuses to run (503) unless SITE_LEAD_CLIENT_ID names a
+      # tenant, and refuses every request (403) unless the browser's Origin is
+      # on this list — that pair IS the authentication, since the form is
+      # public and a shared secret in static JavaScript would be readable by
+      # anyone. Neither value is a secret, so both live here rather than in
+      # the dashboard where nothing records what they are.
+      #
+      # The tenant is Gravvia's own sub-account (Gravvia Global Personal,
+      # GRYExs6FHhpz4KZ4lgUV), whose connection points at the Sales pipeline.
+      - key: SITE_LEAD_CLIENT_ID
+        value: 6c57b668-4b7e-4e4d-8746-126c421f9f40
+      # The browser sends the origin it is ON, so every hostname the site
+      # answers to needs its own entry: the apex, the www host that redirects
+      # to it, and the onrender host, which still serves the same site and is
+      # where testing happens. A missing entry is a silent 403, not an error
+      # anyone sees. (gravvia.com is a different, unowned domain — not this.)
+      - key: SITE_LEAD_ORIGINS
+        value: https://gravvia.agency,https://www.gravvia.agency,https://gravvia-site.onrender.com
+
   # ─── Admin dashboard (Next.js) ─────────────────────────────────────────────
   # NEXT_PUBLIC_API_URL is inlined into the client bundle AT BUILD TIME (see
   # dashboard/next.config.js), so it must be present during the build, not just
