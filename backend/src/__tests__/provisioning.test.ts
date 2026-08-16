@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mock the Retell SDK wrapper (no real network) ────────────────────────────
+// One call now covers the LLM write, the agent write and the publish: Retell
+// requires them in a fixed order, so retell.agent.ts owns the sequence rather
+// than exposing the steps for a caller to get wrong. See retell-agent-publish.
 const agent = {
-  createOrUpdateResponseEngine: vi.fn().mockResolvedValue('llm_new'),
-  createOrUpdateAgent: vi.fn().mockResolvedValue({ agentId: 'ag_new', version: 1 }),
+  provisionRetellAgent: vi
+    .fn()
+    .mockResolvedValue({ agentId: 'ag_new', llmId: 'llm_new', version: 1 }),
   setInboundAgent: vi.fn().mockResolvedValue(undefined),
   purchaseNumber: vi.fn().mockResolvedValue('+14159990000'),
 };
@@ -98,8 +102,7 @@ const { provisioningService } = await import('../services/provisioning.service.j
 describe('ProvisioningService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    agent.createOrUpdateResponseEngine.mockResolvedValue('llm_new');
-    agent.createOrUpdateAgent.mockResolvedValue({ agentId: 'ag_new', version: 1 });
+    agent.provisionRetellAgent.mockResolvedValue({ agentId: 'ag_new', llmId: 'llm_new', version: 1 });
     agent.purchaseNumber.mockResolvedValue('+14159990000');
     clientRow = { ...baseClient };
   });
@@ -137,16 +140,15 @@ describe('ProvisioningService', () => {
     expect(res.vertical).toBe('med_spa');
 
     // Response engine built from the template; tool URLs point at our functions.
-    const [spec, existingLlm] = agent.createOrUpdateResponseEngine.mock.calls[0];
-    expect(existingLlm).toBeNull();
-    expect(spec.general_tools.map((t: { name: string }) => t.name)).toContain('book_appointment');
-    expect(spec.general_tools[0].url).toContain('/functions/retell/');
-    expect(spec.general_prompt).toContain('Glow Med Spa');
+    const call = agent.provisionRetellAgent.mock.calls[0][0];
+    expect(call.existingLlmId).toBeNull();
+    expect(call.responseEngine.general_tools.map((t: { name: string }) => t.name)).toContain('book_appointment');
+    expect(call.responseEngine.general_tools[0].url).toContain('/functions/retell/');
+    expect(call.responseEngine.general_prompt).toContain('Glow Med Spa');
 
     // Agent points its webhook at the single dispatcher; create path (no existing id).
-    const agentArg = agent.createOrUpdateAgent.mock.calls[0][0];
-    expect(agentArg.existingAgentId).toBeNull();
-    expect(agentArg.webhookUrl).toContain('/webhooks/retell');
+    expect(call.existingAgentId).toBeNull();
+    expect(call.webhookUrl).toContain('/webhooks/retell');
 
     // Persisted to the client row.
     expect(clientUpdate).toHaveBeenCalledWith(
@@ -161,8 +163,8 @@ describe('ProvisioningService', () => {
 
     await provisioningService.provisionClient('c1');
 
-    expect(agent.createOrUpdateResponseEngine.mock.calls[0][1]).toBe('llm_existing');
-    expect(agent.createOrUpdateAgent.mock.calls[0][0].existingAgentId).toBe('ag_existing');
+    expect(agent.provisionRetellAgent.mock.calls[0][0].existingLlmId).toBe('llm_existing');
+    expect(agent.provisionRetellAgent.mock.calls[0][0].existingAgentId).toBe('ag_existing');
   });
 
   it('buys a number when buyAreaCode is provided', async () => {

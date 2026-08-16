@@ -6,8 +6,7 @@ import { knowledgeService } from './knowledge.service.js';
 import { writeAuditLog } from './audit.service.js';
 import { agentSyncService } from './agentSync.service.js';
 import {
-  createOrUpdateResponseEngine,
-  createOrUpdateAgent,
+  provisionRetellAgent,
   setInboundAgent,
   purchaseNumber,
 } from '../providers/retell/retell.agent.js';
@@ -132,18 +131,18 @@ export class ProvisioningService {
     const rendered = await this.renderClient(clientId, { template: opts.template });
     const { client, settings, vertical, responseEngine, agent, webhookUrl } = rendered;
 
-    // 1. Response Engine (Retell LLM) — update in place if one exists.
-    const llmId = await createOrUpdateResponseEngine(responseEngine, client.retell_llm_id);
-
-    // 2. Agent — update in place if one exists.
-    const { agentId, version } = await createOrUpdateAgent({
-      spec: agent,
-      llmId,
+    // 1. Push the configuration and PUBLISH it. Retell's draft/publish model
+    //    makes the ordering of the LLM and agent writes load-bearing, so the
+    //    whole sequence lives behind one call — see retell.agent.ts.
+    const { agentId, llmId, version } = await provisionRetellAgent({
+      responseEngine,
+      agentSpec: agent,
       webhookUrl,
       existingAgentId: client.retell_agent_id,
+      existingLlmId: client.retell_llm_id,
     });
 
-    // 3. Persist provisioning result on the client record.
+    // 2. Persist provisioning result on the client record.
     const { error: updateErr } = await supabase
       .from('clients')
       .update({
@@ -156,7 +155,7 @@ export class ProvisioningService {
       .eq('id', clientId);
     if (updateErr) throw new Error(`Failed to persist provisioning: ${updateErr.message}`);
 
-    // 4. Phone numbers — map existing, optionally buy a new one.
+    // 3. Phone numbers — map existing, optionally buy a new one.
     const mappedNumbers: string[] = [];
     const phoneNumbers = opts.phoneNumbers ?? client.phone_numbers ?? [];
     for (const number of phoneNumbers) {
