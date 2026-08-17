@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Onboarding showed operational work.
@@ -116,5 +121,39 @@ describe('create', () => {
     await actionItemService.create({ clientId: 'c1', title: 'Follow up', createdBy: 'u1' });
 
     expect(lastInsert).toMatchObject({ category: 'operations' });
+  });
+});
+
+/**
+ * The category is only worth having if the pages actually pass it.
+ *
+ * Migration 033 landed with the STAFF-facing page filtered and the
+ * client-facing one missed, so an owner still saw every operational item under
+ * "Waiting on you" on their Onboarding tab — the exact symptom 033 was written
+ * to remove, still present for the only person who reads that page daily.
+ *
+ * The dashboard has no test runner, so this asserts on the source. Coarse, but
+ * a filter that silently goes missing is what happened last time.
+ */
+describe('the Onboarding pages ask for onboarding items only', () => {
+  const pages = [
+    ['client timeline', 'onboarding/page.tsx'],
+    ['staff detail', 'onboarding/[clientId]/page.tsx'],
+  ] as const;
+
+  it.each(pages)('%s names a category on every /action-items read', (_label, file) => {
+    const source = readFileSync(
+      resolve(here, '../../../dashboard/src/app/dashboard', file),
+      'utf8'
+    );
+
+    // Every GET of the collection must scope itself. An unfiltered read is the
+    // bug: it returns operations items to a page that means onboarding.
+    const reads = [...source.matchAll(/\.get\(\s*'\/action-items'([^)]*)\)/g)];
+    expect(reads.length).toBeGreaterThan(0);
+
+    for (const [, args] of reads) {
+      expect(args).toMatch(/category:\s*'onboarding'/);
+    }
   });
 });

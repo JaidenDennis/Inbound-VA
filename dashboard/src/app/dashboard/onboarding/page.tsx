@@ -159,7 +159,14 @@ function ClientTimeline() {
       .get('/onboarding')
       .then((r) => setMilestones(r.data.data ?? []))
       .finally(() => setLoading(false));
-    api.get('/action-items').then((r) => setItems(r.data.data ?? [])).catch(() => setItems([]));
+    // Onboarding steps only. Without the filter this page lists the whole
+    // table, so operational work raised long after go-live reappears here as
+    // though the client were still being onboarded — and appears a second time
+    // in the Work Queue, where it belongs. See migration 033.
+    api
+      .get('/action-items', { params: { category: 'onboarding' } })
+      .then((r) => setItems(r.data.data ?? []))
+      .catch(() => setItems([]));
   }, []);
 
   useEffect(load, [load]);
