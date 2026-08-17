@@ -93,7 +93,11 @@ export async function businessProfileRoutes(app: FastifyInstance): Promise<void>
    * did not send address line 2", and the field would be impossible to empty.
    */
   app.put<{ Querystring: { clientId?: string } }>('/business-profile', {
-    preHandler: requirePermission('settings:write'),
+    // `account:write`, not `settings:write`. This is the tenant's own record,
+    // and `settings:write` is platform-only by construction (022), so gating it
+    // there meant the owner whose address this is could never save the form.
+    // Migration 037 split the two.
+    preHandler: requirePermission('account:write'),
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
       const clientId = scopeFor(user, request.query.clientId);

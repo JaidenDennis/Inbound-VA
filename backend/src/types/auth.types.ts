@@ -62,6 +62,11 @@ export const ALL_PERMISSIONS = [
   'exports:read',
   'configure:roles',
   'configure:alerts',
+  // Added by migration 037. A tenant editing its OWN account — contact name,
+  // address, billing notification email. Split out of `settings:write`, which
+  // means "configure the platform" and is barred from client roles; the two
+  // were conflated under one name, so an owner could not edit their own record.
+  'account:write',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
@@ -80,8 +85,13 @@ export type Permission = (typeof ALL_PERMISSIONS)[number];
  * `settings:write`, and `tickets:triage` are all platform territory, and a
  * tenant handing one to itself is exactly the failure being prevented.
  *
- * Keep in step with the `cpo_permission_is_client_safe` constraint;
- * `client-permission-overlay.test.ts` asserts the two match.
+ * `account:write` is present and `settings:write` is not, which looks like an
+ * inconsistency and is not: migration 037 split the tenant's own record out of
+ * platform configuration. Editing your own address is yours; retrying a
+ * platform job is not.
+ *
+ * Keep in step with the `cpo_permission_is_client_safe` constraint, as last
+ * declared by migration 037; `rbac-permissions.test.ts` asserts the two match.
  */
 export const CLIENT_SAFE_PERMISSIONS = [
   'clients:read',
@@ -90,6 +100,7 @@ export const CLIENT_SAFE_PERMISSIONS = [
   'bookings:write',
   'analytics:read',
   'settings:read',
+  'account:write',
   'tickets:read',
   'tickets:write',
   'transcripts:read',

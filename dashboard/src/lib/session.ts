@@ -51,7 +51,11 @@ export type Permission =
   | 'callbacks:write'
   | 'exports:read'
   | 'configure:roles'
-  | 'configure:alerts';
+  | 'configure:alerts'
+  // Added by migration 037: a tenant editing its OWN account details. Split out
+  // of settings:write, which is platform-only — so gating the business profile
+  // on it left owners staring at their own address with every input disabled.
+  | 'account:write';
 
 export interface Session {
   sub: string;

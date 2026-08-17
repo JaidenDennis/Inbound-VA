@@ -8,14 +8,28 @@ const migrationsDir = resolve(here, '../../../../supabase/migrations');
 
 export const MIGRATION_016 = resolve(migrationsDir, '016_rbac_role_families.sql');
 export const MIGRATION_022 = resolve(migrationsDir, '022_permission_overlay.sql');
+export const MIGRATION_037 = resolve(migrationsDir, '037_account_write_permission.sql');
 
 /**
  * Migrations that seed grants, in run order.
  *
- * 016 rebuilds the table wholesale (it had drifted); 022 layers additively on
- * top. Applying them in order here reproduces what the database actually holds.
+ * 016 rebuilds the table wholesale (it had drifted); 022 and 037 layer
+ * additively on top. Applying them in order here reproduces what the database
+ * actually holds.
+ *
+ * A migration that adds a grant MUST be added here, or the fixture describes a
+ * database that no longer exists and the tests pass against a fiction.
  */
-const GRANT_MIGRATIONS = [MIGRATION_016, MIGRATION_022];
+const GRANT_MIGRATIONS = [MIGRATION_016, MIGRATION_022, MIGRATION_037];
+
+/**
+ * The migration that most recently declared the overlay allowlist.
+ *
+ * 022 created the constraint; 037 re-declared it. Tests must read the LIVE
+ * declaration rather than the one that happened to come first — otherwise they
+ * keep asserting a boundary the database has since moved.
+ */
+export const OVERLAY_CONSTRAINT_MIGRATION = MIGRATION_037;
 
 /**
  * Role → permissions, parsed out of the migrations rather than duplicated here.

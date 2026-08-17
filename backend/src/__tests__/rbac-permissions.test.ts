@@ -8,7 +8,12 @@ import {
   CLIENT_SAFE_PERMISSIONS,
   roleScope,
 } from '../types/index.js';
-import { ROLE_GRANTS, MIGRATION_016, MIGRATION_022 } from './helpers/rbac.js';
+import {
+  ROLE_GRANTS,
+  MIGRATION_016,
+  MIGRATION_022,
+  OVERLAY_CONSTRAINT_MIGRATION,
+} from './helpers/rbac.js';
 
 const migration = readFileSync(MIGRATION_016, 'utf8');
 const migration022 = readFileSync(MIGRATION_022, 'utf8');
@@ -167,8 +172,12 @@ describe('migration 022 safety', () => {
   // The overlay's CHECK constraint and CLIENT_SAFE_PERMISSIONS are two halves of
   // one boundary. If they drift, the DB and the service disagree about what a
   // tenant may hold, and the looser of the two wins.
+  //
+  // Read from whichever migration declared the constraint LAST, not from 022
+  // which merely declared it first. Pinning this to 022 would have meant the
+  // test kept checking a boundary the database had already moved.
   it('the overlay allowlist matches CLIENT_SAFE_PERMISSIONS exactly', () => {
-    const constraint = migration022.match(
+    const constraint = readFileSync(OVERLAY_CONSTRAINT_MIGRATION, 'utf8').match(
       /CONSTRAINT cpo_permission_is_client_safe CHECK \(\s*permission IN \(([\s\S]*?)\)\s*\)/
     )?.[1];
     expect(constraint).toBeDefined();

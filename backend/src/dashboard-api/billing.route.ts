@@ -121,7 +121,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
 
   /** Where payment and invoice notices go. */
   app.put<{ Querystring: { clientId?: string } }>('/billing/notifications', {
-    preHandler: requirePermission('settings:write'),
+    // The tenant's own address book entry, not platform configuration — same
+    // split as the business profile. See migration 037.
+    preHandler: requirePermission('account:write'),
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
       const clientId = scopeFor(user, request.query.clientId);

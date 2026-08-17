@@ -35,6 +35,10 @@ const CONFIGURE_GRANTS = [
   'configure:alerts',
   'settings:write',
   'clients:write',
+  // Migration 037. A tenant changing its own legal name, address or billing
+  // contact is a configuration change like any other — the fact that it is
+  // self-service does not make it less worth an audit trail.
+  'account:write',
 ];
 
 const MUTATING_VERBS = ['post', 'patch', 'put', 'delete'];

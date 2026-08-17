@@ -102,7 +102,9 @@ export function Billing({ clientId }: { clientId: string | null }) {
   const [email, setEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
 
-  const writable = can('settings:write');
+  // Gates only the notification email — the one field on this tab a tenant
+  // owns. Same split as the business profile; see migration 037.
+  const writable = can('account:write');
 
   useEffect(() => {
     let cancelled = false;

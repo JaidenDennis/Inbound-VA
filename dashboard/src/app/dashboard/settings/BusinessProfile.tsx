@@ -62,7 +62,9 @@ export function BusinessProfile({ clientId }: { clientId: string | null }) {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  const writable = can('settings:write');
+  // `account:write`, not `settings:write` — the latter is platform-only, so
+  // gating on it disabled every input for the owner whose profile this is.
+  const writable = can('account:write');
 
   // State is set only after the request settles, never synchronously in the
   // effect body — a sync setState there triggers a cascading render. The
