@@ -94,3 +94,52 @@ describe('med-spa template refinements', () => {
     expect(prompt).not.toMatch(/Laser inquiry/i);
   });
 });
+
+/**
+ * The three client-tunable knobs must actually reach the agent.
+ *
+ * `voiceTuning()` exists so a client can change how eagerly the agent replies,
+ * how readily it yields the floor, and how much the voice varies — clamped to
+ * ranges that still produce a usable call. Every other template gets this by
+ * delegating to inboundRoutingTemplate, which calls it. This one built its
+ * AgentSpec from literals and never called it, so the values a client saved
+ * were written to the database, shown back to them in the dashboard, published,
+ * synced — and then discarded at render time.
+ *
+ * Found when Bare Beauty set interruption sensitivity to 0.3 (the floor: they
+ * wanted the agent to stop yielding so easily), published, and watched Retell
+ * keep reporting 0.95. The sync was working; the renderer was overwriting them.
+ */
+describe('med-spa template — client voice tuning', () => {
+  const tune = (agent_config: Record<string, unknown>) =>
+    medSpaTemplate.build(ctx({ agent_config } as never)).agent;
+
+  it('honours a client\u2019s interruption sensitivity', () => {
+    expect(tune({ interruption_sensitivity: 0.3 }).interruption_sensitivity).toBe(0.3);
+  });
+
+  it('honours responsiveness and voice temperature too', () => {
+    const agent = tune({ responsiveness: 0.4, voice_temperature: 1.2 });
+    expect(agent.responsiveness).toBe(0.4);
+    expect(agent.voice_temperature).toBe(1.2);
+  });
+
+  it('falls through to the template\u2019s own values when unset', () => {
+    // The guarantee that makes this safe to change: an agent nobody has tuned
+    // must render exactly as it did before.
+    const agent = tune({});
+    expect(agent.interruption_sensitivity).toBe(0.95);
+    expect(agent.responsiveness).toBe(0.85);
+    expect(agent.voice_temperature).toBe(0.6);
+  });
+
+  it('clamps a value that would make the call unusable', () => {
+    // 0 interruption sensitivity means the agent talks over everyone.
+    expect(tune({ interruption_sensitivity: 0 }).interruption_sensitivity).toBe(0.3);
+    expect(tune({ interruption_sensitivity: 5 }).interruption_sensitivity).toBe(1);
+  });
+
+  it('ignores a non-numeric value rather than rendering NaN', () => {
+    expect(tune({ interruption_sensitivity: 'very' }).interruption_sensitivity).toBe(0.95);
+  });
+});

@@ -5,6 +5,7 @@ import type {
   AgentSpec,
   RetellToolSpec,
 } from './template.types.js';
+import { voiceTuning } from './render.helpers.js';
 import type {
   ClientSettings,
   AgentConfig,
@@ -369,12 +370,6 @@ export const medSpaTemplate: AgentTemplate = {
       // Per-client TTS overrides (business/service/surname pronunciations).
       // Configured in client_settings.agent_config; omitted when unset.
       pronunciation_dictionary: ctx.settings.agent_config?.pronunciation_dictionary,
-      // Warm, unhurried pacing + don't drop the call right after the last sentence.
-      // High interruption_sensitivity = the caller can always barge in: the agent
-      // yields the floor the instant they speak (pairs with the "YIELD INSTANTLY"
-      // prompt rule). Responsiveness kept high so replies come back promptly.
-      responsiveness: 0.85,
-      interruption_sensitivity: 0.95,
       enable_backchannel: true,
       begin_message_delay_ms: 600,
       // Hang-up behavior: the agent ends the call itself with the end_call tool
@@ -386,8 +381,23 @@ export const medSpaTemplate: AgentTemplate = {
       end_call_after_silence_ms: 10000,
       reminder_trigger_ms: 5000,
       reminder_max_count: 1,
-      // Hold a steady, even tone across the call (default 1 ranges too far).
-      voice_temperature: 0.6,
+      // Warm, unhurried pacing + don't drop the call right after the last sentence.
+      // High interruption_sensitivity = the caller can always barge in: the agent
+      // yields the floor the instant they speak (pairs with the "YIELD INSTANTLY"
+      // prompt rule). Responsiveness kept high so replies come back promptly, and
+      // a steady voice_temperature holds an even tone (Retell's default 1 ranges
+      // too far).
+      //
+      // Spread LAST so a client's tuning wins over these defaults. Without this
+      // call the three knobs were literals here, and everything a client saved
+      // was rendered away — the value round-tripped through the dashboard and
+      // the sync, then never reached Retell. Every other template inherits this
+      // by delegating to inboundRoutingTemplate; this one builds its own spec.
+      ...voiceTuning(ctx, {
+        responsiveness: 0.85,
+        interruption_sensitivity: 0.95,
+        voice_temperature: 0.6,
+      }),
     };
     return { responseEngine, agent };
   },
