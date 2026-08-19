@@ -5,7 +5,7 @@ import type {
   AgentSpec,
   RetellToolSpec,
 } from './template.types.js';
-import { voiceTuning } from './render.helpers.js';
+import { voiceTuning, styleDirective, enabledTools } from './render.helpers.js';
 import type {
   ClientSettings,
   AgentConfig,
@@ -115,6 +115,7 @@ function buildSystemPrompt(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx);
   const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'friendly';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'warm and caring';
   const qualFields = settings.booking_rules?.lead_qualification_fields ?? [];
   const policies = settings.business_policies?.length
@@ -125,7 +126,7 @@ function buildSystemPrompt(ctx: TemplateContext): string {
     ? `\n\nADDITIONAL CLIENT INSTRUCTIONS:\n${settings.agent_prompt.trim()}`
     : '';
 
-  return `You are ${agentName}, the voice concierge for ${business}, a med spa. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the voice concierge for ${business}, a med spa. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — CUSTOMER EXPERIENCE FIRST ★
 Make the caller feel genuinely cared for, never "processed." Be warm, natural, and unhurried. Acknowledge what they say and how they feel before moving on ("Of course—", "I understand—"). Never sound scripted or robotic. Every suggestion should feel like genuine help, never a hard sell.
@@ -360,7 +361,10 @@ export const medSpaTemplate: AgentTemplate = {
       model: 'gpt-4.1',
       general_prompt: buildSystemPrompt(ctx),
       begin_message: buildBeginMessage(ctx),
-      general_tools: buildTools(ctx, ctx.settings),
+      // Toggled-off capabilities are dropped here, at the one place the
+      // finished list exists, so a template cannot add a governed tool and
+      // forget its switch.
+      general_tools: enabledTools(ctx.settings, buildTools(ctx, ctx.settings)),
     };
     const agent: AgentSpec = {
       // Internal label only (not spoken); the spoken name lives in the prompt.

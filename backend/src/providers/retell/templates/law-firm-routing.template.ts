@@ -1,8 +1,7 @@
 import type { AgentTemplate, TemplateContext } from './template.types.js';
 import type { AgentConfig } from '../../../types/index.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
-import {
-  bulletsOr,
+import { bulletsOr,
   extraInstructions,
   identity,
   renderFaqs,
@@ -14,6 +13,7 @@ import {
   sharedRoutingContract,
   sharedSpeechRules,
   sharedToolsSection,
+  styleDirective,
 } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,10 +53,11 @@ function buildLawPrompt(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx, 'our law firm');
   const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'calm and professional';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'composed, discreet, and reassuring';
   const consult = cfg.free_case_evaluation ? ' (the initial consultation is free)' : '';
 
-  return `You are ${agentName}, the intake coordinator for ${business}, a law firm. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the intake coordinator for ${business}, a law firm. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — CUSTOMER EXPERIENCE FIRST ★
 People calling a law firm are usually having one of the worst weeks of their life — after an accident, an arrest, a job loss, a divorce, a death in the family. Lead with calm and steadiness, not cheerfulness. Acknowledge the situation before asking anything ("I'm sorry you're dealing with this — let me get you to the right person."). Never sound chirpy, salesy, or scripted. Never rush them.

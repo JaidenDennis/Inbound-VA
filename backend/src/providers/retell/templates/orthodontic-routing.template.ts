@@ -1,8 +1,7 @@
 import type { AgentTemplate, TemplateContext } from './template.types.js';
 import type { AgentConfig, Service } from '../../../types/index.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
-import {
-  bulletsOr,
+import { bulletsOr,
   extraInstructions,
   hasService,
   identity,
@@ -15,6 +14,7 @@ import {
   sharedRoutingContract,
   sharedSpeechRules,
   sharedToolsSection,
+  styleDirective,
 } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,10 +60,11 @@ function buildOrthoPrompt(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx, 'our orthodontic practice');
   const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'friendly';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'warm and encouraging';
   const consult = cfg.free_consultation ? " (it's complimentary)" : '';
 
-  return `You are ${agentName}, the voice concierge for ${business}, an orthodontic practice. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the voice concierge for ${business}, an orthodontic practice. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — CUSTOMER EXPERIENCE FIRST ★
 Make the caller feel genuinely cared for, never "processed." Most callers are a parent asking about their child, or an adult who has quietly wanted straighter teeth for years — both deserve warmth and zero pressure. Be natural and unhurried. Acknowledge what they say and how they feel before moving on ("Of course—", "That's a great age to have it looked at—"). Every suggestion should feel like genuine help, never a sales push.

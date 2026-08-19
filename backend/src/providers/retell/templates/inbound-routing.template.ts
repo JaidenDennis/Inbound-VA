@@ -6,7 +6,7 @@ import type {
   RetellToolSpec,
 } from './template.types.js';
 import type { ClientSettings, FAQ, PricingItem, Service, WorkingHours } from '../../../types/index.js';
-import { applyGreeting, voiceTuning } from './render.helpers.js';
+import { applyGreeting, voiceTuning, styleDirective, enabledTools } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Inbound ROUTING agent template (vertical-neutral). Unlike the single-prompt
@@ -68,6 +68,7 @@ function buildSystemPrompt(ctx: TemplateContext): string {
   const { client, settings } = ctx;
   const { business, agentName } = identity(ctx);
   const tone = settings.agent_tone || 'friendly';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'warm and professional';
   const policies = settings.business_policies?.length
     ? settings.business_policies.map((p) => `- ${p}`).join('\n')
@@ -76,7 +77,7 @@ function buildSystemPrompt(ctx: TemplateContext): string {
     ? `\n\nADDITIONAL CLIENT INSTRUCTIONS:\n${settings.agent_prompt.trim()}`
     : '';
 
-  return `You are ${agentName}, the voice concierge for ${business}. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the voice concierge for ${business}. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — CUSTOMER EXPERIENCE FIRST ★
 Make the caller feel genuinely cared for, never "processed." Be warm, natural, and unhurried. Acknowledge what they say and how they feel before moving on ("Of course—", "I understand—"). Never sound scripted or robotic. Every suggestion should feel like genuine help, never a hard sell.
@@ -512,7 +513,10 @@ export const inboundRoutingTemplate: AgentTemplate = {
       model: 'gpt-4.1',
       general_prompt: buildSystemPrompt(ctx),
       begin_message: buildBeginMessage(ctx),
-      general_tools: buildTools(ctx, ctx.settings),
+      // Toggled-off capabilities are dropped here, at the one place the
+      // finished list exists, so a template cannot add a governed tool and
+      // forget its switch.
+      general_tools: enabledTools(ctx.settings, buildTools(ctx, ctx.settings)),
     };
     const agent: AgentSpec = {
       agent_name: `${business} — ${agentName} (Inbound Routing)`,

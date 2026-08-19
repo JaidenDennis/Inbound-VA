@@ -9,6 +9,11 @@ const IN_12_HOURS = new Date(Date.now() + 12 * 3_600_000).toISOString();
 
 const settingsObj: Record<string, unknown> = {
   booking_enabled: true,
+  // The waitlist is opt-in: unset reads as OFF, matching what the dashboard
+  // shows a client for an untouched toggle. This suite exercises the tool
+  // itself, so it opts in explicitly rather than relying on a default that
+  // deliberately means "not enabled".
+  agent_config: { waitlist_enabled: true },
   notification_emails: [],
   services: [{ name: 'Botox', duration_minutes: 30 }],
   booking_rules: {

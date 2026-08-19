@@ -1,8 +1,7 @@
 import type { AgentTemplate, TemplateContext } from './template.types.js';
 import type { AgentConfig, Service } from '../../../types/index.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
-import {
-  bulletsOr,
+import { bulletsOr,
   extraInstructions,
   hasService,
   identity,
@@ -15,6 +14,7 @@ import {
   sharedRoutingContract,
   sharedSpeechRules,
   sharedToolsSection,
+  styleDirective,
 } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,9 +65,10 @@ function buildDentalPrompt(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx, 'our dental office');
   const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'friendly';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'warm and reassuring';
 
-  return `You are ${agentName}, the voice concierge for ${business}, a dental practice. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the voice concierge for ${business}, a dental practice. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — CUSTOMER EXPERIENCE FIRST ★
 Make the caller feel genuinely cared for, never "processed." Many dental callers are anxious, in pain, or embarrassed about how long it's been since their last visit — meet all three with warmth and zero judgment. Be natural and unhurried. Acknowledge what they say and how they feel before moving on ("Of course—", "That sounds really uncomfortable—"). Never sound scripted, and never make someone feel bad for waiting to call.

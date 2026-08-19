@@ -1,8 +1,7 @@
 import type { AgentTemplate, TemplateContext } from './template.types.js';
 import type { AgentConfig } from '../../../types/index.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
-import {
-  bulletsOr,
+import { bulletsOr,
   extraInstructions,
   identity,
   renderFaqs,
@@ -14,6 +13,7 @@ import {
   sharedRoutingContract,
   sharedSpeechRules,
   sharedToolsSection,
+  styleDirective,
 } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,10 +60,11 @@ function buildRestaurantPrompt(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx, 'our restaurant');
   const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'friendly';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'warm, upbeat, and hospitable';
   const cap = maxParty(cfg);
 
-  return `You are ${agentName}, the voice host for ${business}, a restaurant. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the voice host for ${business}, a restaurant. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — HOSPITALITY FIRST ★
 You are the first impression of the room. Sound like a great host: warm, quick, and genuinely glad they called. People calling a restaurant are usually mid-plan and in a hurry — be efficient without being brusque, and never make them wait through a speech. Acknowledge the occasion when they mention one ("A birthday — how lovely, I'll make a note.").

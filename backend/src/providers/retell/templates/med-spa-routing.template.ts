@@ -1,4 +1,5 @@
 import type { AgentTemplate, TemplateContext } from './template.types.js';
+import { styleDirective } from './render.helpers.js';
 import type { AgentConfig, PricingItem, Service, WorkingHours } from '../../../types/index.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
 
@@ -91,6 +92,7 @@ function buildMergedPrompt(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx);
   const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'friendly';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'warm and caring';
   const policies = settings.business_policies?.length
     ? settings.business_policies.map((p) => `- ${p}`).join('\n')
@@ -100,7 +102,7 @@ function buildMergedPrompt(ctx: TemplateContext): string {
     ? `\n\nADDITIONAL CLIENT INSTRUCTIONS:\n${settings.agent_prompt.trim()}`
     : '';
 
-  return `You are ${agentName}, the voice concierge for ${business}, a med spa. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the voice concierge for ${business}, a med spa. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — CUSTOMER EXPERIENCE FIRST ★
 Make the caller feel genuinely cared for, never "processed." Be warm, natural, and unhurried. Acknowledge what they say and how they feel before moving on ("Of course—", "I understand—"). Never sound scripted or robotic. Every suggestion should feel like genuine help, never a hard sell.

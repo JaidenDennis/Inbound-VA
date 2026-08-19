@@ -178,6 +178,83 @@ export function extraInstructions(ctx: TemplateContext): string {
  * (0 interruption sensitivity means the agent talks over everyone), so a client
  * cannot configure their way into a broken call.
  */
+/**
+ * Capability toggles, mapped to the tool each one governs.
+ *
+ * The defaults MUST match the read-back defaults in my-agent.route.ts
+ * (`callback_enabled ?? true`, `waitlist_enabled ?? false`,
+ * `take_messages ?? true`). The dashboard shows those values for an unset
+ * toggle, so rendering anything else puts the agent and the screen back into
+ * the disagreement this exists to end: a client reading "Waitlist: off" while
+ * the agent offers to add them to one.
+ *
+ * `request_human_handoff` is deliberately absent. It is not the transfer —
+ * live SIP transfer is a Retell built-in driven by `transfer_number` — it is
+ * the notify-and-follow-up path that keeps a caller asking for a person from
+ * being dropped. Gating it on `transfer_enabled` would remove the fallback,
+ * not honour a preference.
+ */
+const TOOL_TOGGLES: Record<string, { key: string; whenUnset: boolean }> = {
+  schedule_callback: { key: 'callback_enabled', whenUnset: true },
+  waitlist_add: { key: 'waitlist_enabled', whenUnset: false },
+  leave_staff_message: { key: 'take_messages', whenUnset: true },
+};
+
+/**
+ * Drop the tools a client has switched off.
+ *
+ * Applied to the finished tool list rather than threaded through each builder,
+ * so a template cannot add a governed tool and forget to check its toggle.
+ */
+export function enabledTools<T extends { name: string }>(
+  settings: { agent_config?: Record<string, unknown> | null },
+  tools: T[]
+): T[] {
+  const cfg = settings.agent_config ?? {};
+  return tools.filter((tool) => {
+    const toggle = TOOL_TOGGLES[tool.name];
+    if (!toggle) return true;
+    const value = cfg[toggle.key];
+    return typeof value === 'boolean' ? value : toggle.whenUnset;
+  });
+}
+
+/**
+ * The four response styles the editor offers, as instructions rather than
+ * labels.
+ *
+ * "Response style: concise." tells a model almost nothing — it names a
+ * preference without saying what to do differently. Each entry here is a
+ * directive the model can actually follow, which is the difference between the
+ * dropdown changing the call and the dropdown changing a string in a prompt.
+ *
+ * Keep the keys in step with STYLE_OPTIONS in my-agent.route.ts; an unknown or
+ * unset value falls through to no directive at all, leaving the agent exactly
+ * as it renders today.
+ */
+export const STYLE_DIRECTIVES: Record<string, string> = {
+  concise:
+    'Keep answers to one or two short sentences. Lead with the answer itself and add detail only when asked.',
+  conversational:
+    'Speak naturally and back-and-forth. One idea per turn, and leave room for the caller to respond.',
+  detailed:
+    'Give the complete answer with the specifics that matter, still in spoken sentences a caller can follow.',
+  reassuring:
+    'Acknowledge the concern before answering, and keep the caller feeling looked after throughout.',
+};
+
+/**
+ * The persona sentence fragment for a client's chosen response style.
+ *
+ * Returns '' when unset or unrecognised, so a template can append it
+ * unconditionally without emitting a dangling label.
+ */
+export function styleDirective(settings: { agent_response_style?: string | null }): string {
+  const key = settings.agent_response_style ?? '';
+  const directive = STYLE_DIRECTIVES[key];
+  return directive ? ` Response style: ${directive}` : '';
+}
+
 export function voiceTuning(
   ctx: TemplateContext,
   defaults: { responsiveness: number; interruption_sensitivity: number; voice_temperature: number }

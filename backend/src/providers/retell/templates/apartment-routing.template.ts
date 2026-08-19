@@ -1,8 +1,7 @@
 import type { AgentTemplate, TemplateContext } from './template.types.js';
 import type { AgentConfig } from '../../../types/index.js';
 import { inboundRoutingTemplate } from './inbound-routing.template.js';
-import {
-  bulletsOr,
+import { bulletsOr,
   extraInstructions,
   identity,
   renderFaqs,
@@ -14,6 +13,7 @@ import {
   sharedRoutingContract,
   sharedSpeechRules,
   sharedToolsSection,
+  styleDirective,
 } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,9 +72,10 @@ function buildApartmentPrompt(ctx: TemplateContext): string {
   const { business, agentName } = identity(ctx, 'our apartment community');
   const cfg = settings.agent_config ?? {};
   const tone = settings.agent_tone || 'friendly';
+  const style = styleDirective(settings);
   const personality = settings.agent_personality || 'warm, clear, and helpful';
 
-  return `You are ${agentName}, the voice of the leasing office at ${business}, an apartment community. Personality: ${personality}. Tone: ${tone}.
+  return `You are ${agentName}, the voice of the leasing office at ${business}, an apartment community. Personality: ${personality}. Tone: ${tone}.${style}
 
 ★ GUIDING PRINCIPLE — TWO KINDS OF CALLER ★
 Some callers are looking for a home; some already live here. Find out which within the first turn or two — "Are you calling about renting with us, or are you a current resident?" — and handle them differently. A prospect needs availability, price, and a tour. A resident needs something fixed, paid, or answered. Never make either wait through a speech.

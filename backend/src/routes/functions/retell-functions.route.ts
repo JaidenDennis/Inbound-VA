@@ -444,6 +444,14 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
   app.post<{ Body: RetellFunctionBody }>('/functions/retell/waitlist_add', guarded('waitlist_add'), async (req, reply) => {
     const client = await resolveClient(req.body.call);
     if (!client) return reply.code(404).send({ added: false, message: 'Client not configured.' });
+    // Render-time gating removes this tool, but an agent that has not
+    // re-synced still carries it — so the capability is refused here too.
+    // Default matches the dashboard's read-back for an unset toggle.
+    {
+      const cfg = (await clientService.getSettings(client.id))?.agent_config ?? {};
+      const on = typeof cfg.waitlist_enabled === 'boolean' ? cfg.waitlist_enabled : false;
+      if (!on) return reply.send({ added: false, message: 'The waitlist is not available; offer to take a message instead.' });
+    }
     const args = z
       .object({
         caller_name: z.string().min(1),
@@ -483,6 +491,14 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
   app.post<{ Body: RetellFunctionBody }>('/functions/retell/schedule_callback', guarded('schedule_callback'), async (req, reply) => {
     const client = await resolveClient(req.body.call);
     if (!client) return reply.code(404).send({ scheduled: false, message: 'Client not configured.' });
+    // Render-time gating removes this tool, but an agent that has not
+    // re-synced still carries it — so the capability is refused here too.
+    // Default matches the dashboard's read-back for an unset toggle.
+    {
+      const cfg = (await clientService.getSettings(client.id))?.agent_config ?? {};
+      const on = typeof cfg.callback_enabled === 'boolean' ? cfg.callback_enabled : true;
+      if (!on) return reply.send({ scheduled: false, message: 'Callbacks are not available; offer to take a message instead.' });
+    }
     const args = z
       .object({
         caller_name: z.string().min(1),
@@ -547,6 +563,14 @@ export async function retellFunctionRoutes(app: FastifyInstance): Promise<void> 
   app.post<{ Body: RetellFunctionBody }>('/functions/retell/leave_staff_message', guarded('leave_staff_message'), async (req, reply) => {
     const client = await resolveClient(req.body.call);
     if (!client) return reply.code(404).send({ saved: false, message: 'Client not configured.' });
+    // Render-time gating removes this tool, but an agent that has not
+    // re-synced still carries it — so the capability is refused here too.
+    // Default matches the dashboard's read-back for an unset toggle.
+    {
+      const cfg = (await clientService.getSettings(client.id))?.agent_config ?? {};
+      const on = typeof cfg.take_messages === 'boolean' ? cfg.take_messages : true;
+      if (!on) return reply.send({ saved: false, message: 'Message taking is not available; offer a callback instead.' });
+    }
     const args = z.object({ caller_name: z.string().min(1), phone: z.string().min(3), message: z.string().min(1), urgency: z.string().optional() }).safeParse(req.body.args ?? {});
     if (!args.success) return reply.send({ saved: false, message: 'Need the caller name, phone, and message.' });
 
