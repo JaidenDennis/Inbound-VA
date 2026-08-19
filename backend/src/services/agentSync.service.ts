@@ -67,6 +67,26 @@ export class AgentSyncService {
 
     // Same jobId + delay = the burst collapses. BullMQ ignores an add for a
     // jobId that already exists, so edits 2..n within the window are free.
+    //
+    // That id outlives the run that used it: the queue retains completed jobs
+    // (removeOnComplete: { count: 200 }) and keeps failed ones forever
+    // (removeOnFail: false). So the dedup key that should last 60 seconds
+    // lasted until the retention window rotated it out — the first successful
+    // sync permanently blocked every later one for that client, and a failed
+    // one blocked even the retry that would have fixed it. Bare Beauty last
+    // reached Retell on 14 Aug and reported 'pending' for five days without a
+    // single error, because requestSync returned cleanly having queued nothing.
+    //
+    // Clearing the corpse first is what frees the id. A job still delayed,
+    // waiting or active is left alone — that one is the coalescing working.
+    const stale = await agentProvisioningQueue.getJob(jobId);
+    if (stale) {
+      const state = await stale.getState();
+      if (state === 'completed' || state === 'failed') {
+        await stale.remove().catch(() => undefined);
+      }
+    }
+
     await agentProvisioningQueue.add(
       'provision',
       { clientId, userId: opts.userId },

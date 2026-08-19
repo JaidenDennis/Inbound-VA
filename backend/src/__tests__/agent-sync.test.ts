@@ -196,3 +196,96 @@ describe('agent sync — state transitions', () => {
     expect((db.updates.at(-1)!.patch.agent_sync_error as string).length).toBe(1000);
   });
 });
+
+/**
+ * A finished job must not block the next one.
+ *
+ * The coalescing above leans on "BullMQ ignores an add for a jobId that already
+ * exists". That is true, and it is also true AFTER the job finishes: the queue
+ * keeps completed jobs (removeOnComplete: { count: 200 }) and keeps failed ones
+ * forever (removeOnFail: false), so the id survives the run that used it.
+ *
+ * The consequence in production: Bare Beauty synced once on 14 Aug, and every
+ * edit afterwards flipped the row to 'pending' and queued nothing. Five days
+ * later the dashboard still said "pending", Retell still served version 19, and
+ * nothing had errored — requestSync had returned cleanly each time. Clearview
+ * Orthodontics was in the same state since 11 Aug, and a client whose provision
+ * FAILED was worse off still: retained forever, it could never retry even once
+ * the invalid config was fixed.
+ *
+ * The double below models what the real queue does — an add against a live id
+ * is dropped — because the mock this file previously used returned null from
+ * getJob unconditionally, which is exactly the blindfold that let this ship.
+ */
+describe('agent sync — a finished job must not block the next one', () => {
+  /** Minimal BullMQ semantics: ids are unique, add against a live id is a no-op. */
+  function stubQueue(seed?: { id: string; state: string }) {
+    const jobs = new Map<string, { id: string; state: string; removed: boolean }>();
+    if (seed) jobs.set(seed.id, { ...seed, removed: false });
+
+    queue.getJob.mockImplementation(async (id: string) => {
+      const job = jobs.get(id);
+      if (!job) return null;
+      return {
+        id: job.id,
+        getState: async () => job.state,
+        remove: async () => {
+          job.removed = true;
+          jobs.delete(job.id);
+        },
+      };
+    });
+
+    queue.add.mockImplementation(async (_n: string, _d: unknown, opts?: { jobId?: string }) => {
+      assertValidBullMqJobId(opts?.jobId);
+      const id = opts?.jobId;
+      if (id && jobs.has(id)) return { id, dropped: true }; // what BullMQ really does
+      if (id) jobs.set(id, { id, state: 'delayed', removed: false });
+      return { id };
+    });
+
+    return jobs;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.updates.length = 0;
+  });
+
+  it.each(['completed', 'failed'])(
+    'clears a %s job for this client so the new edit is actually queued',
+    async (state) => {
+      const jobs = stubQueue({ id: 'agent-sync-client-a', state });
+
+      await agentSyncService.requestSync('client-a');
+
+      // The live job must be one this request scheduled, not the corpse of the
+      // last one. Without the fix the add is silently dropped and the client
+      // never syncs again.
+      const live = jobs.get('agent-sync-client-a');
+      expect(live).toBeDefined();
+      expect(live!.state).toBe('delayed');
+    }
+  );
+
+  it('still coalesces while a job is genuinely pending', async () => {
+    // The behaviour the fix must NOT break: a burst of edits inside the window
+    // is still one provision, so a delayed job is left exactly where it is.
+    stubQueue({ id: 'agent-sync-client-a', state: 'delayed' });
+
+    const before = await queue.getJob('agent-sync-client-a');
+    const removeSpy = vi.spyOn(before, 'remove');
+
+    for (let i = 0; i < 5; i += 1) await agentSyncService.requestSync('client-a');
+
+    expect(removeSpy).not.toHaveBeenCalled();
+  });
+
+  it('leaves another client\u2019s finished job alone', async () => {
+    const jobs = stubQueue({ id: 'agent-sync-client-b', state: 'completed' });
+
+    await agentSyncService.requestSync('client-a');
+
+    expect(jobs.has('agent-sync-client-b')).toBe(true);
+  });
+});
