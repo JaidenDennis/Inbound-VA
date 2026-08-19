@@ -271,7 +271,7 @@ export class BookingService {
   private async internalAvailability(req: AvailabilityRequest): Promise<TimeSlot[]> {
     const { data: settings } = await supabase
       .from('client_settings')
-      .select('booking_rules')
+      .select('booking_rules, services')
       .eq('client_id', req.clientId)
       .single();
 
@@ -294,7 +294,32 @@ export class BookingService {
     const dayEnd = toZonedTime(date, timezone);
     dayEnd.setHours(closeH, closeM, 0, 0);
 
-    const slotDuration = 30; // default 30-min slots
+    // Slot length follows the service being asked about. A fixed 30 offered a
+    // 30-minute hole for a 60-minute treatment, so the agent could book two
+    // clients into one room; the durations already live on `services`.
+    const requested = (req.serviceType ?? '').trim().toLowerCase();
+    const service = requested
+      ? ((settings as { services?: Array<{ name?: string; duration_minutes?: number }> }).services ?? []).find(
+          (svc) => (svc.name ?? '').trim().toLowerCase() === requested
+        )
+      : undefined;
+    const slotDuration = service?.duration_minutes ?? 30;
+
+    // Turnover time after each appointment. Enforced in the conflict query
+    // rather than by trimming afterwards, so a booking made through any path
+    // respects it.
+    const buffer = rules.buffer_minutes ?? 0;
+
+    // How soon, and how far ahead, this client accepts bookings. Both were
+    // editable and unread: a caller could book five minutes out, or a year.
+    const now = Date.now();
+    const earliest = rules.advance_booking_hours
+      ? now + rules.advance_booking_hours * 3_600_000
+      : now;
+    const latest = rules.max_advance_booking_days
+      ? now + rules.max_advance_booking_days * 86_400_000
+      : Number.POSITIVE_INFINITY;
+
     const slots: TimeSlot[] = [];
     let cursor = new Date(dayStart);
 
@@ -302,27 +327,42 @@ export class BookingService {
       const slotEnd = addMinutes(cursor, slotDuration);
       if (slotEnd > dayEnd) break;
 
-      const busy = await this.hasConflict(req.clientId, cursor, slotEnd);
-      slots.push({ start: new Date(cursor), end: slotEnd, available: !busy });
-      cursor = slotEnd;
+      const busy = await this.hasConflict(req.clientId, cursor, slotEnd, undefined, buffer);
+      const withinNotice = cursor.getTime() >= earliest;
+      const withinHorizon = cursor.getTime() <= latest;
+      // Kept in the list but marked unavailable, so the caller hears "not that
+      // one" rather than a day that looks closed.
+      slots.push({ start: new Date(cursor), end: slotEnd, available: !busy && withinNotice && withinHorizon });
+      // Step past the buffer too, so the offered grid already reflects turnover.
+      cursor = addMinutes(cursor, slotDuration + buffer);
     }
 
     return slots;
   }
 
+  /**
+   * `bufferMinutes` pads the overlap test on both sides.
+   *
+   * A trailing gap after every appointment means any two must sit at least
+   * `buffer` apart, and that is exactly a symmetric padding here — padding only
+   * the end would let a new booking butt up against the START of an existing
+   * one, which is the same collision seen from the other direction.
+   */
   private async hasConflict(
     clientId: string,
     start: Date,
     end: Date,
-    excludeId?: string
+    excludeId?: string,
+    bufferMinutes = 0
   ): Promise<boolean> {
+    const padded = { start: addMinutes(start, -bufferMinutes), end: addMinutes(end, bufferMinutes) };
     let query = supabase
       .from('appointments')
       .select('id')
       .eq('client_id', clientId)
       .not('status', 'in', '("cancelled","no_show")')
-      .lt('start_time', end.toISOString())
-      .gt('end_time', start.toISOString());
+      .lt('start_time', padded.end.toISOString())
+      .gt('end_time', padded.start.toISOString());
 
     if (excludeId) {
       query = query.neq('id', excludeId);
