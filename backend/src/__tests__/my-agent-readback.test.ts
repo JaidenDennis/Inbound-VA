@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeAgentReadback } from '../dashboard-api/my-agent.sanitize.js';
+import { sanitizeAgentReadback, transferValidationError } from '../dashboard-api/my-agent.sanitize.js';
 
 /**
  * The lockout this guards against.
@@ -93,5 +93,44 @@ describe('sanitizeAgentReadback', () => {
     expect(out.notification_emails).toEqual([]);
     expect(out.pronunciation_dictionary).toEqual([]);
     expect(out.voice_id).toBe('');
+  });
+});
+
+/**
+ * A transfer that could never connect must be refused at save time.
+ *
+ * The bug this closes is the one this whole file is about, in a new place: a
+ * value the dashboard accepts and the renderer silently discards. Enabling
+ * transfer without a dialable number produced no transfer tool, no error, and
+ * a toggle reading "on".
+ */
+describe('transferValidationError', () => {
+  it('passes when transfer is off, whatever the number says', () => {
+    expect(transferValidationError({ transfer_enabled: false, transfer_number: 'front desk' })).toBeNull();
+    expect(transferValidationError({})).toBeNull();
+  });
+
+  it('passes when transfer is on with a dialable number', () => {
+    expect(transferValidationError({ transfer_enabled: true, transfer_number: '+19045551234' })).toBeNull();
+  });
+
+  it('accepts a number stored with surrounding whitespace', () => {
+    expect(transferValidationError({ transfer_enabled: true, transfer_number: '  +19045551234 ' })).toBeNull();
+  });
+
+  it.each([undefined, '', 'front desk', '9045551234', '+1 904 555 1234', '+0123456'])(
+    'rejects transfer enabled with %s',
+    (number) => {
+      const result = transferValidationError({ transfer_enabled: true, transfer_number: number });
+      expect(result).not.toBeNull();
+      // The dashboard renders `details` per field; a bare message would tell
+      // the user a validation failed without saying which field to fix.
+      expect(result!.details.transfer_number).toHaveLength(1);
+    }
+  );
+
+  it('names the field so the editor can point at it', () => {
+    const result = transferValidationError({ transfer_enabled: true });
+    expect(Object.keys(result!.details)).toEqual(['transfer_number']);
   });
 });

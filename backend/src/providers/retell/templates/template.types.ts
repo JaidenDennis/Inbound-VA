@@ -49,12 +49,30 @@ export interface RetellToolSpec {
   parameters?: RetellToolParameters;
 }
 
+/**
+ * A live transfer destination.
+ *
+ * Present only when the client both enabled transfer AND supplied a number
+ * Retell can dial. Absent is the safe state: an agent that offers a transfer
+ * and then dials nothing is worse than one that never offers.
+ */
+export interface TransferSpec {
+  /** E.164, validated before it gets here. */
+  number: string;
+}
+
 /** What a template produces for the Retell LLM (Response Engine). */
 export interface ResponseEngineSpec {
   model?: string;
   general_prompt: string;
   begin_message: string;
   general_tools: RetellToolSpec[];
+  /**
+   * Retell's built-in transfer, when configured. Not a custom function tool —
+   * the provider layer translates this into the `transfer_call` tool type, the
+   * same way it appends `end_call`.
+   */
+  transfer?: TransferSpec;
 }
 
 /** What a template produces for the Retell Agent. Locale kept to a supported subset. */

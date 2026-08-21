@@ -5,7 +5,7 @@ import type {
   AgentSpec,
   RetellToolSpec,
 } from './template.types.js';
-import { voiceTuning, styleDirective, enabledTools } from './render.helpers.js';
+import { voiceTuning, styleDirective, enabledTools, transferSpec } from './render.helpers.js';
 import type {
   ClientSettings,
   AgentConfig,
@@ -365,6 +365,8 @@ export const medSpaTemplate: AgentTemplate = {
       // finished list exists, so a template cannot add a governed tool and
       // forget its switch.
       general_tools: enabledTools(ctx.settings, buildTools(ctx, ctx.settings)),
+      // Retell's built-in transfer, only when a dialable number is configured.
+      transfer: transferSpec(ctx.settings),
     };
     const agent: AgentSpec = {
       // Internal label only (not spoken); the spoken name lives in the prompt.

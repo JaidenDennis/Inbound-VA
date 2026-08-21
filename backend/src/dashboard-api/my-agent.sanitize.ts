@@ -1,3 +1,4 @@
+import { isDialable } from '../utils/index.js';
 /**
  * Read-side sanitiser for the agent editor.
  *
@@ -105,5 +106,35 @@ export function sanitizeAgentReadback(
         );
       }
     ),
+  };
+}
+
+/**
+ * Reject a transfer that could never connect.
+ *
+ * Without this the save succeeds, the toggle reads "on", and the renderer
+ * quietly emits no transfer tool — a switch that does nothing and says
+ * nothing, which is the exact failure this area kept producing.
+ *
+ * Checked against the MERGED config rather than the patch: turning the toggle
+ * on without resending the number is a legitimate edit, and the number already
+ * stored is the one that counts. Checking the patch alone would reject it.
+ *
+ * This can only reject a save that is already broken, and both escapes — fix
+ * the number, or switch transfer off — are fields on the same form, so it
+ * cannot produce the un-editable record described at the top of this file.
+ */
+export function transferValidationError(
+  merged: Record<string, unknown>
+): { error: string; details: Record<string, string[]> } | null {
+  if (merged.transfer_enabled !== true) return null;
+  if (isDialable(merged.transfer_number)) return null;
+  return {
+    error: 'Validation failed',
+    details: {
+      transfer_number: [
+        'Add a phone number in international format (e.g. +19045551234) to transfer callers to a person.',
+      ],
+    },
   };
 }

@@ -195,3 +195,46 @@ describe('setInboundAgent', () => {
     });
   });
 });
+
+/**
+ * The transfer tool has to reach the payload, not just the spec.
+ *
+ * `transfer_enabled` and `transfer_number` were editable in the dashboard and
+ * never sent to Retell at all — RetellToolSpec modelled only custom function
+ * tools, so a transfer could not be expressed. The template now emits a
+ * `transfer` spec; this is the half that turns it into Retell's built-in
+ * `transfer_call` tool, and a mistake here is invisible from the template side.
+ */
+describe('provisionRetellAgent — live transfer', () => {
+  // These provision a NEW agent, which create() leaves at v0; the suite default
+  // describes v4 and would fail the publish read-back for unrelated reasons.
+  beforeEach(() => withVersions({ version: 0, is_published: true }));
+
+  const toolsSent = () => {
+    const payload = (llmCreate.mock.calls[0]?.[0] ?? llmUpdate.mock.calls[0]?.[1]) as {
+      general_tools?: Array<Record<string, unknown>>;
+    };
+    return payload.general_tools ?? [];
+  };
+
+  it('sends a cold transfer_call tool with the configured destination', async () => {
+    await provision({ responseEngine: { ...responseEngine, transfer: { number: '+19045551234' } } as never });
+
+    const transfer = toolsSent().find((t) => t.type === 'transfer_call');
+    expect(transfer).toBeDefined();
+    expect(transfer!.transfer_destination).toEqual({ type: 'predefined', number: '+19045551234' });
+    expect(transfer!.transfer_option).toEqual({ type: 'cold_transfer' });
+    // The caller must be told before the line goes quiet mid-handover.
+    expect(transfer!.speak_during_execution).toBe(true);
+  });
+
+  it('sends no transfer tool when the spec carries no destination', async () => {
+    await provision();
+    expect(toolsSent().some((t) => t.type === 'transfer_call')).toBe(false);
+  });
+
+  it('still sends end_call either way, so the two built-ins do not displace each other', async () => {
+    await provision({ responseEngine: { ...responseEngine, transfer: { number: '+19045551234' } } as never });
+    expect(toolsSent().some((t) => t.type === 'end_call')).toBe(true);
+  });
+});

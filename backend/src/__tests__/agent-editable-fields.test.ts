@@ -141,3 +141,62 @@ describe('capability toggles remove the tool on every vertical', () => {
     expect(off).toEqual(on);
   });
 });
+
+/**
+ * Live transfer: the toggle and the number must actually reach Retell.
+ *
+ * `transfer_enabled` and `transfer_number` were editable and went nowhere —
+ * not misconfigured, unimplemented. RetellToolSpec modelled only custom
+ * function tools, so there was no way to express a transfer at all, and the
+ * dashboard offered a switch and a phone field that changed nothing.
+ *
+ * A transfer needs BOTH a yes and a destination. Enabling it without a valid
+ * number must render no tool: an agent that promises a transfer and then dials
+ * nothing is worse than one that never offers.
+ *
+ * request_human_handoff stays regardless — it is the notify-and-follow-up path,
+ * not the transfer, and it is what catches the caller when transfer is off.
+ */
+describe('live transfer reaches Retell', () => {
+  const spec = (overrides: Record<string, unknown>) =>
+    getTemplate('med_spa_routing')!.build(ctx({ agent_config: overrides } as never)).responseEngine;
+
+  it('is absent when the toggle is off', () => {
+    expect(spec({ transfer_enabled: false, transfer_number: '+19045551234' }).transfer).toBeUndefined();
+  });
+
+  it('is absent when unset, matching the dashboard default', () => {
+    expect(spec({}).transfer).toBeUndefined();
+  });
+
+  it('is absent when enabled with no number', () => {
+    expect(spec({ transfer_enabled: true }).transfer).toBeUndefined();
+  });
+
+  it.each(['5551234', '+1 904 555 1234', 'front desk', '+0123', ''])(
+    'is absent when enabled with an unusable number (%s)',
+    (number) => {
+      expect(spec({ transfer_enabled: true, transfer_number: number }).transfer).toBeUndefined();
+    }
+  );
+
+  it('carries the destination when enabled with a valid E.164 number', () => {
+    expect(spec({ transfer_enabled: true, transfer_number: '+19045551234' }).transfer).toEqual({
+      number: '+19045551234',
+    });
+  });
+
+  it.each(VERTICALS)('%s supports transfer, not just one vertical', (vertical) => {
+    const engine = getTemplate(vertical)!.build(
+      ctx({ agent_config: { transfer_enabled: true, transfer_number: '+19045551234' } } as never)
+    ).responseEngine;
+    expect(engine.transfer).toEqual({ number: '+19045551234' });
+  });
+
+  it.each(VERTICALS)('%s keeps the handoff fallback when transfer is configured', (vertical) => {
+    const names = getTemplate(vertical)!
+      .build(ctx({ agent_config: { transfer_enabled: true, transfer_number: '+19045551234' } } as never))
+      .responseEngine.general_tools.map((t) => t.name);
+    expect(names).toContain('request_human_handoff');
+  });
+});

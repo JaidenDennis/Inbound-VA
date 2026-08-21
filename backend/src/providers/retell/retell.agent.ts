@@ -14,9 +14,27 @@ type RetellCustomTool = {
 // Retell's built-in end-call tool: lets the LLM hang up the line itself once the
 // goodbye is done, so calls don't sit in dead air waiting on the silence timer.
 type RetellEndCallTool = { type: 'end_call'; name: string; description?: string };
-type RetellGeneralTool = RetellCustomTool | RetellEndCallTool;
 
-function buildGeneralTools(tools: ResponseEngineSpec['general_tools']): RetellGeneralTool[] {
+// Retell's built-in live transfer. A cold transfer: the agent hands the caller
+// over and drops, which is what "put me through to the front desk" means. Warm
+// transfer would keep the agent on to brief whoever answers — a different
+// product decision, and one nobody has asked for.
+type RetellTransferTool = {
+  type: 'transfer_call';
+  name: string;
+  description: string;
+  transfer_destination: { type: 'predefined'; number: string };
+  transfer_option: { type: 'cold_transfer' };
+  speak_during_execution: boolean;
+  execution_message_description: string;
+};
+
+type RetellGeneralTool = RetellCustomTool | RetellEndCallTool | RetellTransferTool;
+
+function buildGeneralTools(
+  tools: ResponseEngineSpec['general_tools'],
+  transfer?: ResponseEngineSpec['transfer']
+): RetellGeneralTool[] {
   const custom: RetellGeneralTool[] = tools.map((t) => ({
     type: 'custom',
     name: t.name,
@@ -31,6 +49,24 @@ function buildGeneralTools(tools: ResponseEngineSpec['general_tools']): RetellGe
     description:
       'End the phone call. Call this ONLY after you have given the caller a warm goodbye and confirmed they need nothing else, so the line hangs up instead of sitting silent.',
   });
+
+  // Only when a dialable destination exists. The template already refuses to
+  // emit one otherwise, so reaching here means the client opted in AND gave a
+  // number Retell can call.
+  if (transfer) {
+    custom.push({
+      type: 'transfer_call',
+      name: 'transfer_to_human',
+      description:
+        'Transfer the caller to a member of staff on the live line. Use this when the caller asks to speak to a person, or when their request genuinely needs one. Tell them you are putting them through BEFORE calling this. If the transfer does not connect, fall back to request_human_handoff so the team is alerted and the caller is not left with nothing.',
+      transfer_destination: { type: 'predefined', number: transfer.number },
+      transfer_option: { type: 'cold_transfer' },
+      speak_during_execution: true,
+      execution_message_description:
+        'Tell the caller you are putting them through to someone now, in one short sentence.',
+    });
+  }
+
   return custom;
 }
 
@@ -129,7 +165,7 @@ export async function createOrUpdateResponseEngine(
   const common = {
     general_prompt: spec.general_prompt,
     begin_message: spec.begin_message,
-    general_tools: buildGeneralTools(spec.general_tools),
+    general_tools: buildGeneralTools(spec.general_tools, spec.transfer),
   };
   if (existingLlmId) {
     // On UPDATE, deliberately omit `model`. The LLM may have been switched to a

@@ -12,7 +12,7 @@ import {
   PromptBoundaryError,
 } from '../services/index.js';
 import { toSettingsPatch } from '../services/agentDraft.service.js';
-import { sanitizeAgentReadback } from './my-agent.sanitize.js';
+import { sanitizeAgentReadback, transferValidationError } from './my-agent.sanitize.js';
 import type { JwtPayload } from '../types/index.js';
 
 /**
@@ -220,6 +220,21 @@ export async function myAgentRoutes(app: FastifyInstance): Promise<void> {
       if (!existing) return reply.code(404).send({ error: 'Settings not found' });
 
       const patch = toSettingsPatch(body as Record<string, unknown>);
+
+      // A transfer needs a destination Retell can dial. Without this the save
+      // succeeds, the toggle reads "on", and the renderer quietly emits no
+      // transfer tool — the client is left with a switch that does nothing and
+      // says nothing, which is the failure this whole area kept producing.
+      //
+      // Checked against the MERGED config, not the patch: turning the toggle on
+      // without resending the number is a legitimate edit, and the number
+      // already stored is the one that counts.
+      const mergedConfig = {
+        ...((existing.agent_config ?? {}) as Record<string, unknown>),
+        ...((patch.agent_config ?? {}) as Record<string, unknown>),
+      };
+      const transferError = transferValidationError(mergedConfig);
+      if (transferError) return reply.code(400).send(transferError);
 
       try {
         // Belt and braces. `updateSchema` has no prompt fields, so this cannot

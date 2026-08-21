@@ -6,7 +6,7 @@ import type {
   RetellToolSpec,
 } from './template.types.js';
 import type { ClientSettings, FAQ, PricingItem, Service, WorkingHours } from '../../../types/index.js';
-import { applyGreeting, voiceTuning, styleDirective, enabledTools } from './render.helpers.js';
+import { applyGreeting, voiceTuning, styleDirective, enabledTools, transferSpec } from './render.helpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Inbound ROUTING agent template (vertical-neutral). Unlike the single-prompt
@@ -517,6 +517,8 @@ export const inboundRoutingTemplate: AgentTemplate = {
       // finished list exists, so a template cannot add a governed tool and
       // forget its switch.
       general_tools: enabledTools(ctx.settings, buildTools(ctx, ctx.settings)),
+      // Retell's built-in transfer, only when a dialable number is configured.
+      transfer: transferSpec(ctx.settings),
     };
     const agent: AgentSpec = {
       agent_name: `${business} — ${agentName} (Inbound Routing)`,

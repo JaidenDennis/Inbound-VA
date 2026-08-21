@@ -1,4 +1,5 @@
 import type { TemplateContext } from './template.types.js';
+import { isDialable } from '../../../utils/index.js';
 import type { FAQ, PricingItem, Service, WorkingHours } from '../../../types/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,6 +179,26 @@ export function extraInstructions(ctx: TemplateContext): string {
  * (0 interruption sensitivity means the agent talks over everyone), so a client
  * cannot configure their way into a broken call.
  */
+
+/**
+ * The live transfer destination for a client, or undefined.
+ *
+ * Requires BOTH an explicit opt-in and a dialable number. `transfer_enabled`
+ * defaults to false in the dashboard's read-back, so unset means no transfer
+ * and the agent falls back to request_human_handoff — which is exactly what
+ * that tool is for.
+ */
+export function transferSpec(settings: {
+  agent_config?: Record<string, unknown> | null;
+}): { number: string } | undefined {
+  const cfg = settings.agent_config ?? {};
+  if (cfg.transfer_enabled !== true) return undefined;
+  const number = typeof cfg.transfer_number === 'string' ? cfg.transfer_number.trim() : '';
+  // Strict on purpose: a number Retell cannot dial produces a transfer that
+  // fails mid-call, the one outcome worse than never offering to transfer.
+  return isDialable(number) ? { number } : undefined;
+}
+
 /**
  * Capability toggles, mapped to the tool each one governs.
  *
